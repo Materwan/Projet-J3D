@@ -2,9 +2,9 @@ import pygame
 
 screen = pygame.display.set_mode((700, 700))
 
-animation = ["Projet-J3D/runAnimation/run animation frame 1.png",
-             "Projet-J3D/runAnimation/run animation frame 2.png",
-             "Projet-J3D/runAnimation/run animation frame 3.png"]
+animation = ["runAnimation/run animation frame 1.png",
+             "runAnimation/run animation frame 2.png",
+             "runAnimation/run animation frame 3.png"]
 
 animation = list(map(lambda x: pygame.transform.scale(pygame.image.load(x).convert_alpha(), (100, 100)), animation))
 
