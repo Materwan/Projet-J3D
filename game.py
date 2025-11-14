@@ -3,11 +3,21 @@ from player import Player
 
 screen = pygame.display.set_mode((700, 700))
 
-animation = ["runAnimation/run animation frame 1.png",
-             "runAnimation/run animation frame 2.png",
-             "runAnimation/run animation frame 3.png"]
+animation = [
+    "runAnimation/run animation frame 1.png",
+    "runAnimation/run animation frame 2.png",
+    "runAnimation/run animation frame 3.png",
+]
 
-animation = list(map(lambda x: pygame.transform.scale(pygame.image.load(x).convert_alpha(), (100, 100)), animation))
+animation = list(
+    map(
+        lambda x: pygame.transform.scale(
+            pygame.image.load(x).convert_alpha(), (100, 100)
+        ),
+        animation,
+    )
+)
+
 
 class Game:
 
@@ -35,8 +45,8 @@ class Game:
     def display(self):
         self.screen.fill((0, 0, 0))
         self.player.display()
-        #self.screen.blit(animation[self.i], self.position)
-        pygame.display.update( )
+        # self.screen.blit(animation[self.i], self.position)
+        pygame.display.update()
 
     def run(self):
 
@@ -46,4 +56,4 @@ class Game:
             self.update()
             self.display()
 
-            self.clock.tick(60) # à ne pas toucher
+            self.clock.tick(60)  # à ne pas toucher
