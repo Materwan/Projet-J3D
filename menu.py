@@ -1,38 +1,49 @@
-import pygame
+import pygame as p
 
-pygame.init()
+p.init()
 
-WINDOWS = pygame.display.get_desktop_sizes()[0]   #dimention de l'écran
+WINDOWS = p.display.get_desktop_sizes()[0]   #fullscreen
 
-screen = pygame.display.set_mode(WINDOWS)
-clock = pygame.time.Clock()
+screen = p.display.set_mode(WINDOWS)
+clock = p.time.Clock()
 running = True
 
-bouton = pygame.Rect(WINDOWS[0]-200,0,200,200)
-surface = pygame.Surface((200,200))
-color = pygame.Color(0,255,0)
+class Bouton:
+
+    def __init__(self, left, top, width, height, color):
+        self.left = left
+        self.top = top
+        self.width = width
+        self.height = height
+        self.color = p.Color(color)
+        self.rec = p.Rect(left, top, width, height)
+        self.surface = p.Surface((width, height))
+
+
+    def draw(self):                     #display the button
+        self.surface.fill(self.color)
+        screen.blit(self.surface, (self.left, self.top))
+
+bouton = Bouton(WINDOWS[0]-200,0,200,200,(0, 0, 255))
 
 while running:
     
     screen.fill((0, 0, 0)) #background
 
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
+    for event in p.event.get():
+        if event.type == p.QUIT:
             running = False
 
-        if event.type == pygame.MOUSEBUTTONDOWN: #si bouton est cliqué alors on ferme le menu
-            x,y = pygame.mouse.get_pos()
-            if bouton.collidepoint(x,y):
+        if event.type == p.MOUSEBUTTONDOWN: #si bouton est cliqué alors on ferme le menu
+            x,y = p.mouse.get_pos()
+            if bouton.rec.collidepoint(x,y):
                 running = False
 
+    bouton.draw()
 
-    surface.fill((0, 0, 255))                #affichage du bouton
-    pygame.draw.rect(surface,color,bouton)
-    screen.blit(surface, (WINDOWS[0]-200, 0))
-
-    pygame.display.update()
+    p.display.update()
 
 
     clock.tick(60)
 
-pygame.quit()
+p.quit()
