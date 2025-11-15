@@ -1,8 +1,8 @@
 import pygame
-from game import Game
+from menu import Menu
 
 pygame.init()
 
-Game().run()
+Menu().run()
 
 pygame.quit()

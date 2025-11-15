@@ -1,4 +1,5 @@
 import pygame as p
+from game import Game
 
 p.init()
 
@@ -43,6 +44,7 @@ class Menu:
         self.clock = p.time.Clock()
         self.running = True
         self.bouton = Bouton(WINDOWS[0]-200,0,200,200,(0, 0, 255),Text('Comic Sans MS',30,'Quitter',(255,0,0)))
+        self.start = Bouton(WINDOWS[0]//2 -100,WINDOWS[1]//2 -100,200,200,(0, 0, 255),Text('Comic Sans MS',30,'Start',(255,0,0)))
 
     def event(self):
         events = p.event.get()
@@ -51,8 +53,11 @@ class Menu:
                 self.running = False
 
             if event.type == p.MOUSEBUTTONDOWN: #si bouton est cliqué alors on ferme le menu
-                if self.bouton.rec.collidepoint(p.mouse.get_pos()):
+                coord = p.mouse.get_pos()
+                if self.bouton.rec.collidepoint(coord):
                     self.running = False
+                if self.start.rec.collidepoint(coord):
+                    Game().run()
     
     def update(self):
         p.display.update()
@@ -60,6 +65,7 @@ class Menu:
     def display(self):
         self.screen.fill((0, 0, 0)) #background
         self.bouton.draw()
+        self.start.draw()
 
     def run(self):
         while self.running:
@@ -68,7 +74,3 @@ class Menu:
             self.display()
 
             self.clock.tick(60)
-
-
-Menu().run()
-p.quit()
