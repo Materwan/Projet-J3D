@@ -4,7 +4,6 @@ from game import Game
 p.init()
 
 p.font.init()
-my_font = p.font.SysFont('Comic Sans MS', 30)
 
 WINDOWS = p.display.get_desktop_sizes()[0]   #fullscreen
 
@@ -13,29 +12,31 @@ screen = p.display.set_mode(WINDOWS)
 
 class Text:
 
-    def __init__(self,name,size,text,t_color,antialias=False):
-        self.text = p.font.SysFont(name,size).render(text,antialias,t_color)
+    def __init__(self, name, size, text, t_color, antialias=False):
+        self.font = p.font.SysFont(name, size)
+        self.text = self.font.render(text, antialias, t_color)
+        self.l = self.text.get_size()
     
-    def draw_text(self,coordonninate):
-        screen.blit(self.text,coordonninate)
+    def draw_text(self, coordonninate):
+        screen.blit(self.text, coordonninate)
 
 class Bouton:
 
-    def __init__(self,left,top,width,height,color,text=Text('',0,'',(0,0,0))):
+    def __init__(self, left, top, width, height, color, text=Text('', 0, '', (0, 0, 0))):
         self.left = left
         self.top = top
         self.width = width
         self.height = height
         self.color = p.Color(color)
         self.rec = p.Rect(left, top, width, height)
-        self.surface = p.Surface((width, height))
+        self.rec2 = p.Rect(left+15, top+15, width-30, height-30)
         self.text = text
 
 
     def draw(self):                     #affiche le bouton
-        self.surface.fill(self.color)
-        screen.blit(self.surface, (self.left, self.top))
-        self.text.draw_text((self.left+(self.width//4),self.top+(self.height//3)+10))
+        p.draw.rect(screen, self.color, self.rec)
+        p.draw.rect(screen, (0, 0, 0), self.rec2)
+        self.text.draw_text(((self.width-self.text.l[0])//2+self.left,(self.height -self.text.l[1])//2+self.top))
 
 class Menu:
 
@@ -43,8 +44,9 @@ class Menu:
         self.screen = screen
         self.clock = p.time.Clock()
         self.running = True
-        self.bouton = Bouton(WINDOWS[0]-200,0,200,200,(0, 0, 255),Text('Comic Sans MS',30,'Quitter',(255,0,0)))
-        self.start = Bouton(WINDOWS[0]//2 -100,WINDOWS[1]//2 -100,200,200,(0, 0, 255),Text('Comic Sans MS',30,'Start',(255,0,0)))
+        self.start = Bouton(WINDOWS[0]//2 -100, WINDOWS[1]//2-150, 200, 100, (61, 239, 73), Text('Impact', 30, 'Start', (255, 0, 0)))
+        self.settings = Bouton(WINDOWS[0]//2 -100, WINDOWS[1]//2-25, 200, 100, (61, 239, 73), Text('Impact', 30, 'Settings', (255, 0, 0)))
+        self.quitter = Bouton(WINDOWS[0]//2-100, WINDOWS[1]//2 +100, 200, 100, (61, 239, 73), Text('Impact', 30, 'Quitter', (255, 0, 0)))
 
     def event(self):
         events = p.event.get()
@@ -54,7 +56,7 @@ class Menu:
 
             if event.type == p.MOUSEBUTTONDOWN: #si bouton est cliqué alors on ferme le menu
                 coord = p.mouse.get_pos()
-                if self.bouton.rec.collidepoint(coord):
+                if self.quitter.rec.collidepoint(coord):
                     self.running = False
                 if self.start.rec.collidepoint(coord):
                     Game().run()
@@ -64,8 +66,9 @@ class Menu:
 
     def display(self):
         self.screen.fill((0, 0, 0)) #background
-        self.bouton.draw()
         self.start.draw()
+        self.settings.draw()
+        self.quitter.draw()
 
     def run(self):
         while self.running:
