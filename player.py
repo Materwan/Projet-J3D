@@ -1,11 +1,7 @@
 import pygame
 
-screen = pygame.display.set_mode((0, 0))
-
-
 class Animation:
-
-    def __init__(self, screen: pygame.surface.Surface):
+    def __init__(self, screen):
         self.path = "runAnimation/"
         self.images = {}
         flip = False
@@ -33,8 +29,8 @@ class Animation:
                 )
             flip = True
 
-    def update(self, direction):
 
+    def update(self, direction):
         if self.last_direction != direction:
             self.frame = 0
             self.last_direction = direction
@@ -42,76 +38,47 @@ class Animation:
         if self.frame >= 60:
             self.frame = 0
 
-    def display(self, pos):
 
+    def display(self, pos):
         self.screen.blit(self.images[self.last_direction][self.frame // 6 % 3], pos)
 
 
 class Player:
-
-    def __init__(self, screen: pygame.surface.Surface):
-
+    def __init__(self, screen, x, y, moteur):
+        self.moteur = moteur
         self.screen = screen
-        self.position = [0, 0]
-        self.speed = [0, 0]
         self.velocity = [0, 0]
+        self.speed = 2
         self.direction = "right"
-        self.pressed = False
-
+        self.dico = {(1, 0): "right", (-1, 0): "left", (0, 1): "down", (0, -1): "up"}
         self.Animation = Animation(self.screen)
+        self.hitbox = pygame.Rect(x, y, 70, 15)
 
-    def event(self, events: pygame.event.Event):
 
-        for event in events:
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_RIGHT:
-                    self.direction = "right"
-                    self.pressed = True
-                    self.velocity[0] += 2
-                if event.key == pygame.K_LEFT:
-                    self.direction = "left"
-                    self.pressed = True
-                    self.velocity[0] += -2
-                if event.key == pygame.K_DOWN:
-                    self.direction = "down"
-                    self.pressed = True
-                    self.velocity[1] += 2
-                if event.key == pygame.K_UP:
-                    self.direction = "up"
-                    self.pressed = True
-                    self.velocity[1] += -2
+    def event(self, keys):
+        # gestion de la vélocité en regardant les touches pressées
+        self.velocity[0] = int(keys[pygame.K_RIGHT]) - int(keys[pygame.K_LEFT]) # vaut soit 0, 1 ou -1 pour la vélocité en x
+        self.velocity[1] = int(keys[pygame.K_DOWN]) - int(keys[pygame.K_UP]) # vaut soit 0, 1 ou -1 pour la vélocité en y
 
-            if event.type == pygame.KEYUP:
-                if event.key == pygame.K_RIGHT:
-                    self.pressed = False
-                    self.velocity[0] -= 2
-                if event.key == pygame.K_LEFT:
-                    self.pressed = False
-                    self.velocity[0] -= -2
-                if event.key == pygame.K_DOWN:
-                    self.pressed = False
-                    self.velocity[1] -= 2
-                if event.key == pygame.K_UP:
-                    self.pressed = False
-                    self.velocity[1] -= -2
 
     def update(self):
+        # gestion collision
+        self.velocity = self.moteur.collision(self.velocity, self.hitbox)
 
-        if self.pressed:
-            self.speed[0] += self.velocity[0]
-            self.speed[1] += self.velocity[1]
+        # gestion de la position de la hitbox / modifie la position de la hitbox en décalant de x, y
+        self.hitbox.move_ip(self.velocity[0] * self.speed, self.velocity[1] * self.speed)
 
-        self.position[0] += self.speed[0]
-        self.position[1] += self.speed[1]
+        # gestion de la direction via self.dico
+        if (self.velocity[0], self.velocity[1]) in self.dico: 
+            self.direction = self.dico[(self.velocity[0], self.velocity[1])]
 
-        self.speed = [0, 0]
-
-        if self.pressed:
+        # gestion des frames selon si touche appuyer ou non
+        if (self.velocity[0], self.velocity[1]) != (0, 0):
             self.Animation.frame += 1
         else:
             self.Animation.frame = 0
-        self.Animation.update(self.direction)
+        self.Animation.update(self.direction)   
+
 
     def display(self):
-
-        self.Animation.display(self.position)
+        self.Animation.display((self.hitbox.x - 15, self.hitbox.y - 63))
