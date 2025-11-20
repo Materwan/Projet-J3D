@@ -2,23 +2,6 @@ import pygame
 from player import Player
 from moteur import Moteur
 
-""" thibaut : inutile ?
-animation = [
-    "runAnimation/run animation frame 1.png",
-    "runAnimation/run animation frame 2.png",
-    "runAnimation/run animation frame 3.png",
-]
-
-animation = list(
-    map(
-        lambda x: pygame.transform.scale(
-            pygame.image.load(x).convert_alpha(), (100, 100)
-        ),
-        animation,
-    )
-)
-"""
-
 class Game:
     def __init__(self):
         self.running = True

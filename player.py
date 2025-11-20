@@ -52,7 +52,7 @@ class Player:
         self.direction = "right"
         self.dico = {(1, 0): "right", (-1, 0): "left", (0, 1): "down", (0, -1): "up"}
         self.Animation = Animation(self.screen)
-        self.hitbox = pygame.Rect(x, y, 70, 15)
+        self.hitbox = pygame.Rect(x, y, 32, 15)
 
 
     def event(self, keys):
@@ -81,4 +81,5 @@ class Player:
 
 
     def display(self):
-        self.Animation.display((self.hitbox.x - 15, self.hitbox.y - 63))
+        self.Animation.display((self.hitbox.x - 34, self.hitbox.y - 70))
+        # pygame.draw.rect(self.screen, "red", self.hitbox) / pour voir la hitbox (pas touche)
