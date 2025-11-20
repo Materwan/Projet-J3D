@@ -47,6 +47,10 @@ class Menu:
         self.start = Bouton(WINDOWS[0]//2 -100, WINDOWS[1]//2-150, 200, 100, (61, 239, 73), Text('Impact', 30, 'Start', (255, 0, 0)))
         self.settings = Bouton(WINDOWS[0]//2 -100, WINDOWS[1]//2-25, 200, 100, (61, 239, 73), Text('Impact', 30, 'Settings', (255, 0, 0)))
         self.quitter = Bouton(WINDOWS[0]//2-100, WINDOWS[1]//2 +100, 200, 100, (61, 239, 73), Text('Impact', 30, 'Quitter', (255, 0, 0)))
+        self.pagemenu = True
+        self.settingstext = Text('Impact', 50, 'Page pour changer les touches', (255, 0, 0))
+        self.retour = Bouton(0, 0, 200, 100, (61, 239, 73), Text('Impact', 30, '<--', (255, 0, 0)))
+        
 
     def event(self):
         events = p.event.get()
@@ -54,21 +58,37 @@ class Menu:
             if event.type == p.QUIT:
                 self.running = False
 
-            if event.type == p.MOUSEBUTTONDOWN: #si bouton est cliqué alors on ferme le menu
-                coord = p.mouse.get_pos()
-                if self.quitter.rec.collidepoint(coord):
-                    self.running = False
-                if self.start.rec.collidepoint(coord):
-                    Game().run()
+            if self.pagemenu:
+                if event.type == p.MOUSEBUTTONDOWN: #si bouton est cliqué alors on ferme le menu
+                    coord = p.mouse.get_pos()
+                    if self.quitter.rec.collidepoint(coord):
+                        self.running = False
+                    elif self.start.rec.collidepoint(coord):
+                        Game().run()
+                    elif self.settings.rec.collidepoint(coord):
+                        self.pagemenu = False
+            else:
+                if event.type == p.KEYDOWN:
+                    if event.key == p.K_ESCAPE:
+                        self.pagemenu = True
+                if event.type == p.MOUSEBUTTONDOWN:
+                    coord = p.mouse.get_pos()
+                    if self.retour.rec.collidepoint(coord):
+                        self.pagemenu = True
+
     
     def update(self):
-        p.display.update()
+        p.display.flip()
 
     def display(self):
-        self.screen.fill((0, 0, 0)) #background
-        self.start.draw()
-        self.settings.draw()
-        self.quitter.draw()
+        self.screen.fill((0, 0, 0))#background
+        if self.pagemenu:
+            self.start.draw()
+            self.settings.draw()
+            self.quitter.draw()
+        else:
+            self.settingstext.draw_text(((WINDOWS[0]-self.settingstext.l[0])//2,(WINDOWS[1]-self.settingstext.l[1])//2))
+            self.retour.draw()
 
     def run(self):
         while self.running:
