@@ -1,13 +1,11 @@
 import pygame as p
 from game import Game
 
-p.init()
-
 p.font.init()
 
-WINDOWS = p.display.get_desktop_sizes()[0]  # fullscreen
+screen = p.display.set_mode((0, 0))
 
-screen = p.display.set_mode(WINDOWS)
+WINDOWS = p.display.get_window_size()
 
 
 class Text:
