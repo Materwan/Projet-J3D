@@ -4,8 +4,9 @@ from moteur import Moteur
 
 
 class Game:
-    def __init__(self, screen):
+    def __init__(self, screen, keybinds):
         self.running = True
+        self.keybinds = keybinds
         self.screen = screen
         self.moteur = Moteur(self.screen)
         largeur, hauteur = self.screen.get_size()
@@ -29,7 +30,8 @@ class Game:
 
         return run_menu, self.running
 
-    def update(self):
+    def update(self, keybinds):
+        self.keybinds = keybinds
         self.player.update()
 
     def display(self):

@@ -13,7 +13,8 @@ class Loop:
         self.running = True
         self.screen = screen
         self.menu = Menu(screen)
-        self.game = Game(screen)
+        self.keybinds = self.menu.keybinds
+        self.game = Game(screen, self.keybinds)
         self.run_menu = True
         self.run_game = False
         self.clock = pygame.time.Clock()
@@ -38,11 +39,11 @@ class Loop:
 
         if self.run_menu:
 
-            self.menu.update()
+            self.keybinds = self.menu.update()
 
         elif self.run_game:
 
-            self.game.update()
+            self.game.update(self.keybinds)
 
     def display(self):
 
