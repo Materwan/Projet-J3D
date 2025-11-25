@@ -4,7 +4,7 @@ from moteur import Moteur
 
 
 class Game:
-    def __init__(self):
+    def __init__(self, screen):
         self.running = True
         self.screen = pygame.display.set_mode((0, 0))
         self.moteur = Moteur(self.screen)

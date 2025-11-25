@@ -61,6 +61,6 @@ class Loop:
             self.clock.tick(60)
 
 
-Loop().run()
+Loop(screen).run()
 
 pygame.quit()
