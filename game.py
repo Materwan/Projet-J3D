@@ -6,7 +6,7 @@ from moteur import Moteur
 class Game:
     def __init__(self, screen):
         self.running = True
-        self.screen = pygame.display.set_mode((0, 0))
+        self.screen = screen
         self.moteur = Moteur(self.screen)
         largeur, hauteur = self.screen.get_size()
         self.player = Player(
@@ -14,7 +14,7 @@ class Game:
         )
         self.clock = pygame.time.Clock()
 
-    def event(self, events: pygame.event.Event) -> bool:
+    def event(self, events: list[pygame.event.Event]) -> bool:
         run_menu = False
         for event in events:
             if event.type == pygame.QUIT:

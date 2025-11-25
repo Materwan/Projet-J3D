@@ -20,15 +20,15 @@ class Loop:
 
     def event(self):
 
-        for event in pygame.event.get():
+        events = pygame.event.get()
 
-            if self.run_menu:
+        if self.run_menu:
 
-                self.run_game = self.menu.event(event)
+            self.run_game = self.menu.event(events)
 
-            elif self.run_game:
+        elif self.run_game:
 
-                self.run_menu = self.game.event(event)
+            self.run_menu = self.game.event(events)
 
     def update(self):
 
