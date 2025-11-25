@@ -147,7 +147,7 @@ class Menu:
                 return False
         return True
 
-    def event(self, events: p.event.Event) -> bool:
+    def event(self, events: list[p.event.Event]) -> bool:
         rungame = False
         for event in events:
             if self.pagemenu:  # menu page
@@ -179,7 +179,7 @@ class Menu:
                         self.key["right"] = True
             return rungame
 
-    def __update__(self):
+    def update(self):
         p.display.flip()
 
     def display(self):
