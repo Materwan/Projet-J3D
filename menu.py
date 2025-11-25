@@ -1,30 +1,27 @@
 import pygame as p
-from game import Game
 
 p.font.init()
-
-screen = p.display.set_mode((0, 0))
-
-WINDOWS = p.display.get_window_size()
 
 
 class Text:
 
-    def __init__(self, name, size, text, t_color, antialias=False):
+    def __init__(self, screen, name, size, text, t_color, antialias=False):
+        self.screen = screen
         self.font = p.font.SysFont(name, size)
         self.text = self.font.render(text, antialias, t_color)
         self.l = self.text.get_size()
 
     def draw_text(self, coordonninate):
         """draw a text"""
-        screen.blit(self.text, coordonninate)
+        self.screen.blit(self.text, coordonninate)
 
 
 class Bouton:
 
     def __init__(
-        self, left, top, width, height, color, text=Text("", 0, "", (0, 0, 0))
+        self, screen, left, top, width, height, color, text=Text("", 0, "", (0, 0, 0))
     ):
+        self.screen = screen
         self.left = left
         self.top = top
         self.width = width
@@ -36,8 +33,8 @@ class Bouton:
 
     def draw(self):
         """draw the button with text"""
-        p.draw.rect(screen, self.color, self.rec)
-        p.draw.rect(screen, (0, 0, 0), self.rec2)
+        p.draw.rect(self.screen, self.color, self.rec)
+        p.draw.rect(self.screen, (0, 0, 0), self.rec2)
         self.text.draw_text(
             (
                 (self.width - self.text.l[0]) // 2 + self.left,
@@ -48,40 +45,47 @@ class Bouton:
 
 class Menu:
 
-    def __init__(self):
+    def __init__(self, screen):
+        self.WINDOWS = screen.get_size()
         self.screen = screen
         self.clock = p.time.Clock()
         self.running = True
         self.start = Bouton(
-            WINDOWS[0] // 2 - 100,
-            WINDOWS[1] // 2 - 150,
+            self.screen,
+            self.WINDOWS[0] // 2 - 100,
+            self.WINDOWS[1] // 2 - 150,
             200,
             100,
             (61, 239, 73),
-            Text("Impact", 30, "Start", (255, 0, 0)),
+            Text(self.screen, "Impact", 30, "Start", (255, 0, 0)),
         )
         self.settings = Bouton(
-            WINDOWS[0] // 2 - 100,
-            WINDOWS[1] // 2 - 25,
+            self.screen,
+            self.WINDOWS[0] // 2 - 100,
+            self.WINDOWS[1] // 2 - 25,
             200,
             100,
             (61, 239, 73),
-            Text("Impact", 30, "Settings", (255, 0, 0)),
+            Text(self.screen, "Impact", 30, "Settings", (255, 0, 0)),
         )
         self.quitter = Bouton(
-            WINDOWS[0] // 2 - 100,
-            WINDOWS[1] // 2 + 100,
+            self.screen,
+            self.WINDOWS[0] // 2 - 100,
+            self.WINDOWS[1] // 2 + 100,
             200,
             100,
             (61, 239, 73),
-            Text("Impact", 30, "Quitter", (255, 0, 0)),
+            Text(self.screen, "Impact", 30, "Quitter", (255, 0, 0)),
         )
         self.pagemenu = True
-        self.settingstext = Text(
-            "Impact", 50, "Page pour changer les touches", (255, 0, 0)
-        )
         self.retour = Bouton(
-            0, 0, 200, 100, (61, 239, 73), Text("Impact", 30, "<--", (255, 0, 0))
+            self.screen,
+            0,
+            0,
+            200,
+            100,
+            (61, 239, 73),
+            Text(self.screen, "Impact", 30, "<--", (255, 0, 0)),
         )
         self.keybinds = {
             "up": p.K_UP,
@@ -90,36 +94,40 @@ class Menu:
             "right": p.K_RIGHT,
         }
         self.changeup = Bouton(
-            WINDOWS[0] // 2 - 100,
-            WINDOWS[1] // 2 - 275,
+            self.screen,
+            self.WINDOWS[0] // 2 - 100,
+            self.WINDOWS[1] // 2 - 275,
             200,
             100,
             (61, 239, 73),
-            Text("Impact", 30, "UP", (255, 0, 0)),
+            Text(self.screen, "Impact", 30, "UP", (255, 0, 0)),
         )
         self.changedown = Bouton(
-            WINDOWS[0] // 2 - 100,
-            WINDOWS[1] // 2 - 150,
+            self.screen,
+            self.WINDOWS[0] // 2 - 100,
+            self.WINDOWS[1] // 2 - 150,
             200,
             100,
             (61, 239, 73),
-            Text("Impact", 30, "DOWN", (255, 0, 0)),
+            Text(self.screen, "Impact", 30, "DOWN", (255, 0, 0)),
         )
         self.changeleft = Bouton(
-            WINDOWS[0] // 2 - 100,
-            WINDOWS[1] // 2 - 25,
+            self.screen,
+            self.WINDOWS[0] // 2 - 100,
+            self.WINDOWS[1] // 2 - 25,
             200,
             100,
             (61, 239, 73),
-            Text("Impact", 30, "LEFT", (255, 0, 0)),
+            Text(self.screen, "Impact", 30, "LEFT", (255, 0, 0)),
         )
         self.changeright = Bouton(
-            WINDOWS[0] // 2 - 100,
-            WINDOWS[1] // 2 + 100,
+            self.screen,
+            self.WINDOWS[0] // 2 - 100,
+            self.WINDOWS[1] // 2 + 100,
             200,
             100,
             (61, 239, 73),
-            Text("Impact", 30, "RIGHT", (255, 0, 0)),
+            Text(self.screen, "Impact", 30, "RIGHT", (255, 0, 0)),
         )
         self.key = {"up": False, "down": False, "left": False, "right": False}
 
@@ -138,8 +146,8 @@ class Menu:
                 return False
         return True
 
-    def event(self):
-        events = p.event.get()
+    def event(self, events: p.event.Event) -> bool:
+        rungame = False
         for event in events:
             if self.pagemenu:  # menu page
                 if event.type == p.MOUSEBUTTONDOWN:
@@ -147,7 +155,7 @@ class Menu:
                     if self.quitter.rec.collidepoint(coord):
                         self.running = False
                     elif self.start.rec.collidepoint(coord):
-                        Game().run()
+                        rungame = True
                     elif self.settings.rec.collidepoint(coord):
                         self.pagemenu = False
             else:  # settings page
@@ -168,8 +176,9 @@ class Menu:
                         self.key["left"] = True
                     elif self.changeright.rec.collidepoint(coord):
                         self.key["right"] = True
+            return rungame
 
-    def update(self):
+    def __update__(self):
         p.display.flip()
 
     def display(self):
@@ -185,7 +194,7 @@ class Menu:
             self.changeleft.draw()
             self.changeright.draw()
 
-    def run(self):
+    def __run__(self):
         while self.running:
             self.event()
             self.update()
