@@ -24,11 +24,15 @@ class Loop:
 
         if self.run_menu:
 
-            self.run_game = self.menu.event(events)
+            self.run_game, self.running = self.menu.event(events)
+            if self.run_game:
+                self.run_menu = False
 
         elif self.run_game:
 
-            self.run_menu = self.game.event(events)
+            self.run_menu, self.running = self.game.event(events)
+            if self.run_menu:
+                self.run_game = False
 
     def update(self):
 

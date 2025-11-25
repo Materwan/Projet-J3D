@@ -22,12 +22,12 @@ class Game:
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    self.running = False
+                    run_menu = True
 
         keys = pygame.key.get_pressed()
         self.player.event(keys)
 
-        return run_menu
+        return run_menu, self.running
 
     def update(self):
         self.player.update()
