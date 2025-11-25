@@ -5,7 +5,7 @@ p.font.init()
 
 class Text:
 
-    def __init__(self, screen, name, size, text, t_color, antialias=False):
+    def __init__(self, name, size, text, t_color, screen=None, antialias=False):
         self.screen = screen
         self.font = p.font.SysFont(name, size)
         self.text = self.font.render(text, antialias, t_color)
@@ -30,6 +30,7 @@ class Bouton:
         self.rec = p.Rect(left, top, width, height)
         self.rec2 = p.Rect(left + 15, top + 15, width - 30, height - 30)
         self.text = text
+        self.text.screen = screen
 
     def draw(self):
         """draw the button with text"""
@@ -57,7 +58,7 @@ class Menu:
             200,
             100,
             (61, 239, 73),
-            Text(self.screen, "Impact", 30, "Start", (255, 0, 0)),
+            Text("Impact", 30, "Start", (255, 0, 0)),
         )
         self.settings = Bouton(
             self.screen,
@@ -66,7 +67,7 @@ class Menu:
             200,
             100,
             (61, 239, 73),
-            Text(self.screen, "Impact", 30, "Settings", (255, 0, 0)),
+            Text("Impact", 30, "Settings", (255, 0, 0)),
         )
         self.quitter = Bouton(
             self.screen,
@@ -75,7 +76,7 @@ class Menu:
             200,
             100,
             (61, 239, 73),
-            Text(self.screen, "Impact", 30, "Quitter", (255, 0, 0)),
+            Text("Impact", 30, "Quitter", (255, 0, 0)),
         )
         self.pagemenu = True
         self.retour = Bouton(
@@ -85,7 +86,7 @@ class Menu:
             200,
             100,
             (61, 239, 73),
-            Text(self.screen, "Impact", 30, "<--", (255, 0, 0)),
+            Text("Impact", 30, "<--", (255, 0, 0)),
         )
         self.keybinds = {
             "up": p.K_UP,
@@ -100,7 +101,7 @@ class Menu:
             200,
             100,
             (61, 239, 73),
-            Text(self.screen, "Impact", 30, "UP", (255, 0, 0)),
+            Text("Impact", 30, "UP", (255, 0, 0)),
         )
         self.changedown = Bouton(
             self.screen,
@@ -109,7 +110,7 @@ class Menu:
             200,
             100,
             (61, 239, 73),
-            Text(self.screen, "Impact", 30, "DOWN", (255, 0, 0)),
+            Text("Impact", 30, "DOWN", (255, 0, 0)),
         )
         self.changeleft = Bouton(
             self.screen,
@@ -118,7 +119,7 @@ class Menu:
             200,
             100,
             (61, 239, 73),
-            Text(self.screen, "Impact", 30, "LEFT", (255, 0, 0)),
+            Text("Impact", 30, "LEFT", (255, 0, 0)),
         )
         self.changeright = Bouton(
             self.screen,
@@ -127,7 +128,7 @@ class Menu:
             200,
             100,
             (61, 239, 73),
-            Text(self.screen, "Impact", 30, "RIGHT", (255, 0, 0)),
+            Text("Impact", 30, "RIGHT", (255, 0, 0)),
         )
         self.key = {"up": False, "down": False, "left": False, "right": False}
 
