@@ -70,14 +70,17 @@ class Player:
 
     def event(self, keys):
         # gestion de la vélocité en regardant les touches pressées
-        self.velocity[0] = int(keys[pygame.K_RIGHT]) - int(
-            keys[pygame.K_LEFT]
+        self.velocity[0] = int(keys[self.keybinds["right"]]) - int(
+            keys[self.keybinds["left"]]
         )  # vaut soit 0, 1 ou -1 pour la vélocité en x
-        self.velocity[1] = int(keys[pygame.K_DOWN]) - int(
-            keys[pygame.K_UP]
+        self.velocity[1] = int(keys[self.keybinds["down"]]) - int(
+            keys[self.keybinds["up"]]
         )  # vaut soit 0, 1 ou -1 pour la vélocité en y
 
-    def update(self):
+    def update(self, keybinds):
+        # reception des touches
+        self.keybinds = keybinds
+
         # gestion collision
         self.velocity = self.moteur.collision(self.velocity, self.hitbox)
 

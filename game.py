@@ -32,7 +32,7 @@ class Game:
 
     def update(self, keybinds):
         self.keybinds = keybinds
-        self.player.update()
+        self.player.update(keybinds)
 
     def display(self):
         self.screen.fill((100, 100, 100))
