@@ -147,7 +147,7 @@ class Menu:
                 return False
         return True
 
-    def event(self, events: list[p.event.Event]) -> bool:
+    def event(self, events: list[p.event.Event]) -> tuple[bool, bool]:
         rungame = False
         for event in events:
             if self.pagemenu:  # menu page
@@ -177,7 +177,7 @@ class Menu:
                         self.key["left"] = True
                     elif self.changeright.rec.collidepoint(coord):
                         self.key["right"] = True
-            return rungame
+        return rungame, self.running
 
     def update(self):
         p.display.flip()
