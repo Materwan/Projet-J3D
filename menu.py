@@ -179,8 +179,9 @@ class Menu:
                         self.key["right"] = True
         return rungame, self.running
 
-    def update(self):
+    def update(self) -> dict[str, int]:
         p.display.flip()
+        return self.keybinds
 
     def display(self):
         self.screen.fill((0, 0, 0))  # background
