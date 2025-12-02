@@ -1,6 +1,10 @@
 import pygame as p
 
 p.font.init()
+p.mixer.init()
+
+p.mixer.music.load("placeholder.mp3")
+p.mixer.music.play(-1)
 
 
 class Text:

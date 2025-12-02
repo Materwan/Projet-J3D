@@ -3,6 +3,7 @@ from menu import Menu
 from game import Game
 
 pygame.init()
+pygame.mixer.init()
 
 screen = pygame.display.set_mode((0, 0))
 
@@ -28,12 +29,14 @@ class Loop:
             self.run_game, self.running = self.menu.event(events)
             if self.run_game:
                 self.run_menu = False
+                pygame.mixer.music.stop()
 
         elif self.run_game:
 
             self.run_menu, self.running = self.game.event(events)
             if self.run_menu:
                 self.run_game = False
+                pygame.mixer.music.play(-1)
 
     def update(self):
 
