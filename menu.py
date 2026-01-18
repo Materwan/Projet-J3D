@@ -105,7 +105,7 @@ class Menu:
             200,
             100,
             (61, 239, 73),
-            Text("Impact", 30, "UP", (255, 0, 0)),
+            Text("Impact", 30, "UP: up", (255, 0, 0)),
         )
         self.changedown = Bouton(
             self.screen,
@@ -114,7 +114,7 @@ class Menu:
             200,
             100,
             (61, 239, 73),
-            Text("Impact", 30, "DOWN", (255, 0, 0)),
+            Text("Impact", 30, "DOWN: down", (255, 0, 0)),
         )
         self.changeleft = Bouton(
             self.screen,
@@ -123,7 +123,7 @@ class Menu:
             200,
             100,
             (61, 239, 73),
-            Text("Impact", 30, "LEFT", (255, 0, 0)),
+            Text("Impact", 30, "LEFT: left", (255, 0, 0)),
         )
         self.changeright = Bouton(
             self.screen,
@@ -132,7 +132,7 @@ class Menu:
             200,
             100,
             (61, 239, 73),
-            Text("Impact", 30, "RIGHT", (255, 0, 0)),
+            Text("Impact", 30, "RIGHT: right", (255, 0, 0)),
         )
         self.key = {"up": False, "down": False, "left": False, "right": False}
 
@@ -142,6 +142,7 @@ class Menu:
             if self.key[elt]:
                 if event.key != p.K_ESCAPE:
                     self.keybinds[elt] = event.key
+
                 self.key[elt] = False
 
     def checkchangekey(self):
@@ -150,6 +151,17 @@ class Menu:
             if self.key[elt]:
                 return False
         return True
+
+    def interchange(self, bouton, direction, caractere, bool):
+        """change the texte of the bouton that you want to change the keybind"""
+        bouton.text.text = bouton.text.font.render(caractere, False, (255, 0, 0))
+        bouton.text.l = bouton.text.text.get_size()
+        self.key[direction] = bool
+
+    def pagedisplay(self, eltpages):
+        """draw the page"""
+        for elt in eltpages:
+            elt.draw()
 
     def event(self, events: list[p.event.Event]) -> tuple[bool, bool]:
         rungame = False
@@ -165,22 +177,46 @@ class Menu:
                         self.pagemenu = False
             else:  # settings page
                 if event.type == p.KEYDOWN:
-                    self.changekey(event)  # try to change the keybind
-                    if event.key == p.K_ESCAPE:
+                    if event.key == p.K_ESCAPE and self.checkchangekey():
                         self.pagemenu = True
+                    self.changekey(event)  # try to change the keybind
+                    self.interchange(
+                        self.changeup,
+                        "up",
+                        "UP: " + p.key.name(self.keybinds["up"]),
+                        False,
+                    )
+                    self.interchange(
+                        self.changedown,
+                        "down",
+                        "DOWN: " + p.key.name(self.keybinds["down"]),
+                        False,
+                    )
+                    self.interchange(
+                        self.changeleft,
+                        "left",
+                        "LEFT: " + p.key.name(self.keybinds["left"]),
+                        False,
+                    )
+                    self.interchange(
+                        self.changeright,
+                        "right",
+                        "RIGHT: " + p.key.name(self.keybinds["right"]),
+                        False,
+                    )
                 if event.type == p.MOUSEBUTTONDOWN and self.checkchangekey():
                     """if a keybind is changing dont look for collidepoint"""
                     coord = p.mouse.get_pos()
                     if self.retour.rec.collidepoint(coord):
                         self.pagemenu = True
                     elif self.changeup.rec.collidepoint(coord):
-                        self.key["up"] = True
+                        self.interchange(self.changeup, "up", "...", True)
                     elif self.changedown.rec.collidepoint(coord):
-                        self.key["down"] = True
+                        self.interchange(self.changedown, "down", "...", True)
                     elif self.changeleft.rec.collidepoint(coord):
-                        self.key["left"] = True
+                        self.interchange(self.changeleft, "left", "...", True)
                     elif self.changeright.rec.collidepoint(coord):
-                        self.key["right"] = True
+                        self.interchange(self.changeright, "right", "...", True)
         return rungame, self.running
 
     def update(self) -> dict[str, int]:
@@ -190,15 +226,17 @@ class Menu:
     def display(self):
         self.screen.fill((0, 0, 0))  # background
         if self.pagemenu:
-            self.start.draw()
-            self.settings.draw()
-            self.quitter.draw()
+            self.pagedisplay([self.start, self.settings, self.quitter])
         else:
-            self.retour.draw()
-            self.changeup.draw()
-            self.changedown.draw()
-            self.changeleft.draw()
-            self.changeright.draw()
+            self.pagedisplay(
+                [
+                    self.retour,
+                    self.changeup,
+                    self.changedown,
+                    self.changeleft,
+                    self.changeright,
+                ]
+            )
 
     def __run__(self):
         while self.running:
