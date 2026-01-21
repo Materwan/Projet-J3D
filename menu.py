@@ -57,29 +57,24 @@ class Menu:
         self.screen = screen
         self.clock = p.time.Clock()
         self.running = True
-        self.bg_img = p.image.load('Ressources/Animations/UI/fond ecran menu.png')
+        self.bg_img = p.image.load("Ressources/Animations/UI/fond ecran menu.png")
         self.start = a.Button(
             "Ressources/Animations/UI/PLAY.png",
             self.screen,
-            (self.WINDOWS[0] // 2 - 100,
-            self.WINDOWS[1] // 2 - 150),
-            (200,
-             100))
+            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 200),
+            (400, 200),
+        )
         self.settings = a.Button(
             "Ressources/Animations/UI/SETTINGS.png",
             self.screen,
-            (self.WINDOWS[0] // 2 - 100,
-            self.WINDOWS[1] // 2 - 25),
-            (200,
-            100)
+            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2),
+            (400, 200),
         )
         self.quit = a.Button(
             "Ressources/Animations/UI/EXIT.png",
             self.screen,
-            (self.WINDOWS[0] // 2 - 100,
-            self.WINDOWS[1] // 2 + 100),
-            (200,
-            100)
+            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 200),
+            (400, 200),
         )
         self.pagemenu = True
         self.retour = Bouton(
@@ -134,6 +129,7 @@ class Menu:
             Text("Impact", 30, "RIGHT: right", (255, 0, 0)),
         )
         self.key = {"up": False, "down": False, "left": False, "right": False}
+        self.titre = Text("Impact", 400, "Mole Tale", (255, 0, 0), self.screen)
 
     def changekey(self, event):
         """take the last keybind to replace the old one"""
@@ -245,6 +241,7 @@ class Menu:
     def display(self):
         self.screen.blit(self.bg_img, self.bg_img.get_rect())  # background
         if self.pagemenu:
+            self.titre.draw_text((0, 0))
             self.start.display()
             self.settings.display()
             self.quit.display()
