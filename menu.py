@@ -1,4 +1,6 @@
 import pygame as p
+import animations as a
+import os
 
 p.font.init()
 p.mixer.init()
@@ -56,32 +58,28 @@ class Menu:
         self.clock = p.time.Clock()
         self.running = True
         self.bg_img = p.image.load('Ressources/Animations/UI/fond ecran menu.png')
-        self.start = Bouton(
+        self.start = a.Button(
+            "Ressources/Animations/UI/PLAY.png",
             self.screen,
-            self.WINDOWS[0] // 2 - 100,
-            self.WINDOWS[1] // 2 - 150,
-            200,
-            100,
-            (61, 239, 73),
-            Text("Impact", 30, "Start", (255, 0, 0)),
+            (self.WINDOWS[0] // 2 - 100,
+            self.WINDOWS[1] // 2 - 150),
+            (200,
+             100))
+        self.settings = a.Button(
+            "Ressources/Animations/UI/SETTINGS.png",
+            self.screen,
+            (self.WINDOWS[0] // 2 - 100,
+            self.WINDOWS[1] // 2 - 25),
+            (200,
+            100)
         )
-        self.settings = Bouton(
+        self.quit = a.Button(
+            "Ressources/Animations/UI/EXIT.png",
             self.screen,
-            self.WINDOWS[0] // 2 - 100,
-            self.WINDOWS[1] // 2 - 25,
-            200,
-            100,
-            (61, 239, 73),
-            Text("Impact", 30, "Settings", (255, 0, 0)),
-        )
-        self.quit = Bouton(
-            self.screen,
-            self.WINDOWS[0] // 2 - 100,
-            self.WINDOWS[1] // 2 + 100,
-            200,
-            100,
-            (61, 239, 73),
-            Text("Impact", 30, "Quit", (255, 0, 0)),
+            (self.WINDOWS[0] // 2 - 100,
+            self.WINDOWS[1] // 2 + 100),
+            (200,
+            100)
         )
         self.pagemenu = True
         self.retour = Bouton(
@@ -171,11 +169,31 @@ class Menu:
                 if event.type == p.MOUSEBUTTONDOWN:
                     coord = p.mouse.get_pos()
                     if self.quit.rec.collidepoint(coord):
+                        self.quit.clicked = True
                         self.running = False
                     elif self.start.rec.collidepoint(coord):
+                        self.start.clicked = True
                         rungame = True
                     elif self.settings.rec.collidepoint(coord):
+                        self.settings.clicked = True
                         self.pagemenu = False
+                else:
+                    coord = p.mouse.get_pos()
+                    if self.quit.rec.collidepoint(coord):
+                        self.quit.hover = True
+                        self.start.hover = False
+                        self.settings.hover = False
+                    elif self.start.rec.collidepoint(coord):
+                        self.start.hover = True
+                        self.quit.hover = False
+                    elif self.settings.rec.collidepoint(coord):
+                        self.quit.hover = False
+                        self.start.hover = False
+                        self.settings.hover = True
+                    else:
+                        self.quit.hover = False
+                        self.start.hover = False
+                        self.settings.hover = False
             else:  # settings page
                 if event.type == p.KEYDOWN:
                     if event.key == p.K_ESCAPE and self.checkchangekey():
@@ -227,7 +245,12 @@ class Menu:
     def display(self):
         self.screen.blit(self.bg_img, self.bg_img.get_rect())  # background
         if self.pagemenu:
-            self.pagedisplay([self.start, self.settings, self.quit])
+            self.start.display()
+            self.settings.display()
+            self.quit.display()
+            self.start.clicked = False
+            self.settings.clicked = False
+            self.quit.clicked = False
         else:
             self.pagedisplay(
                 [
