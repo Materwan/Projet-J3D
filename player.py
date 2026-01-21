@@ -14,7 +14,7 @@ class Animation:
     def __init__(self, screen):
         self.screen = screen
         self.last_direction = "right"
-        self.path = "runAnimation/"
+        self.path = "Ressources/Animations/runAnimation/"
         self.images = [
             "run animation frame 1.png",
             "run animation frame 2.png",

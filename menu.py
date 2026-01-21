@@ -3,7 +3,7 @@ import pygame as p
 p.font.init()
 p.mixer.init()
 
-p.mixer.music.load("placeholder.mp3")
+p.mixer.music.load("Ressources/Musics/placeholder.mp3")
 p.mixer.music.play(-1)
 
 
@@ -55,6 +55,7 @@ class Menu:
         self.screen = screen
         self.clock = p.time.Clock()
         self.running = True
+        self.bg_img = p.image.load('Ressources/Animations/UI/fond ecran menu.png')
         self.start = Bouton(
             self.screen,
             self.WINDOWS[0] // 2 - 100,
@@ -73,14 +74,14 @@ class Menu:
             (61, 239, 73),
             Text("Impact", 30, "Settings", (255, 0, 0)),
         )
-        self.quitter = Bouton(
+        self.quit = Bouton(
             self.screen,
             self.WINDOWS[0] // 2 - 100,
             self.WINDOWS[1] // 2 + 100,
             200,
             100,
             (61, 239, 73),
-            Text("Impact", 30, "Quitter", (255, 0, 0)),
+            Text("Impact", 30, "Quit", (255, 0, 0)),
         )
         self.pagemenu = True
         self.retour = Bouton(
@@ -169,7 +170,7 @@ class Menu:
             if self.pagemenu:  # menu page
                 if event.type == p.MOUSEBUTTONDOWN:
                     coord = p.mouse.get_pos()
-                    if self.quitter.rec.collidepoint(coord):
+                    if self.quit.rec.collidepoint(coord):
                         self.running = False
                     elif self.start.rec.collidepoint(coord):
                         rungame = True
@@ -224,9 +225,9 @@ class Menu:
         return self.keybinds
 
     def display(self):
-        self.screen.fill((0, 0, 0))  # background
+        self.screen.blit(self.bg_img, self.bg_img.get_rect())  # background
         if self.pagemenu:
-            self.pagedisplay([self.start, self.settings, self.quitter])
+            self.pagedisplay([self.start, self.settings, self.quit])
         else:
             self.pagedisplay(
                 [
