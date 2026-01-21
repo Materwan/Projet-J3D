@@ -126,7 +126,9 @@ class Button:
         if size != None:
             assert len(size) == 2
             self.image = pygame.transform.scale(self.image, size)
-        self.rec = pygame.rect.Rect(position[0],position[1],size[0],size[1])
+        self.rec = pygame.rect.Rect(
+            position[0] - size[0] // 2, position[1] - size[1] // 2, size[0], size[1]
+        )
 
         # Create darker image for hover button
         self.dark_image = self.image.copy()
