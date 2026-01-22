@@ -69,50 +69,50 @@ class Menu:
         self.start = a.Button(
             "Ressources/Animations/UI/PLAY.png",
             self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 200),
-            (400, 200),
+            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 150),
+            (301, 95),
         )
         self.settings = a.Button(
             "Ressources/Animations/UI/SETTINGS.png",
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2),
-            (400, 200),
+            (497 * 0.80, 184 * 0.80),
         )
         self.quit = a.Button(
             "Ressources/Animations/UI/EXIT.png",
             self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 200),
-            (400, 200),
+            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 150),
+            (322 * 0.97, 82 * 0.97),
         )
         self.retour = a.Button(
             r"Ressources\Animations\UI\EMPTY.png",
             self.screen,
-            (175, 40),
-            (400, 200),
+            (170, 67),
+            (301, 95),
         )
         self.changeup = a.Button(
             r"Ressources\Animations\UI\EMPTY.png",
             self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 275),
-            (400, 200),
+            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 210),
+            (301, 95),
         )
         self.changedown = a.Button(
             r"Ressources\Animations\UI\EMPTY.png",
             self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 150),
-            (400, 200),
+            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 70),
+            (301, 95),
         )
         self.changeleft = a.Button(
             r"Ressources\Animations\UI\EMPTY.png",
             self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 25),
-            (400, 200),
+            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 70),
+            (301, 95),
         )
         self.changeright = a.Button(
             r"Ressources\Animations\UI\EMPTY.png",
             self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 100),
-            (400, 200),
+            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 210),
+            (301, 95),
         )
         self.up_t = [Text("Impact", 30, "UP: up", (0, 0, 0), self.screen)]
         self.up_t.append(
