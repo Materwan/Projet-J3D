@@ -57,6 +57,14 @@ class Menu:
         self.screen = screen
         self.clock = p.time.Clock()
         self.running = True
+        self.pagemenu = True
+        self.keybinds = {
+            "up": p.K_UP,
+            "down": p.K_DOWN,
+            "left": p.K_LEFT,
+            "right": p.K_RIGHT,
+        }
+        self.key = {"up": False, "down": False, "left": False, "right": False}
         self.bg_img = p.image.load("Ressources/Animations/UI/fond ecran menu.png")
         self.start = a.Button(
             "Ressources/Animations/UI/PLAY.png",
@@ -76,60 +84,83 @@ class Menu:
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 200),
             (400, 200),
         )
-        self.pagemenu = True
-        self.retour = Bouton(
+        self.retour = a.Button(
+            r"Ressources\Animations\UI\EMPTY.png",
             self.screen,
-            0,
-            0,
-            200,
-            100,
-            (61, 239, 73),
-            Text("Impact", 30, "<--", (255, 0, 0)),
+            (175, 40),
+            (400, 200),
         )
-        self.keybinds = {
-            "up": p.K_UP,
-            "down": p.K_DOWN,
-            "left": p.K_LEFT,
-            "right": p.K_RIGHT,
-        }
-        self.changeup = Bouton(
+        self.changeup = a.Button(
+            r"Ressources\Animations\UI\EMPTY.png",
             self.screen,
-            self.WINDOWS[0] // 2 - 100,
-            self.WINDOWS[1] // 2 - 275,
-            200,
-            100,
-            (61, 239, 73),
-            Text("Impact", 30, "UP: up", (255, 0, 0)),
+            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 275),
+            (400, 200),
         )
-        self.changedown = Bouton(
+        self.changedown = a.Button(
+            r"Ressources\Animations\UI\EMPTY.png",
             self.screen,
-            self.WINDOWS[0] // 2 - 100,
-            self.WINDOWS[1] // 2 - 150,
-            200,
-            100,
-            (61, 239, 73),
-            Text("Impact", 30, "DOWN: down", (255, 0, 0)),
+            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 150),
+            (400, 200),
         )
-        self.changeleft = Bouton(
+        self.changeleft = a.Button(
+            r"Ressources\Animations\UI\EMPTY.png",
             self.screen,
-            self.WINDOWS[0] // 2 - 100,
-            self.WINDOWS[1] // 2 - 25,
-            200,
-            100,
-            (61, 239, 73),
-            Text("Impact", 30, "LEFT: left", (255, 0, 0)),
+            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 25),
+            (400, 200),
         )
-        self.changeright = Bouton(
+        self.changeright = a.Button(
+            r"Ressources\Animations\UI\EMPTY.png",
             self.screen,
-            self.WINDOWS[0] // 2 - 100,
-            self.WINDOWS[1] // 2 + 100,
-            200,
-            100,
-            (61, 239, 73),
-            Text("Impact", 30, "RIGHT: right", (255, 0, 0)),
+            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 100),
+            (400, 200),
         )
-        self.key = {"up": False, "down": False, "left": False, "right": False}
-        self.titre = Text("Impact", 400, "Mole Tale", (255, 0, 0), self.screen)
+        self.up_t = [Text("Impact", 30, "UP: up", (0, 0, 0), self.screen)]
+        self.up_t.append(
+            (
+                (self.changeup.rec.width - self.up_t[0].l[0]) // 2
+                + self.changeup.rec.left,
+                (self.changeup.rec.height - self.up_t[0].l[1]) // 2
+                + self.changeup.rec.top,
+            )
+        )
+        self.down_t = [Text("Impact", 30, "DOWN: down", (0, 0, 0), self.screen)]
+        self.down_t.append(
+            (
+                (self.changedown.rec.width - self.down_t[0].l[0]) // 2
+                + self.changedown.rec.left,
+                (self.changedown.rec.height - self.down_t[0].l[1]) // 2
+                + self.changedown.rec.top,
+            )
+        )
+        self.left_t = [Text("Impact", 30, "LEFT: left", (0, 0, 0), self.screen)]
+        self.left_t.append(
+            (
+                (self.changeleft.rec.width - self.left_t[0].l[0]) // 2
+                + self.changeleft.rec.left,
+                (self.changeleft.rec.height - self.left_t[0].l[1]) // 2
+                + self.changeleft.rec.top,
+            )
+        )
+        self.right_t = [Text("Impact", 30, "RIGHT: right", (0, 0, 0), self.screen)]
+        self.right_t.append(
+            (
+                (self.changeright.rec.width - self.right_t[0].l[0]) // 2
+                + self.changeright.rec.left,
+                (self.changeright.rec.height - self.right_t[0].l[1]) // 2
+                + self.changeright.rec.top,
+            )
+        )
+        self.retour_t = [Text("Impact", 30, "<--", (0, 0, 0), self.screen)]
+        self.retour_t.append(
+            (
+                (self.retour.rec.width - self.retour_t[0].l[0]) // 2
+                + self.retour.rec.left,
+                (self.retour.rec.height - self.retour_t[0].l[1]) // 2
+                + self.retour.rec.top,
+            )
+        )
+        self.titre = [Text("Impact", 150, "Mole Tale", (255, 255, 255), self.screen)]
+        self.titre.append(((self.WINDOWS[0] - self.titre[0].l[0]) // 2, 0))
 
     def changekey(self, event):
         """take the last keybind to replace the old one"""
@@ -147,91 +178,165 @@ class Menu:
                 return False
         return True
 
-    def interchange(self, bouton, direction, caractere, bool):
-        """change the texte of the bouton that you want to change the keybind"""
-        bouton.text.text = bouton.text.font.render(caractere, False, (255, 0, 0))
-        bouton.text.l = bouton.text.text.get_size()
+    def recalculcoord(self, text, button):
+        """recalcul the coordonnee"""
+        return (
+            (button.rec.width - text[0].l[0]) // 2 + button.rec.left,
+            (button.rec.height - text[0].l[1]) // 2 + button.rec.top,
+        )
+
+    def interchange(self, changetext, button, direction, caractere, bool):
+        """change the texte of the button that you want to change the keybind"""
+        changetext[0].text = changetext[0].font.render(caractere, False, (0, 0, 0))
+        changetext[0].l = changetext[0].text.get_size()
+        changetext[1] = self.recalculcoord(changetext, button)
         self.key[direction] = bool
 
     def pagedisplay(self, eltpages):
         """draw the page"""
         for elt in eltpages:
-            elt.draw()
+            elt.display()
+
+    def textdisplay(self, elttexts):
+        """draw the text"""
+        for elt in elttexts:
+            elt[0].draw_text(elt[1])
 
     def event(self, events: list[p.event.Event]) -> tuple[bool, bool]:
         rungame = False
         for event in events:
+            coord = p.mouse.get_pos()
             if self.pagemenu:  # menu page
                 if event.type == p.MOUSEBUTTONDOWN:
-                    coord = p.mouse.get_pos()
                     if self.quit.rec.collidepoint(coord):
-                        self.quit.clicked = True
-                        self.running = False
+                        self.quit.clicked, self.running = True, False
                     elif self.start.rec.collidepoint(coord):
-                        self.start.clicked = True
-                        rungame = True
+                        self.start.clicked, rungame = True, True
                     elif self.settings.rec.collidepoint(coord):
-                        self.settings.clicked = True
-                        self.pagemenu = False
+                        self.settings.clicked, self.pagemenu = True, False
                 else:
-                    coord = p.mouse.get_pos()
                     if self.quit.rec.collidepoint(coord):
-                        self.quit.hover = True
-                        self.start.hover = False
-                        self.settings.hover = False
+                        self.quit.hover, self.start.hover, self.settings.hover = (
+                            True,
+                            False,
+                            False,
+                        )
                     elif self.start.rec.collidepoint(coord):
-                        self.start.hover = True
-                        self.quit.hover = False
+                        self.start.hover, self.quit.hover = True, False
                     elif self.settings.rec.collidepoint(coord):
-                        self.quit.hover = False
-                        self.start.hover = False
-                        self.settings.hover = True
+                        self.quit.hover, self.start.hover, self.settings.hover = (
+                            False,
+                            False,
+                            True,
+                        )
                     else:
-                        self.quit.hover = False
-                        self.start.hover = False
-                        self.settings.hover = False
+                        self.quit.hover, self.start.hover, self.settings.hover = (
+                            False,
+                            False,
+                            False,
+                        )
             else:  # settings page
                 if event.type == p.KEYDOWN:
                     if event.key == p.K_ESCAPE and self.checkchangekey():
                         self.pagemenu = True
                     self.changekey(event)  # try to change the keybind
                     self.interchange(
+                        self.up_t,
                         self.changeup,
                         "up",
                         "UP: " + p.key.name(self.keybinds["up"]),
                         False,
                     )
                     self.interchange(
+                        self.down_t,
                         self.changedown,
                         "down",
                         "DOWN: " + p.key.name(self.keybinds["down"]),
                         False,
                     )
                     self.interchange(
+                        self.left_t,
                         self.changeleft,
                         "left",
                         "LEFT: " + p.key.name(self.keybinds["left"]),
                         False,
                     )
                     self.interchange(
+                        self.right_t,
                         self.changeright,
                         "right",
                         "RIGHT: " + p.key.name(self.keybinds["right"]),
                         False,
                     )
-                if event.type == p.MOUSEBUTTONDOWN and self.checkchangekey():
+                if self.checkchangekey():
                     """if a keybind is changing dont look for collidepoint"""
-                    coord = p.mouse.get_pos()
+                    checkevent = event.type == p.MOUSEBUTTONDOWN
                     if self.retour.rec.collidepoint(coord):
-                        self.pagemenu = True
+                        (
+                            self.retour.hover,
+                            self.changeup.hover,
+                            self.changedown.hover,
+                            self.changeleft.hover,
+                            self.changeright.hover,
+                        ) = (True, False, False, False, False)
+                        if checkevent:
+                            self.pagemenu = True
                     elif self.changeup.rec.collidepoint(coord):
-                        self.interchange(self.changeup, "up", "...", True)
+                        (
+                            self.retour.hover,
+                            self.changeup.hover,
+                            self.changedown.hover,
+                            self.changeleft.hover,
+                            self.changeright.hover,
+                        ) = (False, True, False, False, False)
+                        if checkevent:
+                            self.interchange(
+                                self.up_t, self.changeup, "up", "...", True
+                            )
                     elif self.changedown.rec.collidepoint(coord):
-                        self.interchange(self.changedown, "down", "...", True)
+                        (
+                            self.retour.hover,
+                            self.changeup.hover,
+                            self.changedown.hover,
+                            self.changeleft.hover,
+                            self.changeright.hover,
+                        ) = (False, False, True, False, False)
+                        if checkevent:
+                            self.interchange(
+                                self.down_t, self.changedown, "down", "...", True
+                            )
                     elif self.changeleft.rec.collidepoint(coord):
-                        self.interchange(self.changeleft, "left", "...", True)
+                        (
+                            self.retour.hover,
+                            self.changeup.hover,
+                            self.changedown.hover,
+                            self.changeleft.hover,
+                            self.changeright.hover,
+                        ) = (False, False, False, True, False)
+                        if checkevent:
+                            self.interchange(
+                                self.left_t, self.changeleft, "left", "...", True
+                            )
                     elif self.changeright.rec.collidepoint(coord):
-                        self.interchange(self.changeright, "right", "...", True)
+                        (
+                            self.retour.hover,
+                            self.changeup.hover,
+                            self.changedown.hover,
+                            self.changeleft.hover,
+                            self.changeright.hover,
+                        ) = (False, False, False, False, True)
+                        if checkevent:
+                            self.interchange(
+                                self.right_t, self.changeright, "right", "...", True
+                            )
+                    else:
+                        (
+                            self.retour.hover,
+                            self.changeup.hover,
+                            self.changedown.hover,
+                            self.changeleft.hover,
+                            self.changeright.hover,
+                        ) = (False, False, False, False, False)
         return rungame, self.running
 
     def update(self) -> dict[str, int]:
@@ -241,7 +346,7 @@ class Menu:
     def display(self):
         self.screen.blit(self.bg_img, self.bg_img.get_rect())  # background
         if self.pagemenu:
-            self.titre.draw_text((0, 0))
+            self.textdisplay([self.titre])
             self.start.display()
             self.settings.display()
             self.quit.display()
@@ -257,6 +362,9 @@ class Menu:
                     self.changeleft,
                     self.changeright,
                 ]
+            )
+            self.textdisplay(
+                [self.up_t, self.down_t, self.left_t, self.right_t, self.retour_t]
             )
 
     def __run__(self):
