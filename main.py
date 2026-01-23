@@ -15,7 +15,7 @@ class Loop:
         self.screen = screen
         self.menu = Menu(screen)
         self.keybinds = self.menu.keybinds
-        self.game = Game(screen, self.keybinds)
+        self.game = Game(screen)
         self.run_menu = True
         self.run_game = False
         self.clock = pygame.time.Clock()
@@ -28,6 +28,7 @@ class Loop:
 
             self.run_game, self.running = self.menu.event(events)
             if self.run_game:
+                self.game.player.keybinds = self.keybinds
                 self.run_menu = False
                 pygame.mixer.music.stop()
 
@@ -46,7 +47,7 @@ class Loop:
 
         elif self.run_game:
 
-            self.game.update(self.keybinds)
+            self.game.update()
 
     def display(self):
 
@@ -59,14 +60,14 @@ class Loop:
             self.game.display()
 
     def run(self):
-
+        
         while self.running:
 
             self.event()
             self.update()
             self.display()
 
-            self.clock.tick(60)
+            self.clock.tick(60) # à ne pas toucher
 
 
 Loop(screen).run()
