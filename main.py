@@ -14,11 +14,11 @@ class Loop:
         self.running = True
         self.screen = screen
         self.menu = Menu(screen)
-        self.keybinds = self.menu.keybinds
         self.game = Game(screen)
         self.run_menu = True
         self.run_game = False
         self.clock = pygame.time.Clock()
+        self.font = pygame.font.SysFont(None, 24) # fps
 
     def event(self):
 
@@ -28,13 +28,13 @@ class Loop:
 
             self.run_game, self.running = self.menu.event(events)
             if self.run_game:
-                self.game.player.keybinds = self.keybinds
+                self.game.player.keybinds = self.menu.keybinds
                 self.run_menu = False
                 pygame.mixer.music.stop()
 
         elif self.run_game:
 
-            self.run_menu, self.running = self.game.event(events)
+            self.run_menu = self.game.event(events)
             if self.run_menu:
                 self.run_game = False
                 pygame.mixer.music.play(-1)
@@ -43,7 +43,7 @@ class Loop:
 
         if self.run_menu:
 
-            self.keybinds = self.menu.update()
+            self.menu.update()
 
         elif self.run_game:
 
@@ -58,6 +58,10 @@ class Loop:
         elif self.run_game:
 
             self.game.display()
+        
+        self.screen.blit(self.font.render(f"FPS: {int(self.clock.get_fps())}", True, (255, 255, 255)), (10, 10)) # fps
+        pygame.display.flip()  # ne pas utiliser .update()
+
 
     def run(self):
         

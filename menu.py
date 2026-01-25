@@ -55,7 +55,6 @@ class Menu:
     def __init__(self, screen):
         self.WINDOWS = screen.get_size()
         self.screen = screen
-        self.clock = p.time.Clock()
         self.running = True
         self.pagemenu = True
         self.keybinds = {
@@ -203,15 +202,16 @@ class Menu:
             elt[0].draw_text(elt[1])
 
     def event(self, events: list[p.event.Event]) -> tuple[bool, bool]:
-        rungame = False
-        for event in events:
-            coord = p.mouse.get_pos()
-            if self.pagemenu:  # menu page
+        run_game = False
+        coord = p.mouse.get_pos()
+        
+        if self.pagemenu:  # menu page
+            for event in events:
                 if event.type == p.MOUSEBUTTONDOWN:
                     if self.quit.rec.collidepoint(coord):
                         self.quit.clicked, self.running = True, False
                     elif self.start.rec.collidepoint(coord):
-                        self.start.clicked, rungame = True, True
+                        self.start.clicked, run_game = True, True
                     elif self.settings.rec.collidepoint(coord):
                         self.settings.clicked, self.pagemenu = True, False
                 else:
@@ -235,7 +235,9 @@ class Menu:
                             False,
                             False,
                         )
-            else:  # settings page
+
+        else:  # settings page
+            for event in events:
                 if event.type == p.KEYDOWN:
                     if event.key == p.K_ESCAPE and self.checkchangekey():
                         self.pagemenu = True
@@ -337,11 +339,10 @@ class Menu:
                             self.changeleft.hover,
                             self.changeright.hover,
                         ) = (False, False, False, False, False)
-        return rungame, self.running
+        return run_game, self.running
 
     def update(self) -> dict[str, int]:
-        p.display.flip()
-        return self.keybinds
+        pass
 
     def display(self):
         self.screen.blit(self.bg_img, self.bg_img.get_rect())  # background
@@ -366,11 +367,3 @@ class Menu:
             self.textdisplay(
                 [self.up_t, self.down_t, self.left_t, self.right_t, self.retour_t]
             )
-
-    def __run__(self):
-        while self.running:
-            self.event()
-            self.update()
-            self.display()
-
-            self.clock.tick(60)

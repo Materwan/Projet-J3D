@@ -66,14 +66,12 @@ class Animation:
 
 
 class Player:
-    def __init__(self, screen, x, y, list_surface):
+    def __init__(self, screen, x, y):
         self.screen = screen
         self.moteur = Moteur(self.screen)
         self.Animation = Animation(self.screen)
-        self.dico = {(1, 0): "right", (-1, 0): "left", (0, 1): "down", (0, -1): "up"}
         self.keybinds = None # il sera defini quand on passe du menu au game
-        self.list_surface = list_surface
-        
+    
         self.hitbox = pygame.Rect(x, y, 32, 15)
         self.velocity = [0, 0]
         self.direction = "right"
@@ -90,20 +88,23 @@ class Player:
 
     def update(self):
         # gestion collision
-        self.velocity = self.moteur.collision(self.velocity, self.hitbox, self.list_surface)
+        nearby_obstacles = self.moteur.get_nearby_obstacles(self.hitbox)
+        self.velocity = self.moteur.collision(self.hitbox, self.velocity, nearby_obstacles)
 
         # gestion de la position de la hitbox / modifie la position de la hitbox en décalant de x, y
         self.hitbox.move_ip(self.velocity[0] * 2, self.velocity[1] * 2)
 
-        # gestion de la direction via self.dico /// a upgrade
-        if (self.velocity[0], self.velocity[1]) in self.dico:
-            self.direction = self.dico[(self.velocity[0], self.velocity[1])]
+        # gestion de la direction via self.dico /// en attente de animation up et down
+        if self.velocity[0] == -1:
+            self.direction = "left"
+        elif self.velocity[0] == 1:
+            self.direction = "right"
 
         self.Animation.update(self.direction, self.velocity != [0, 0])
 
     def display(self):
         self.Animation.display((self.hitbox.x - 34, self.hitbox.y - 70))
-        # pygame.draw.rect(self.screen, "red", self.hitbox) # pour voir la hitbox du joueur (pas touche)
+        # pygame.draw.rect(self.screen, "red", self.hitbox, 2) # pour voir la hitbox du joueur (pas touche)
 
 
 
@@ -113,7 +114,9 @@ class Hôte:
         self.moteur = Moteur(self.screen)
         self.Animation = Animation(self.screen)
         self.keybinds = None
+        
         self.Lplayer = {"player1" : [pygame.Rect(x,y,32,15), [0,0], "right", self.keybinds]}
+        # dico des infos des joueurs : hitbox, velocité, direction, config de touche, ext..
 
     def event(self, keys):
         # gestion de la vélocité en regardant les touches pressées
@@ -143,7 +146,10 @@ class Hôte:
         """
         pass
 
-    def display(self): # devra afficher tous les joueurs grâce à la position, direction et bool
+    def display(self):
+        """
+        affiche tous les joueurs grâce à leurs positions, directions et bool (bool = en mouvement)
+        """
         pass
 
     def new_player(self, x, y, keybinds): # prendra en argument le nom du joueur
@@ -187,5 +193,8 @@ class Client:
         """
         pass
 
-    def display(self): # devra afficher tous les joueurs grâce à la position, direction et bool
+    def display(self):
+        """
+        affiche tous les joueurs grâce à leurs positions, directions et bool (bool = en mouvement)
+        """
         pass
