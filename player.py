@@ -73,34 +73,44 @@ class Player:
         self.keybinds = None # il sera defini quand on passe du menu au game
     
         self.hitbox = pygame.Rect(x, y, 32, 15)
-        self.velocity = [0, 0]
+        self.velocity = pygame.math.Vector2(0, 0) # == [0, 0]
         self.direction = "right"
+        self.is_moving = False
 
 
     def event(self, keys):
         # gestion de la vélocité en regardant les touches pressées
-        self.velocity[0] = int(keys[self.keybinds["right"]]) - int(
-            keys[self.keybinds["left"]]
-        )  # vaut soit 0, 1 ou -1 pour la vélocité en x
-        self.velocity[1] = int(keys[self.keybinds["down"]]) - int(
-            keys[self.keybinds["up"]]
-        )  # vaut soit 0, 1 ou -1 pour la vélocité en y
+        self.velocity.update(
+            keys[self.keybinds["right"]] - keys[self.keybinds["left"]],
+            keys[self.keybinds["down"]] - keys[self.keybinds["up"]]
+        )
+        # vaut soit -1, 0 ou 1 pour la velocité en x et en y 
 
     def update(self):
-        # gestion collision
-        nearby_obstacles = self.moteur.get_nearby_obstacles(self.hitbox)
-        self.velocity = self.moteur.collision(self.hitbox, self.velocity, nearby_obstacles)
+        is_moving = self.velocity.length_squared() > 0 # si != [0, 0]
+        if is_moving: # si le joueur se deplace alors :
 
-        # gestion de la position de la hitbox / modifie la position de la hitbox en décalant de x, y
-        self.hitbox.move_ip(self.velocity[0] * 2, self.velocity[1] * 2)
+            # gestion collision
+            nearby_obstacles = self.moteur.get_nearby_obstacles(self.hitbox)
+            self.moteur.collision(self.hitbox, self.velocity, nearby_obstacles)
 
-        # gestion de la direction via self.dico /// en attente de animation up et down
-        if self.velocity[0] == -1:
-            self.direction = "left"
-        elif self.velocity[0] == 1:
-            self.direction = "right"
+            is_moving = self.velocity.length_squared() > 0
+            if is_moving: # si on se deplace toujours alors :
+                
+                # gestion des déplacements en diagonales
+                if self.velocity.length_squared() > 1: # si deplacement en diagonale
+                    self.velocity.normalize_ip() # [1, 1] devient [0.707107, 0.707107]
+            
+                # gestion de la position de la hitbox / modifie la position de la hitbox en décalant de x et y
+                self.hitbox.move_ip(self.velocity.x * 2, self.velocity.y * 2)
 
-        self.Animation.update(self.direction, self.velocity != [0, 0])
+                # gestion de la direction /// en attente de animation up et down
+                if self.velocity.x < 0:
+                    self.direction = "left"
+                elif self.velocity.x > 0:
+                    self.direction = "right"
+
+        self.Animation.update(self.direction, is_moving)
 
     def display(self):
         self.Animation.display((self.hitbox.x - 34, self.hitbox.y - 70))

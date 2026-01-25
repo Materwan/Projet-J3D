@@ -36,13 +36,12 @@ class Moteur:
         entre la liste de toutes les surface et notre future "hitbox" en x et/ou y pour ensuite
         s'il y a collision empecher le déplacement (en mettant la vélocité sur 0 pour x et/ou y)
         """
-        if velocity[0] != 0:
-            future_hitbox = hitbox.move(velocity[0] * 2, 0)
+        if velocity.x != 0:
+            future_hitbox = hitbox.move(velocity.x * 2, 0)
             if any(future_hitbox.colliderect(obstacle) for obstacle in nearby_obstacles):
-                velocity[0] = 0
+                velocity.x = 0
 
-        if velocity[1] != 0: # pareil pour l'axe y
-            future_hitbox = hitbox.move(0, velocity[1] * 2)
+        if velocity.y != 0:
+            future_hitbox = hitbox.move(0, velocity.y * 2)
             if any(future_hitbox.colliderect(obstacle) for obstacle in nearby_obstacles):
-                velocity[1] = 0
-        return velocity
+                velocity.y = 0
