@@ -1,6 +1,5 @@
 import pygame as p
 import animations as a
-import os
 
 p.font.init()
 p.mixer.init()
@@ -20,34 +19,6 @@ class Text:
     def draw_text(self, coordonninate):
         """draw a text"""
         self.screen.blit(self.text, coordonninate)
-
-
-class Bouton:
-
-    def __init__(
-        self, screen, left, top, width, height, color, text=Text("", 0, "", (0, 0, 0))
-    ):
-        self.screen = screen
-        self.left = left
-        self.top = top
-        self.width = width
-        self.height = height
-        self.color = p.Color(color)
-        self.rec = p.Rect(left, top, width, height)
-        self.rec2 = p.Rect(left + 15, top + 15, width - 30, height - 30)
-        self.text = text
-        self.text.screen = screen
-
-    def draw(self):
-        """draw the button with text"""
-        p.draw.rect(self.screen, self.color, self.rec)
-        p.draw.rect(self.screen, (0, 0, 0), self.rec2)
-        self.text.draw_text(
-            (
-                (self.width - self.text.l[0]) // 2 + self.left,
-                (self.height - self.text.l[1]) // 2 + self.top,
-            )
-        )
 
 
 class Menu:
@@ -84,31 +55,31 @@ class Menu:
             (322 * 0.97, 82 * 0.97),
         )
         self.retour = a.Button(
-            r"Ressources\Animations\UI\EMPTY.png",
+            "Ressources/Animations/UI/EMPTY.png",
             self.screen,
             (170, 67),
             (301, 95),
         )
         self.changeup = a.Button(
-            r"Ressources\Animations\UI\EMPTY.png",
+            "Ressources/Animations/UI/EMPTY.png",
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 210),
             (301, 95),
         )
         self.changedown = a.Button(
-            r"Ressources\Animations\UI\EMPTY.png",
+            "Ressources/Animations/UI/EMPTY.png",
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 70),
             (301, 95),
         )
         self.changeleft = a.Button(
-            r"Ressources\Animations\UI\EMPTY.png",
+            "Ressources/Animations/UI/EMPTY.png",
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 70),
             (301, 95),
         )
         self.changeright = a.Button(
-            r"Ressources\Animations\UI\EMPTY.png",
+            "Ressources/Animations/UI/EMPTY.png",
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 210),
             (301, 95),
@@ -204,7 +175,7 @@ class Menu:
     def event(self, events: list[p.event.Event]) -> tuple[bool, bool]:
         run_game = False
         coord = p.mouse.get_pos()
-        
+
         if self.pagemenu:  # menu page
             for event in events:
                 if event.type == p.MOUSEBUTTONDOWN:
@@ -348,9 +319,7 @@ class Menu:
         self.screen.blit(self.bg_img, self.bg_img.get_rect())  # background
         if self.pagemenu:
             self.textdisplay([self.titre])
-            self.start.display()
-            self.settings.display()
-            self.quit.display()
+            self.pagedisplay([self.start, self.settings, self.quit])
             self.start.clicked = False
             self.settings.clicked = False
             self.quit.clicked = False
