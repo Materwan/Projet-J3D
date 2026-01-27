@@ -88,9 +88,8 @@ class NetworkServerController(Controller):
                 if not data:
                     break
 
-                t = data.decode().strip()
-                print(t)
-                self.inputs[player_id] = t
+                data = data.decode().strip()
+                self.inputs[player_id] = json.loads(data)
 
                 writer.write(bytes(json.dumps(self.outputs[player_id]) + "\n", "utf-8"))
                 await writer.drain()
@@ -119,6 +118,19 @@ class NetworkServerController(Controller):
 
         super().reset_screen()
         super().display_main()
+
+        for client_id in self.inputs.keys():
+            pygame.draw.rect(
+                self.screen,
+                (255, 0, 255),
+                pygame.Rect(
+                    self.inputs[client_id]["position"][0],
+                    self.inputs[client_id]["position"][1],
+                    10,
+                    10,
+                ),
+            )
+
         super().update_screen()
 
     async def main(self):
@@ -160,7 +172,9 @@ class NetworkClientController(Controller):
 
     async def update(self):
 
-        self.writer.write(bytes(json.dumps({"pressed": self.pressed}) + "\n", "utf-8"))
+        self.writer.write(
+            bytes(json.dumps({"position": self.position}) + "\n", "utf-8")
+        )
         await self.writer.drain()
 
         data = await self.reader.readline()
@@ -175,6 +189,7 @@ class NetworkClientController(Controller):
 
         super().reset_screen()
         super().display_main()
+
         pygame.draw.rect(
             self.screen,
             (255, 0, 255),
@@ -204,6 +219,6 @@ class NetworkClientController(Controller):
 screen = pygame.display.set_mode((500, 500))
 
 # asyncio.run(NetworkServerController(screen).main())
-asyncio.run(NetworkClientController(screen, "10.90.134.219", 8888).main())
+asyncio.run(NetworkClientController(screen, "10.90.129.238", 8888).main())
 
 pygame.quit()
