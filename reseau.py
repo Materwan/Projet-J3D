@@ -1,8 +1,12 @@
 import pygame
 import json
 import asyncio
+import socket
 
 pygame.init()
+
+BROADCAST_IP = "255.255.255.255"
+UDP_PORT = 9999
 
 
 class Controller:
@@ -69,6 +73,9 @@ class NetworkServerController(Controller):
         self.clients = {}
         self.inputs = {}
         self.outputs = {}
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        self.sock.setblocking(False)
 
     def event(self):
 
@@ -107,6 +114,13 @@ class NetworkServerController(Controller):
         async with server:
             await server.serve_forever()
 
+    async def broadcast_service(self):
+
+        message = b"SERVICE:MonServeur|PORT:8888"
+        self.sock.sendto(message, (BROADCAST_IP, UDP_PORT))
+        print(True)
+        await asyncio.sleep(2)
+
     def update(self):
 
         # moteur.moteur()
@@ -140,6 +154,7 @@ class NetworkServerController(Controller):
         while self.running:
 
             self.event()
+            await self.broadcast_service()
             self.update()
             self.display()
 
@@ -150,13 +165,28 @@ class NetworkServerController(Controller):
 
 class NetworkClientController(Controller):
 
-    def __init__(self, screen: pygame.surface.Surface, adresse: str, port: int):
+    def __init__(self, screen: pygame.surface.Surface, port: int):
 
         super().__init__(screen)
         self.pressed = False
-        self.adresse = adresse
+        self.adresse = "0"
         self.port = port
         self.data = {"position": (0, 0)}
+
+    async def listen_for_services(self):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.bind(("", UDP_PORT))
+        sock.setblocking(False)
+
+        services = {}
+
+        while len(services) == 0:
+            data, addr = await asyncio.get_event_loop().sock_recvfrom(sock, 1024)
+            message = data.decode()
+
+            services[addr[0]] = message
+            print(f"Annonce reçue de {addr[0]} → {message}")
+        self.adresse = addr[0]
 
     async def connect(self):
 
@@ -207,6 +237,8 @@ class NetworkClientController(Controller):
 
     async def main(self):
 
+        await self.listen_for_services()
+
         await self.connect()
 
         while self.running:
@@ -219,6 +251,6 @@ class NetworkClientController(Controller):
 screen = pygame.display.set_mode((500, 500))
 
 # asyncio.run(NetworkServerController(screen).main())
-asyncio.run(NetworkClientController(screen, "10.90.129.238", 8888).main())
+asyncio.run(NetworkClientController(screen, 8888).main())
 
 pygame.quit()
