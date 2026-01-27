@@ -7,7 +7,8 @@ class Game:
         self.screen = screen
         largeur, hauteur = self.screen.get_size()
         self.player = Player(self.screen, largeur // 2 - 30, hauteur // 2 - 20)
-        
+        self.prochaine_etat = "MENU" # MENU ou CLOSE
+
         # ceci est temporaire (remplace la carte)
         self.map = [pygame.Rect(0,0,largeur,5), pygame.Rect(0,hauteur-5,largeur,5),
                              pygame.Rect(0,0,5,hauteur), pygame.Rect(largeur-5,0,5,hauteur),
@@ -16,15 +17,17 @@ class Game:
         self.player.moteur.map = self.map
 
     def event(self, events: list[pygame.event.Event]) -> bool:
-        run_menu = False
         for event in events:
+            if event.type == pygame.QUIT:
+                self.prochaine_etat = "CLOSE"
+                return True
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    run_menu = True
+                    self.prochaine_etat = "MENU"
+                    return True
 
         self.player.event(pygame.key.get_pressed())
-
-        return run_menu
+        return False
 
     def update(self):
         self.player.update()

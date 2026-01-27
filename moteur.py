@@ -1,4 +1,5 @@
 import pygame
+from typing import List
 
 class Moteur:
     def __init__(self, screen):
@@ -30,12 +31,13 @@ class Moteur:
         """
 
 
-    def collision(self, hitbox, velocity, nearby_obstacles):
+    def collision(self, hitbox: pygame.Rect, velocity: pygame.Vector2):
         """
         S'il y a un déplacement sur l'axe x et/ou y alors on regarde s'il y a une collision 
-        entre la liste de toutes les surface et notre future "hitbox" en x et/ou y pour ensuite
-        s'il y a collision empecher le déplacement (en mettant la vélocité sur 0 pour x et/ou y)
+        entre les obstacles proche et notre future emplacement en x et/ou y pour ensuite s'il
+        y a collision empecher le déplacement (en mettant la vélocité sur 0 pour x et/ou y)
         """
+        nearby_obstacles = self.get_nearby_obstacles(hitbox)
         if velocity.x != 0:
             future_hitbox = hitbox.move(velocity.x * 2, 0)
             if any(future_hitbox.colliderect(obstacle) for obstacle in nearby_obstacles):

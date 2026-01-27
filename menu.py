@@ -26,7 +26,7 @@ class Menu:
     def __init__(self, screen):
         self.WINDOWS = screen.get_size()
         self.screen = screen
-        self.running = True
+        self.prochaine_etat = "GAME" # GAME ou CLOSE
         self.pagemenu = True
         self.keybinds = {
             "up": p.K_UP,
@@ -173,16 +173,21 @@ class Menu:
             elt[0].draw_text(elt[1])
 
     def event(self, events: list[p.event.Event]) -> tuple[bool, bool]:
-        run_game = False
         coord = p.mouse.get_pos()
-
         if self.pagemenu:  # menu page
             for event in events:
+                if event.type == p.QUIT:
+                    self.prochaine_etat = "CLOSE"
+                    return True
                 if event.type == p.MOUSEBUTTONDOWN:
                     if self.quit.rec.collidepoint(coord):
-                        self.quit.clicked, self.running = True, False
+                        self.quit.clicked = True
+                        self.prochaine_etat = "CLOSE"
+                        return True
                     elif self.start.rec.collidepoint(coord):
-                        self.start.clicked, run_game = True, True
+                        self.start.clicked = True
+                        self.prochaine_etat = "GAME"
+                        return True
                     elif self.settings.rec.collidepoint(coord):
                         self.settings.clicked, self.pagemenu = True, False
                 else:
@@ -310,7 +315,7 @@ class Menu:
                             self.changeleft.hover,
                             self.changeright.hover,
                         ) = (False, False, False, False, False)
-        return run_game, self.running
+        return False
 
     def update(self) -> dict[str, int]:
         pass
