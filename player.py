@@ -80,6 +80,7 @@ class Player:
     
         self.hitbox = pygame.Rect(x, y, 32, 15)
         self.velocity = pygame.Vector2(0, 0) # == [0, 0]
+        self.position = pygame.Vector2(x, y)
         self.direction = "right"
         self.is_moving = False
 
@@ -108,6 +109,7 @@ class Player:
             
                 # gestion de la position de la hitbox / modifie la position de la hitbox en décalant de x et y
                 self.hitbox.move_ip(self.velocity.x * 2, self.velocity.y * 2)
+                self.position.update(self.hitbox.x, self.hitbox.y)
 
                 # gestion de la direction /// en attente de animation up et down
                 if self.velocity.x < 0:
