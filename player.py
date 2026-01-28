@@ -19,13 +19,11 @@ class Player:
             "down": pygame.K_DOWN,
             "left": pygame.K_LEFT,
             "right": pygame.K_RIGHT,
-        }  # il sera defini quand on passe du menu au game
-
+        }
+        self.position = pygame.Vector2(x, y)
         self.hitbox = pygame.Rect(x, y, 32, 15)
         self.velocity = pygame.Vector2(0, 0)  # == [0, 0]
-        self.position = pygame.Vector2(x, y)
         self.direction = "right"
-        self.is_moving = False
 
     def event(self, keys: Tuple[bool]):
         # gestion de la vélocité en regardant les touches pressées
@@ -49,9 +47,10 @@ class Player:
                 if is_moving > 1:  # si deplacement en diagonale
                     self.velocity.normalize_ip()  # [1, 1] devient [0.707107, 0.707107]
 
-                # gestion de la position de la hitbox / modifie la position de la hitbox en décalant de x et y
-                self.hitbox.move_ip(self.velocity.x * 2, self.velocity.y * 2)
-                self.position.update(self.hitbox.x, self.hitbox.y)
+                # gestion du vecteur position
+                self.position += self.velocity * 2
+                # la position de la hitbox se cale sur le vecteur position
+                self.hitbox.topleft = self.position
 
                 # gestion de la direction /// en attente de animation up et down
                 if self.velocity.x < 0:
@@ -67,7 +66,7 @@ class Player:
 
 
 class Hôte:
-    def __init__(self, screen, x, y):
+    def __init__(self, screen, x, y, name):
         self.screen = screen
         self.moteur = Moteur(self.screen)
         animation_images = create_player_animation(
@@ -76,12 +75,16 @@ class Hôte:
             (100, 100),
         )
         self.animation = AnimationController(animation_images, self.screen)
-        self.keybinds = None
-
-        self.Lplayer = {
-            "player1": [pygame.Rect(x, y, 32, 15), [0, 0], "right", self.keybinds]
+        self.moteur.new_player(name, x, y)
+        self.keybinds = {
+            "up": pygame.K_UP,
+            "down": pygame.K_DOWN,
+            "left": pygame.K_LEFT,
+            "right": pygame.K_RIGHT,
         }
-        # dico des infos des joueurs : hitbox, velocité, direction, config de touche, ext..
+        self.velocity = pygame.Vector2(0, 0) # == [0, 0]
+        self.position = None
+        self.direction = "right"
 
     def event(self, keys):
         """
@@ -90,42 +93,26 @@ class Hôte:
         """
         self.velocity.update(
             keys[self.keybinds["right"]] - keys[self.keybinds["left"]],
-            keys[self.keybinds["down"]] - keys[self.keybinds["up"]],
+            keys[self.keybinds["down"]] - keys[self.keybinds["up"]]
         )
 
-    def update(self):
+    def update(self, dico):
         """
         - doit recuperer : la vélocité de tous les joueurs
         - traite l'info : verification velocité
         - gestion collision, position et direction de tous les joueurs
         - gestion de l'animation de chaque joueur (frame)
-        - doit envoyer des infos : position, direction
-          et is_moving de tous les joueurs (une fois la map ou seed)
+        - doit envoyer des infos : position, vélocité 
+          de tous les joueurs + (une fois la map ou seed)
         """
-        pass
+        return self.moteur.handle_info(dico)
 
     def display(self):
         """
-        affiche tous les joueurs grâce à leurs positions, directions et is_moving
+        affichage de tous les joueurs via Animation
+        grâce à leurs positions, directions et moving_intent
         """
         pass
-
-    def new_player(self, x, y, keybinds):  # prendra en argument le nom du joueur
-        """
-        Ajoute le client à la liste des joueurs
-        """
-        self.Lplayer["player" + str(len(self.Lplayer) + 1)] = [
-            pygame.Rect(x, y, 32, 15),
-            [0, 0],
-            "right",
-            keybinds,
-        ]
-
-    def del_player(self, name):
-        """
-        Supprime le client de la liste des joueurs grâce à son nom
-        """
-        del self.Lplayer[name]
 
 
 class Client:
@@ -137,7 +124,15 @@ class Client:
             (100, 100),
         )
         self.animation = AnimationController(animation_images, self.screen)
-        self.keybinds = None
+        self.keybinds = {
+            "up": pygame.K_UP,
+            "down": pygame.K_DOWN,
+            "left": pygame.K_LEFT,
+            "right": pygame.K_RIGHT,
+        }
+        self.velocity = pygame.Vector2(0, 0) # == [0, 0]
+        self.position = None
+        self.direction = "right"
 
     def event(self, keys):
         """
@@ -146,21 +141,21 @@ class Client:
         """
         self.velocity.update(
             keys[self.keybinds["right"]] - keys[self.keybinds["left"]],
-            keys[self.keybinds["down"]] - keys[self.keybinds["up"]],
+            keys[self.keybinds["down"]] - keys[self.keybinds["up"]]
         )
 
     def update(self):
         """
         - doit donner des infos : vélocité, ...
         - gestion de l'animation de chaque joueur (frame)
-        - doit recuperer des infos : position, direction
-          et is_moving de tous les joueurs (une fois la map ou seed)
+        - doit recuperer des infos : position, direction 
+          et moving_intent de tous les joueurs + (une fois la map ou seed)
         """
         pass
 
     def display(self):
         """
         affichage de tous les joueurs via Animation
-        grâce à leurs positions, directions et is_moving
+        grâce à leurs positions, directions et moving_intent
         """
         pass
