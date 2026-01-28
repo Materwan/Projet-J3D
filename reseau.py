@@ -2,10 +2,11 @@ import pygame
 import json
 import asyncio
 import socket
+import struct
 
 pygame.init()
 
-BROADCAST_IP = "255.255.255.255"
+BROADCAST_IP = "239.255.0.1"
 UDP_PORT = 9999
 
 
@@ -73,9 +74,8 @@ class NetworkServerController(Controller):
         self.clients = {}
         self.inputs = {}
         self.outputs = {}
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        self.sock.setblocking(False)
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        self.sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 1)
 
     def event(self):
 
@@ -86,7 +86,7 @@ class NetworkServerController(Controller):
         print(True)
         player_id = id(writer)
         self.clients[player_id] = writer
-        self.inputs[player_id] = None
+        self.inputs[player_id] = {"position": [0, 0]}
         self.outputs[player_id] = {"state": True, "position": (0, 0)}
 
         try:
@@ -116,10 +116,10 @@ class NetworkServerController(Controller):
 
     async def broadcast_service(self):
 
-        while self.running:
-            message = b"SERVICE:MonServeur|PORT:8888"
-            self.sock.sendto(message, (BROADCAST_IP, UDP_PORT))
-            print(True)
+        while True:
+            msg = json.dumps({"service": "MonJeu", "port": 8888}).encode()
+            self.sock.sendto(msg, (BROADCAST_IP, UDP_PORT))
+            print("Annonce envoyée")
             await asyncio.sleep(2)
 
     def update(self):
@@ -176,9 +176,16 @@ class NetworkClientController(Controller):
         self.data = {"position": (0, 0)}
 
     async def listen_for_services(self):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.bind(("", UDP_PORT))
-        sock.setblocking(False)
+
+        mreq = struct.pack(
+            "4s4s",
+            socket.inet_aton(BROADCAST_IP),
+            socket.inet_aton("0.0.0.0"),
+        )
+
+        sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
         services = {}
 
