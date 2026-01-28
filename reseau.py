@@ -116,10 +116,11 @@ class NetworkServerController(Controller):
 
     async def broadcast_service(self):
 
-        message = b"SERVICE:MonServeur|PORT:8888"
-        self.sock.sendto(message, (BROADCAST_IP, UDP_PORT))
-        print(True)
-        await asyncio.sleep(2)
+        while self.running:
+            message = b"SERVICE:MonServeur|PORT:8888"
+            self.sock.sendto(message, (BROADCAST_IP, UDP_PORT))
+            print(True)
+            await asyncio.sleep(2)
 
     def update(self):
 
@@ -150,11 +151,12 @@ class NetworkServerController(Controller):
     async def main(self):
 
         server_task = asyncio.create_task(self.tcp_server())
+        brodcast_task = asyncio.create_task(self.broadcast_service())
 
         while self.running:
 
             self.event()
-            await self.broadcast_service()
+            # await self.broadcast_service()
             self.update()
             self.display()
 
