@@ -80,11 +80,12 @@ class AnimationController:
         self.frame_index = 0
         self.length = len(self.animations[self.current_state][self.current_dir])
 
-    def update(self, state: str, direction: str):
+    def update(self, running: str, direction: str):
         """Change state and direction if neccesary, otherwise, update frame index"""
-        if state != self.current_state or direction != self.current_dir:
+        new_state = "run" if running else "idle"
+        if new_state != self.current_state or direction != self.current_dir:
             # Change state and direction
-            self.current_state = state
+            self.current_state = new_state
             self.current_dir = direction
             # Reset frame index and number of images
             self.frame_index = 0
