@@ -8,7 +8,7 @@ class Moteur:
         self.map = None
 
 
-    def get_nearby_obstacles(self, hitbox):
+    def get_nearby_obstacles(self, hitbox: pygame.Rect):
         """
         Récupère la matrice de la map du jeu.
         Analyse une zone de 3x3 tuiles autour de la position 
@@ -36,7 +36,7 @@ class Moteur:
         return nearby_obstacles
 
 
-    def collision(self, hitbox: pygame.Rect, velocity: pygame.Vector2):
+    def collision(self, hitbox: pygame.Rect, velocity: pygame.Vector2, other_hitbox: pygame.Rect|None):
         """
         Anticipe et résout les collisions avec les obstacles environnants.
         
@@ -45,10 +45,13 @@ class Moteur:
         la vélocité sur cet axe est annulée.
 
         Args:
-            hitbox (pygame.Rect): La boîte de collision actuelle de l'entité.
+            hitbox (pygame.Rect): La boîte de collision actuelle du joueur.
             velocity (pygame.Vector2): Vecteur de déplacement souhaité (modifié sur place).
+            other_hitbox (pygame.Rect|None): La boîte de collision actuelle de l'autre joueur.
         """
-        nearby_obstacles = self.map # temporaire
+        nearby_obstacles = self.map # temporaire /// get_nearby_obstacles(hitbox)
+        if other_hitbox != None:
+            nearby_obstacles.append(other_hitbox)
         if velocity.x != 0:
             future_hitbox = hitbox.move(velocity.x * 2, 0)
             if any(future_hitbox.colliderect(obstacle) for obstacle in nearby_obstacles):
@@ -60,37 +63,16 @@ class Moteur:
                 velocity.y = 0
 
 
-    def new_player(self, name, x, y):
-        """
-        Enregistre un nouveau joueur dans le dictionnaire player_data.
-        Args:
-            name (str): Identifiant unique (Nom ou IP).
-            x, y (int): Coordonnées de départ.
-        """
-        self.player_data[name] = {
-            "position" : pygame.Vector2(x, y),
-            "hitbox" : pygame.Rect(x, y, 32, 15),
-            "direction" : "right"
-        }
-
-
-    def del_player(self, name):
-        """
-        Supprime un joueur du dictionnaire player_data.
-        Args:
-            name (str): Identifiant unique (Nom ou IP).
-        """
-        self.player_data.pop(name, None)
-
-
-    def verif_velocity(self, velocity):
+    def verif_velocity(self, velocity: List[int]):
         """
         Convertit la vélocité reçue (sous forme de liste : [x, y]) en vecteur.
         Puis assure que les entrées sont comprises entre -1 et 1. 
         Si le joueur se déplace en diagonale, la vélocité est normalisée.
+
         Returns:
-            vel (pygame.Vector2): Vecteur de déplacement
-            moving_intent (bool): Un bolléen qui est vrai si vel != [0, 0]
+            tuple[pygame.Vector2, bool]: 
+                - vel : Le vecteur de déplacement normalisé (longueur max = 1).
+                - moving_intent : True si le joueur essaie de se déplacer, False sinon.
         """
         vel = pygame.Vector2(velocity)
 
@@ -102,52 +84,3 @@ class Moteur:
             vel.normalize_ip()
         
         return vel, length > 0
-
-
-    def get_player_hitbox(name):
-        """
-        Donne la hitbox de tous les joueurs,
-        sauf la hitbox qui a comme clé le nom donner en argument
-        """
-        pass
-
-
-    def handle_data(self, dico):
-        """
-        Prend un dico de cette forme (pour l'instant) : 
-        self.dico = {"player1" : {"velocity": [1, 0]}, ...}
-        Et return :
-        dico_sortant = {"player1" : {"position" : [595, 1474], "moving_intent" : True, "direction" : "right"}, ...}
-        """
-        dico_sortant = {}
-        for name, data in dico.items():
-            direction = self.player_data[name]["direction"]
-
-            # gestion de la velocité et des déplacements en diagonales
-            velocity, moving_intent = self.verif_velocity(data["velocity"])
-            if moving_intent: # si le joueur veut se deplacer alors :
-
-                # gestion collision
-                self.collision(self.player_data[name]["hitbox"], velocity)
-
-                if velocity.x != 0 or velocity.y != 0: # si on se deplace toujours alors :
-
-                    # gestion du vecteur position
-                    self.player_data[name]["position"] += velocity * 2
-                    # la position de la hitbox se cale sur le vecteur position
-                    self.player_data[name]["hitbox"].topleft = self.player_data[name]["position"]
-
-                    # gestion de la direction /// en attente de animation up et down
-                    if velocity.x < 0:
-                        direction = "left"
-                    elif velocity.x > 0:
-                        direction = "right"
-
-                    self.player_data[name]["direction"] = direction
-            
-            dico_sortant[name] = {
-                "position": list(self.player_data[name]["position"]),
-                "moving_intent": moving_intent,
-                "direction": direction
-            }
-        return dico_sortant
