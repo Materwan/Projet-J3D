@@ -27,7 +27,7 @@ class Game:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     pygame.mixer.music.play(-1)
-                    self.manager.change_state("MENU")
+                    self.manager.change_state("MENU_P")
 
         self.player.event(pygame.key.get_pressed())
         return False
