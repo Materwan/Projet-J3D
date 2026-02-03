@@ -1,180 +1,13 @@
 import pygame as p
 import animations as a
 
-EMPTY_BUTTON = "Ressources/Animations/UI/"
+EMPTY_BUTTON = "Ressources/UI_&_élements_graphiques/"
 
 p.font.init()
 p.mixer.init()
 
 p.mixer.music.load("Ressources/Musics/placeholder.mp3")
 p.mixer.music.play(-1)
-
-"""self.keybinds = {
-            "up": p.K_UP,
-            "down": p.K_DOWN,
-            "left": p.K_LEFT,
-            "right": p.K_RIGHT,
-        }
-        self.key = {"up": False, "down": False, "left": False, "right": False}
-        self.bg_img = p.image.load("Ressources/Animations/UI/fond ecran menu.png")
-        self.start = a.Button(
-            "Ressources/Animations/UI/PLAY.png",
-            self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 150),
-            (301, 95),
-        )
-        self.settings = a.Button(
-            "Ressources/Animations/UI/SETTINGS.png",
-            self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2),
-            (497 * 0.80, 184 * 0.80),
-        )
-        self.quit = a.Button(
-            "Ressources/Animations/UI/EXIT.png",
-            self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 150),
-            (322 * 0.97, 82 * 0.97),
-        )
-        self.retour = a.Button(
-            "Ressources/Animations/UI/EMPTY.png",
-            self.screen,
-            (170, 67),
-            (301, 95),
-        )
-        self.changeup = a.Button(
-            "Ressources/Animations/UI/EMPTY.png",
-            self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 210),
-            (301, 95),
-        )
-        self.changedown = a.Button(
-            "Ressources/Animations/UI/EMPTY.png",
-            self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 70),
-            (301, 95),
-        )
-        self.changeleft = a.Button(
-            "Ressources/Animations/UI/EMPTY.png",
-            self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 70),
-            (301, 95),
-        )
-        self.changeright = a.Button(
-            "Ressources/Animations/UI/EMPTY.png",
-            self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 210),
-            (301, 95),
-        )
-        self.up_t = [Text("Impact", 30, "UP: up", (0, 0, 0), self.screen)]
-        self.up_t.append(
-            (
-                (self.changeup.rec.width - self.up_t[0].l[0]) // 2
-                + self.changeup.rec.left,
-                (self.changeup.rec.height - self.up_t[0].l[1]) // 2
-                + self.changeup.rec.top,
-            )
-        )
-        self.down_t = [Text("Impact", 30, "DOWN: down", (0, 0, 0), self.screen)]
-        self.down_t.append(
-            (
-                (self.changedown.rec.width - self.down_t[0].l[0]) // 2
-                + self.changedown.rec.left,
-                (self.changedown.rec.height - self.down_t[0].l[1]) // 2
-                + self.changedown.rec.top,
-            )
-        )
-        self.left_t = [Text("Impact", 30, "LEFT: left", (0, 0, 0), self.screen)]
-        self.left_t.append(
-            (
-                (self.changeleft.rec.width - self.left_t[0].l[0]) // 2
-                + self.changeleft.rec.left,
-                (self.changeleft.rec.height - self.left_t[0].l[1]) // 2
-                + self.changeleft.rec.top,
-            )
-        )
-        self.right_t = [Text("Impact", 30, "RIGHT: right", (0, 0, 0), self.screen)]
-        self.right_t.append(
-            (
-                (self.changeright.rec.width - self.right_t[0].l[0]) // 2
-                + self.changeright.rec.left,
-                (self.changeright.rec.height - self.right_t[0].l[1]) // 2
-                + self.changeright.rec.top,
-            )
-        )
-        self.retour_t = [Text("Impact", 30, "<--", (0, 0, 0), self.screen)]
-        self.retour_t.append(
-            (
-                (self.retour.rec.width - self.retour_t[0].l[0]) // 2
-                + self.retour.rec.left,
-                (self.retour.rec.height - self.retour_t[0].l[1]) // 2
-                + self.retour.rec.top,
-            )
-        )
-        self.titre = [Text("Impact", 150, "Mole Tale", (255, 255, 255), self.screen)]
-        self.titre.append(((self.WINDOWS[0] - self.titre[0].l[0]) // 2, 0))
-    def event(self, events: list[p.event.Event]) -> tuple[bool, bool]:
-        coord = p.mouse.get_pos()
-            for event in events:
-                if event.type == p.QUIT:
-                    self.prochaine_etat = "CLOSE"
-                    return True
-                if event.type == p.MOUSEBUTTONDOWN:
-                    if self.quit.rec.collidepoint(coord):
-                        self.quit.clicked = True
-                        self.prochaine_etat = "CLOSE"
-                        return True
-                    elif self.start.rec.collidepoint(coord):
-                        self.start.clicked = True
-                        self.prochaine_etat = "GAME"
-                        return True
-                    elif self.settings.rec.collidepoint(coord):
-                        self.settings.clicked, self.pagemenu = True, False
-                else:
-                    if self.quit.rec.collidepoint(coord):
-                        self.quit.hover, self.start.hover, self.settings.hover = (
-                            True,
-                            False,
-                            False,
-                        )
-                    elif self.start.rec.collidepoint(coord):
-                        self.start.hover, self.quit.hover = True, False
-                    elif self.settings.rec.collidepoint(coord):
-                        self.quit.hover, self.start.hover, self.settings.hover = (
-                            False,
-                            False,
-                            True,
-                        )
-                    else:
-                        self.quit.hover, self.start.hover, self.settings.hover = (
-                            False,
-                            False,
-                            False,
-                        )
-
-            
-        return False
-
-    def display(self):
-        self.screen.blit(self.bg_img, self.bg_img.get_rect())  # background
-        if self.pagemenu:
-            self.textdisplay([self.titre])
-            self.pagedisplay([self.start, self.settings, self.quit])
-            self.start.clicked = False
-            self.settings.clicked = False
-            self.quit.clicked = False
-        else:
-            self.pagedisplay(
-                [
-                    self.retour,
-                    self.changeup,
-                    self.changedown,
-                    self.changeleft,
-                    self.changeright,
-                ]
-            )
-            self.textdisplay(
-                [self.up_t, self.down_t, self.left_t, self.right_t, self.retour_t]
-            )"""
 
 
 class Text:
@@ -284,8 +117,7 @@ class Principal_Menu(Menu):
                     self.manager.running = False
                 elif self.start.rec.collidepoint(coord):
                     self.start.clicked = True
-                    p.mixer.music.stop()
-                    self.manager.change_state("GAME")
+                    self.manager.change_state("MENU_PLAY")
                 elif self.settings.rec.collidepoint(coord):
                     self.settings.clicked = True
                     self.manager.change_state("MENU_SETTING")
@@ -493,15 +325,15 @@ class Setting_Menu(Menu):
                     "RIGHT: " + p.key.name(self.keybinds["right"]),
                     False,
                 )
-            (
-                self.retour.hover,
-                self.changeup.hover,
-                self.changedown.hover,
-                self.changeleft.hover,
-                self.changeright.hover,
-            ) = (False, False, False, False, False)
             if self.checkchangekey():
                 """if a keybind is changing dont look for collidepoint"""
+                (
+                    self.retour.hover,
+                    self.changeup.hover,
+                    self.changedown.hover,
+                    self.changeleft.hover,
+                    self.changeright.hover,
+                ) = (False, False, False, False, False)
                 checkevent = event.type == p.MOUSEBUTTONDOWN
                 if self.retour.rec.collidepoint(coord):
                     self.retour.hover = True
@@ -510,7 +342,6 @@ class Setting_Menu(Menu):
                         self.manager.states["GAME"].player.keybinds = self.keybinds
                         self.manager.change_state("MENU_P")
                 elif self.changeup.rec.collidepoint(coord):
-                    self.retour.hover,
                     self.changeup.hover = True
                     if checkevent:
                         self.interchange(self.up_t, self.changeup, "up", "...", True)
@@ -549,3 +380,196 @@ class Setting_Menu(Menu):
         super().textdisplay(
             [self.up_t, self.down_t, self.left_t, self.right_t, self.retour_t]
         )
+
+
+class Play_Menu(Menu):
+
+    def __init__(self, screen, manager):
+        super().__init__(screen, manager)
+        self.manager.running = True
+        self.retour = a.Button(
+            EMPTY_BUTTON + "EMPTY.png",
+            self.screen,
+            (170, 67),
+            (301, 95),
+        )
+        self.solo = a.Button(
+            EMPTY_BUTTON + "EMPTY.png",
+            self.screen,
+            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 150),
+            (301, 95),
+        )
+        self.multiplayer = a.Button(
+            EMPTY_BUTTON + "EMPTY.png",
+            self.screen,
+            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2),
+            (301, 95),
+        )
+        self.joinmultiplayer = a.Button(
+            EMPTY_BUTTON + "EMPTY.png",
+            self.screen,
+            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 150),
+            (301, 95),
+        )
+        self.solo_t = [
+            Text(
+                "Impact",
+                30,
+                "SOLO",
+                (0, 0, 0),
+                self.screen,
+            )
+        ]
+        self.solo_t.append(
+            (
+                (self.solo.rec.width - self.solo_t[0].l[0]) // 2 + self.solo.rec.left,
+                (self.solo.rec.height - self.solo_t[0].l[1]) // 2 + self.solo.rec.top,
+            )
+        )
+        self.multiplayer_t = [
+            Text(
+                "Impact",
+                30,
+                "MULTIPLAYER",
+                (0, 0, 0),
+                self.screen,
+            )
+        ]
+        self.multiplayer_t.append(
+            (
+                (self.multiplayer.rec.width - self.multiplayer_t[0].l[0]) // 2
+                + self.multiplayer.rec.left,
+                (self.multiplayer.rec.height - self.multiplayer_t[0].l[1]) // 2
+                + self.multiplayer.rec.top,
+            )
+        )
+        self.joinmultiplayer_t = [
+            Text(
+                "Impact",
+                30,
+                "JOIN MULTIPLAYER",
+                (0, 0, 0),
+                self.screen,
+            )
+        ]
+        self.joinmultiplayer_t.append(
+            (
+                (self.joinmultiplayer.rec.width - self.joinmultiplayer_t[0].l[0]) // 2
+                + self.joinmultiplayer.rec.left,
+                (self.joinmultiplayer.rec.height - self.joinmultiplayer_t[0].l[1]) // 2
+                + self.joinmultiplayer.rec.top,
+            )
+        )
+        self.retour_t = [Text("Impact", 30, "<--", (0, 0, 0), self.screen)]
+        self.retour_t.append(
+            (
+                (self.retour.rec.width - self.retour_t[0].l[0]) // 2
+                + self.retour.rec.left,
+                (self.retour.rec.height - self.retour_t[0].l[1]) // 2
+                + self.retour.rec.top,
+            )
+        )
+
+    def event(self, events):
+        coord = p.mouse.get_pos()
+        for event in events:
+            if event.type == p.KEYDOWN:
+                if event.key == p.K_ESCAPE:
+                    self.manager.change_state("MENU_P")
+            if event.type == p.MOUSEBUTTONDOWN:
+                if self.solo.rec.collidepoint(coord):
+                    self.solo.clicked = True
+                    p.mixer.music.stop()
+                    self.solo.hover = False
+                    self.manager.change_state("GAME")
+                elif self.multiplayer.rec.collidepoint(coord):
+                    self.multiplayer.clicked = True
+                    p.mixer.music.stop()
+                    self.multiplayer.hover = False
+                    self.manager.change_state("GAME")
+                elif self.joinmultiplayer.rec.collidepoint(coord):
+                    self.joinmultiplayer.clicked = True
+                    self.joinmultiplayer.hover = False
+                    self.manager.change_state("MENU_MULTI")
+                elif self.retour.rec.collidepoint(coord):
+                    self.retour.clicked = True
+                    self.retour.hover = False
+                    self.manager.change_state("MENU_P")
+            else:
+                (
+                    self.solo.hover,
+                    self.multiplayer.hover,
+                    self.joinmultiplayer.hover,
+                    self.retour.hover,
+                ) = (False, False, False, False)
+                if self.solo.rec.collidepoint(coord):
+                    self.solo.hover = True
+                elif self.multiplayer.rec.collidepoint(coord):
+                    self.multiplayer.hover = True
+                elif self.joinmultiplayer.rec.collidepoint(coord):
+                    self.joinmultiplayer.hover = True
+                elif self.retour.rec.collidepoint(coord):
+                    self.retour.hover = True
+
+    def update(self):
+        pass
+
+    def display(self):
+        super().pagedisplay(
+            [self.retour, self.solo, self.multiplayer, self.joinmultiplayer]
+        )
+        super().textdisplay(
+            [self.solo_t, self.multiplayer_t, self.joinmultiplayer_t, self.retour_t]
+        )
+        (
+            self.retour.clicked,
+            self.solo.clicked,
+            self.multiplayer.clicked,
+            self.joinmultiplayer.clicked,
+        ) = (False, False, False, False)
+
+
+class Join_Multi_Menu(Menu):
+
+    def __init__(self, screen, manager):
+        super().__init__(screen, manager)
+        self.manager.running = True
+        self.retour = a.Button(
+            EMPTY_BUTTON + "EMPTY.png",
+            self.screen,
+            (170, 67),
+            (301, 95),
+        )
+        self.retour_t = [Text("Impact", 30, "<--", (0, 0, 0), self.screen)]
+        self.retour_t.append(
+            (
+                (self.retour.rec.width - self.retour_t[0].l[0]) // 2
+                + self.retour.rec.left,
+                (self.retour.rec.height - self.retour_t[0].l[1]) // 2
+                + self.retour.rec.top,
+            )
+        )
+
+    def event(self, events):
+        coord = p.mouse.get_pos()
+        for event in events:
+            if event.type == p.KEYDOWN:
+                if event.key == p.K_ESCAPE:
+                    self.manager.change_state("MENU_PLAY")
+            if event.type == p.MOUSEBUTTONDOWN:
+                if self.retour.rec.collidepoint(coord):
+                    self.retour.clicked = True
+                    self.retour.hover = False
+                    self.manager.change_state("MENU_PLAY")
+            else:
+                self.retour.hover = False
+                if self.retour.rec.collidepoint(coord):
+                    self.retour.hover = True
+
+    def update(self):
+        pass
+
+    def display(self):
+        super().pagedisplay([self.retour])
+        super().textdisplay([self.retour_t])
+        self.retour.clicked = False
