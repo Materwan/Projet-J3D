@@ -13,10 +13,11 @@ class Manager:
         self.running = True
 
         self.states = {
-            "MENU": Menu(self.screen, self),
+            "MENU_P": Principal_Menu(self.screen, self),
+            "MENU_SETTING": Setting_Menu(self.screen, self),
             "GAME": Game(self.screen, self),
         }
-        self.state = self.states["MENU"]
+        self.state = self.states["MENU_P"]
 
         self.font = pygame.font.SysFont(None, 24)  # fps
         self.clock = pygame.time.Clock()
