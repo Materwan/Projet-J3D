@@ -2,50 +2,111 @@ import pygame
 from moteur import Moteur
 from animations import AnimationController, create_player_animation
 from typing import Tuple, Dict
+import asyncio
+import json
 
 
-class Player:
-    def __init__(self, screen, x, y):
+class PlayerControllerBase:
+
+    def __init__(
+        self,
+        screen: pygame.Surface,
+        moteur: Moteur | None,
+        start_position: Tuple[int, int],
+    ):
+        """Créer les éléments nécessaires à un joueur"""
+
         self.screen = screen
-        self.moteur = Moteur(self.screen)
+        self.moteur = moteur
+        self.guest: PlayerControllerBase
+        self.moving_intent = False
+
+        # Initialise les animations
         animation_images = create_player_animation(
             r"Ressources\Animations\Idle_Animations",
             r"Ressources\Animations\runAnimation",
             (100, 100),
         )
         self.animation = AnimationController(animation_images, self.screen)
+
+        # Initialise les données nécessaires pour un joueur
         self.keybinds = {
             "up": pygame.K_UP,
             "down": pygame.K_DOWN,
             "left": pygame.K_LEFT,
             "right": pygame.K_RIGHT,
         }
-        self.position = pygame.Vector2(x, y)
-        self.hitbox = pygame.Rect(x, y, 32, 15)
-        self.velocity = pygame.Vector2(0, 0)  # == [0, 0]
+        self.position = pygame.Vector2(start_position)
+        self.hitbox = pygame.Rect(start_position[0], start_position[1], 32, 15)
+        self.velocity = pygame.Vector2(0, 0)
         self.direction = "right"
+        self.connected = False
 
     def event(self, keys: Tuple[bool]):
-        # gestion de la vélocité en regardant les touches pressées
+        """
+        Détermine le vecteur de mouvement à partir des entrées clavier.
+
+        Utilise une soustraction binaire pour calculer la direction :
+        - (1 - 0) = 1  (Droite/Bas)
+        - (0 - 1) = -1 (Gauche/Haut)
+        - (1 - 1) ou (0 - 0) = 0 (Neutre)
+
+        Le vecteur 'self.velocity' ainsi mis à jour contient des composantes
+        x et y allant de -1 à 1, permettant aussi la gestion des diagonales.
+        """
+
         self.velocity.update(
             keys[self.keybinds["right"]] - keys[self.keybinds["left"]],
             keys[self.keybinds["down"]] - keys[self.keybinds["up"]],
         )
-        # vaut soit -1, 0 ou 1 pour la velocité en x et en y
+
+    def update_animation(self):
+        """Update the direction of the animation"""
+
+        self.look_direction = self.velocity.normalize()
+
+        if self.velocity.x < 0:
+            self.direction = "left"
+        elif self.velocity.x > 0:
+            self.direction = "right"
+        """ Optionnel : en attente animation up et down
+        elif self.velocity.y > 0:
+            self.host_data["direction"] = "down"
+        elif self.velocity.y < 0:
+            self.host_data["direction"] = "up"
+        """
 
     def update(self):
+        """Met à jour toutes les données en lien avec le moteur"""
+
+        is_moving = self.velocity.length_squared()
+        if is_moving > 0:  # si on se deplace toujours alors :
+
+            # gestion des déplacements en diagonales
+            if is_moving > 1:
+                self.velocity.normalize_ip()  # [1, 1] devient [0.707107, 0.707107]
+
+            # gestion du vecteur position
+            self.position += self.velocity * 2
+            # la position de la hitbox se cale sur le vecteur position
+            self.hitbox.topleft = self.position
+
+            self.update_animation()
+
+    """def update(self):
+
         moving_intent = self.velocity.length_squared() > 0
-        if moving_intent: # si le joueur veut se deplacer alors :
+        if moving_intent:  # si le joueur veut se deplacer alors :
 
             # gestion collision
             self.moteur.collision(self.hitbox, self.velocity, None)
 
             is_moving = self.velocity.length_squared()
-            if is_moving > 0: # si on se deplace toujours alors :
+            if is_moving > 0:  # si on se deplace toujours alors :
 
                 # gestion des déplacements en diagonales
-                if is_moving > 1: # si deplacement en diagonale
-                    self.velocity.normalize_ip() # [1, 1] devient [0.707107, 0.707107]
+                if is_moving > 1:  # si deplacement en diagonale
+                    self.velocity.normalize_ip()  # [1, 1] devient [0.707107, 0.707107]
 
                 # gestion du vecteur position
                 self.position += self.velocity * 2
@@ -58,319 +119,233 @@ class Player:
                 elif self.velocity.x > 0:
                     self.direction = "right"
 
-        self.animation.update(moving_intent, self.direction)
+        self.animation.update(moving_intent, self.direction)"""
 
     def display(self):
+
         self.animation.display((self.hitbox.x - 34, self.hitbox.y - 70))
         # pygame.draw.rect(self.screen, "red", self.hitbox, 2) # pour voir la hitbox du joueur (pas touche)
 
 
+class SoloPlayerController(PlayerControllerBase):
 
-class Host:
-    def __init__(self, screen, x, y):
-        animation_images = create_player_animation(
-            r"Ressources\Animations\Idle_Animations",
-            r"Ressources\Animations\runAnimation",
-            (100, 100),
-        )
-        self.host_animation = AnimationController(animation_images, screen)
-        self.guest_animation = AnimationController(animation_images, screen)
-        self.moteur = Moteur(screen)
+    def __init__(
+        self,
+        screen: pygame.Surface,
+        moteur: Moteur | None,
+        start_position: Tuple[int, int],
+    ):
 
-        self.host_data = {
-            "position" : pygame.Vector2(x, y),
-            "hitbox" : pygame.Rect(x, y, 32, 15),
-            "direction" : "right",
-            "moving_intent" : True
-        }
-        self.guest_data = {
-            "position" : pygame.Vector2(x+100, y),
-            "hitbox" : pygame.Rect(x+100, y, 32, 15),
-            "direction" : "right",
-            "moving_intent" : True
-        }
-        self.connected = False # True si client connecté
-
-        self.velocity = pygame.Vector2(0, 0)
-        self.look_direction = pygame.Vector2(1, 0)
-        self.keybinds = {
-            "up": pygame.K_UP,
-            "down": pygame.K_DOWN,
-            "left": pygame.K_LEFT,
-            "right": pygame.K_RIGHT,
-        }
-
+        super().__init__(screen, moteur, start_position)
 
     def event(self, keys: Tuple[bool]):
-        """
-        Détermine le vecteur de mouvement à partir des entrées clavier.
-        
-        Utilise une soustraction binaire pour calculer la direction :
-        - (1 - 0) = 1  (Droite/Bas)
-        - (0 - 1) = -1 (Gauche/Haut)
-        - (1 - 1) ou (0 - 0) = 0 (Neutre)
-        
-        Le vecteur 'self.velocity' ainsi mis à jour contient des composantes 
-        x et y allant de -1 à 1, permettant aussi la gestion des diagonales.
-        """
-        self.velocity.update(
-            keys[self.keybinds["right"]] - keys[self.keybinds["left"]],
-            keys[self.keybinds["down"]] - keys[self.keybinds["up"]]
-        )
 
+        return super().event(keys)
 
     def update(self):
-        """
-        - doit recuperer : la vélocité de client
-        - traite l'info : verification velocité
-        - gestion collision, position et direction de tous les joueurs
-        - gestion de l'animation de chaque joueur (frame)
-        - doit envoyer des infos : position, vélocité 
-          de hote et la position de client + (une fois la map ou seed)
-        """
-        self.host_data["moving_intent"] = self.velocity.length_squared() > 0
-        if self.host_data["moving_intent"]:
-            # gestion de look_direction pour les attaques dans le future 
+
+        self.moving_intent = self.velocity.length_squared() > 0
+        if self.moving_intent:  # si le joueur veut se deplacer alors :
+
             self.look_direction = self.velocity.normalize()
 
-            # gestion collision
-            if self.connected:
-                self.moteur.collision(self.host_data["hitbox"], self.velocity, self.guest_data["hitbox"])
-            else:
-                self.moteur.collision(self.host_data["hitbox"], self.velocity, None)
+            self.moteur.collision(self.hitbox, self.velocity, None)
+            super().update()
 
-            is_moving = self.velocity.length_squared()
-            if is_moving > 0: # si on se deplace toujours alors :
-                
-                # gestion des déplacements en diagonales
-                if is_moving > 1:
-                    self.velocity.normalize_ip() # [1, 1] devient [0.707107, 0.707107]
-
-                # gestion du vecteur position
-                self.host_data["position"] += self.velocity * 2
-                # la position de la hitbox se cale sur le vecteur position
-                self.host_data["hitbox"].topleft = self.host_data["position"]
-
-                # gestion de la direction
-                if self.velocity.x > 0:
-                    self.host_data["direction"] = "right"
-                elif self.velocity.x < 0:
-                    self.host_data["direction"] = "left"
-                """ Optionnel : en attente animation up et down
-                elif self.velocity.y > 0:
-                    self.host_data["direction"] = "down"
-                elif self.velocity.y < 0:
-                    self.host_data["direction"] = "up"
-                """
-        
-        # GESTION RESEAU
-
-        # reçoie des infos du client
-        data_to_receive = {"velocity": [0, 0]}
-
-        # envoie des infos au client
-        data_to_send = self.handle_client_data(data_to_receive)
-
-        # FIN GESTION RESEAU
-
-        # gestion animation frame pour hôte (et client si connecté)
-        self.host_animation.update(self.host_data["moving_intent"], self.host_data["direction"])
-        if self.connected:
-            self.guest_animation.update(self.guest_data["moving_intent"], self.guest_data["direction"])
-
+        self.animation.update(self.moving_intent, self.direction)
 
     def display(self):
-        """
-        Gère le rendu graphique des joueurs (Hôte et Client) à l'écran.
-        
-        Calcule les coordonnées d'affichage en appliquant un décalage
-        pour centrer les sprites par rapport à leurs positions logiques.
-        
-        Note : Les offsets (-34, -70) permettent d'aligner le bas du sprite 
-        avec la position de la hitbox.
-        """
-        self.host_animation.display((self.host_data["hitbox"].x - 34, self.host_data["hitbox"].y - 70))
-        if self.connected:
-            self.guest_animation.display((self.guest_data["hitbox"].x - 34, self.guest_data["hitbox"].y - 70))
+
+        super().display()
 
 
-    def handle_client_data(self, data_to_receive):
-        """
-        Traite les données envoyées par le client, applique la physique et 
-        prépare le paquet réseau de réponse.
+class HostController(PlayerControllerBase):
 
-        Cette méthode à trois étapes principales:
-        1. Validation : Vérifie et normalise la vélocité reçue pour éviter les triches.
-        2. Physique : Gère les collisions entre le client, le décor et l'hôte.
-        3. Mise à jour : Applique le déplacement final et met à jour l'orientation.
+    def __init__(
+        self,
+        screen: pygame.Surface,
+        moteur: Moteur | None,
+        start_position: Tuple[int, int],
+    ):
 
-        Args:
-            data_to_receive (dict): Contient la vélocité souhaitée par le client.
+        super().__init__(screen, moteur, start_position)
 
-        Returns:
-            dict: État synchronisé incluant les positions réelles, directions et intentions.
-        """
-        # verification de la velocité et des déplacements en diagonales
-        velocity, self.guest_data["moving_intent"] = self.moteur.verif_velocity(data_to_receive["velocity"])
-        if self.guest_data["moving_intent"]:
+        # Initialise les données de l'invité
+        self.guest = PlayerControllerBase(self.screen, moteur, (700, 500))
+        self.recieved_data = {"Guest": {"velocity": [0, 0]}}
 
-            # gestion collision
-            self.moteur.collision(self.guest_data["hitbox"], velocity, self.host_data["hitbox"])
+        self.serveur: asyncio.Server
+        self.serveur = None
+        self.connected = False  # True si un invité est connecté
 
-            if velocity.x != 0 or velocity.y != 0: # si on se deplace toujours alors :
+        asyncio.run(self.initialize())
 
-                # gestion du vecteur position
-                self.guest_data["position"] += velocity * 2
-                # la position de la hitbox se cale sur le vecteur position
-                self.guest_data["hitbox"].topleft = self.guest_data["position"]
+    async def initialize(self):
 
-                # gestion de la direction
-                if velocity.x > 0:
-                    self.guest_data["direction"] = "right"
-                elif velocity.x < 0:
-                    self.guest_data["direction"] = "left"
-                """ Optionnel : en attente animation up et down
-                elif velocity.y > 0:
-                    self.guest_data["direction"] = "down"
-                elif velocity.y < 0:
-                    self.guest_data["direction"] = "up"
-                """
-        
-        return {"host" : {"position" : list(self.host_data["position"]), 
-                        "moving_intent" : self.host_data["moving_intent"], 
-                        "direction" : self.host_data["direction"]}, 
-                "guest" : {"position" : list(self.guest_data["position"])}}
-        
-
-
-class Guest:
-    def __init__(self, screen):
-        animation_images = create_player_animation(
-            r"Ressources\Animations\Idle_Animations",
-            r"Ressources\Animations\runAnimation",
-            (100, 100),
-        )
-        self.host_animation = AnimationController(animation_images, screen)
-        self.guest_animation = AnimationController(animation_images, screen)
-
-        self.host_data = {
-            "position" : [100, 100],
-            "direction" : "right",
-            "moving_intent" : False
-        }
-        self.guest_data = {
-            "position" : [300, 300],
-            "direction" : "right",
-            "moving_intent" : False
-        }
-        
-        self.velocity = pygame.Vector2(0, 0)
-        self.look_direction = pygame.Vector2(1, 0)
-        self.keybinds = {
-            "up": pygame.K_UP,
-            "down": pygame.K_DOWN,
-            "left": pygame.K_LEFT,
-            "right": pygame.K_RIGHT,
-        }
-
+        self.serveur_task = await asyncio.create_task(self.tcp_server())
 
     def event(self, keys: Tuple[bool]):
-        """
-        Détermine le vecteur de mouvement à partir des entrées clavier.
-        
-        Utilise une soustraction binaire pour calculer la direction :
-        - (1 - 0) = 1  (Droite/Bas)
-        - (0 - 1) = -1 (Gauche/Haut)
-        - (1 - 1) ou (0 - 0) = 0 (Neutre)
-        
-        Le vecteur 'self.velocity' ainsi mis à jour contient des composantes 
-        x et y allant de -1 à 1, permettant aussi la gestion des diagonales.
-        """
-        self.velocity.update(
-            keys[self.keybinds["right"]] - keys[self.keybinds["left"]],
-            keys[self.keybinds["down"]] - keys[self.keybinds["up"]]
+        super().event(keys)
+
+    async def handle_client(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ):
+
+        # Si un au client est connecté
+        if self.connected:
+            writer.close()
+            await writer.wait_closed()
+            return
+
+        # Si aucun autre client n'est connecté
+        print("Joueur connecté")
+        self.connected = True
+
+        # Arrêt le serveur : n'accepte plus les connections
+        self.serveur.close()
+        await self.serveur.wait_closed()
+        print("Serveur fermé")
+
+        # Gestion du client
+        player_id = id(writer)
+        self.writter = writer
+
+        try:
+            while True:
+                recieved_bytes = await reader.readline()
+                if not recieved_bytes:
+                    break
+
+                recieved_str = recieved_bytes.decode().strip()
+                recieved_data = json.loads(recieved_str)
+                self.guest.velocity.update(recieved_data["guest"]["velocity"])
+                self.guest.moving_intent = recieved_data["guest"]["moving_intent"]
+                self.guest.direction = recieved_data["guest"]["direction"]
+
+                to_send_data = {
+                    "guest": {
+                        "position": list(self.guest.position),
+                        "velocity": list(self.guest.velocity),
+                    },
+                    "host": {
+                        "position": list(self.position),
+                        "moving_intent": self.moving_intent,
+                        "direction": self.direction,
+                    },
+                }
+                to_send_bytes = bytes(json.dumps(to_send_data + "\n", "utf-8"))
+
+                writer.write(to_send_bytes)
+                await writer.drain()
+        finally:
+            writer.close()
+
+    async def tcp_server(self):
+
+        self.serveur = await asyncio.start_server(
+            self.handle_client, host="0.0.0.0", port=8888
         )
 
+        print("Attente de client")
+        async with self.serveur:
+            await self.serveur.serve_forever()
 
     def update(self):
-        """
-        Gère l'update côté client à chaque frame.
-        
-        Cette méthode effectue trois actions principales :
-        1. Détermine l'intention de mouvement et la direction cardinale du Client.
-        2. Synchronise les données avec le serveur (Envoi / Réception).
-        3. Met à jour l'état des animations pour le Client et l'Hôte.
-        """
-        self.guest_data["moving_intent"] = self.velocity.length_squared() > 0
-        if self.guest_data["moving_intent"]:
-            # gestion de look_direction pour les attaques dans le future 
+
+        self.moving_intent = self.velocity.length_squared() > 0
+        if self.moving_intent:
+
             self.look_direction = self.velocity.normalize()
 
-            # gestion de la direction
-            if self.velocity.x > 0:
-                self.guest_data["direction"] = "right"
-            elif self.velocity.x < 0:
-                self.guest_data["direction"] = "left"
-            """ Optionnel : en attente animation up et down
-            elif self.velocity.y > 0:
-                self.guest_data["direction"] = "down"
-            elif self.velocity.y < 0:
-                self.guest_data["direction"] = "up"
-            """
-        
-        # GESTION RESEAU
+            self.moteur.collision(self.hitbox, self.velocity, self.guest.hitbox)
+            self.moteur.collision(self.guest.hitbox, self.guest.velocity, self.hitbox)
 
-        # envoie info à l'hôte
-        data_to_send = {"velocity": list(self.velocity)}
+            super().update()
+            self.guest.update()
 
-        # reçoie info de l'hôte
-        data_to_receive = {"host" : {"position" : [595, 1474],
-                                      "moving_intent" : True,
-                                        "direction" : "right"}, 
-                            "guest" : {"position" : [2, 36]}}
-        
-        self.update_data(data_to_receive)
-
-        # FIN GESTION RESEAU
-        
-        # gestion animation frame pour client et hôte
-        self.guest_animation.update(self.guest_data["moving_intent"], self.guest_data["direction"])
-        self.host_animation.update(self.host_data["moving_intent"], self.host_data["direction"])
-
+        self.animation.update(self.moving_intent, self.direction)
+        self.guest.animation.update(self.guest.moving_intent, self.guest.direction)
 
     def display(self):
-        """
-        Gère le rendu graphique des joueurs (Client et Hôte) à l'écran.
-        
-        Calcule les coordonnées d'affichage en appliquant un décalage
-        pour centrer les sprites par rapport à leurs positions logiques.
-        
-        Note : Les offsets (-34, -70) permettent d'aligner le bas du sprite 
-        avec la position de la hitbox.
-        """
-        self.guest_animation.display((self.guest_data["position"][0]- 34, self.guest_data["position"][1] - 70))
-        self.host_animation.display((self.host_data["position"][0]- 34, self.host_data["position"][1] - 70))
+        """Affiche le joueur ainsi que l'invité"""
+
+        super().display()
+        self.guest.display()
 
 
-    def update_data(self, data_to_receive: Dict[str, Dict]):
-        """
-        Met à jour les données stocké par le client à partir du dictionnaire reçu du serveur.
-        Synchronise l'hôte et le client (juste la position pour client).
-        """
-        if "host" in data_to_receive:
-            host_info = data_to_receive["host"]
-            
-            # On met à jour la position (on convertit la liste en Vector2)
-            self.host_data["position"] = pygame.Vector2(host_info["position"])
-            
-            # On met à jour le reste
-            self.host_data["direction"] = host_info["direction"]
-            self.host_data["moving_intent"] = host_info["moving_intent"]
+class GuestController(PlayerControllerBase):
 
-        if "guest" in data_to_receive:
-            guest_info = data_to_receive["guest"]
-            
-            # On met à jour la position (validée par le serveur)
-            self.guest_data["position"] = pygame.Vector2(guest_info["position"])
-            
-            # Note: moving_intent et direction du client sont déjà gérés localement dans update()
+    def __init__(
+        self,
+        screen: pygame.Surface,
+        moteur: Moteur | None,
+        start_position: Tuple[int, int],
+        reader: asyncio.StreamReader,
+        writer: asyncio.StreamWriter,
+    ):
+
+        super().__init__(screen, moteur, start_position)
+        self.host = PlayerControllerBase(self.screen, moteur, start_position)
+
+        self.reader = reader
+        self.writer = writer
+
+        asyncio.run(self.initialize())
+
+    async def initialize(self):
+
+        self.serveur_task = await asyncio.create_task(self.handle_host())
+
+    def event(self, keys: Tuple[bool]):
+
+        super().event(keys)
+
+    async def handle_host(self):
+
+        try:
+            while True:
+                to_send_data = {
+                    "guest": {
+                        "velocity": list(self.velocity),
+                        "moving_intent": self.moving_intent,
+                        "direction": self.direction,
+                    }
+                }
+                print(True)
+                to_send_bytes = bytes(json.dumps(to_send_data) + "\n", "utf-8")
+                self.writer.write(to_send_bytes)
+                await self.writer.drain()
+
+                recieved_bytes = await self.reader.readline()
+                if not recieved_bytes:
+                    break
+                recieved_str = recieved_bytes.decode().strip()
+                recieved_data = json.loads(recieved_str)
+
+                # Update variables
+                self.position.update(recieved_data["guest"]["position"])
+                self.velocity.update(recieved_data["guest"]["velocity"])
+                self.host.position.update(recieved_data["host"]["position"])
+                self.host.moving_intent = recieved_data["host"]["moving_intent"]
+                self.host.direction = recieved_data["host"]["direction"]
+        finally:
+            pass
+
+    def update(self):
+
+        self.moving_intent = self.velocity.length_squared() > 0
+        if self.moving_intent:
+
+            self.look_direction = self.velocity.normalize()
+
+            super().update()
+            self.host.update()
+
+        self.animation.update(self.moving_intent, self.direction)
+        self.host.animation.update(self.host.moving_intent, self.host.direction)
+
+    def display(self):
+        """Affiche le joueur ainsi que l'hôte"""
+
+        super().display()
+        self.host.display()

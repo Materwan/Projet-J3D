@@ -1,13 +1,20 @@
 import pygame
-from player import Player
+from player import SoloPlayerController, HostController, GuestController
+from moteur import Moteur
+import asyncio
 
 
 class Game:
-    def __init__(self, screen, manager):
+    def __init__(
+        self,
+        screen: pygame.Surface,
+        manager,
+    ):
         self.screen = screen
         self.manager = manager
         largeur, hauteur = self.screen.get_size()
-        self.player = Player(self.screen, largeur // 2 - 30, hauteur // 2 - 20)
+        self.playing_mode = None
+        self.player_controller = None
 
         # ceci est temporaire (remplace la carte)
         self.map = [
@@ -18,7 +25,32 @@ class Game:
             pygame.Rect(largeur // 2 + 200, hauteur // 2 - 300, 300, 150),
             pygame.Rect(400, 200, 30, 400),
         ]
-        self.player.moteur.map = self.map
+        self.adresse = "192.168.56.1"
+        self.port = 8888
+
+    async def connect(self):
+
+        self.reader, self.writer = await asyncio.open_connection(
+            self.adresse, self.port
+        )
+
+    def initialize(self):
+        self.moteur = Moteur(self.screen)
+        if self.playing_mode == "solo":
+            self.player_controller = SoloPlayerController(
+                self.screen, self.moteur, (500, 500)
+            )
+            self.player_controller.moteur.map = self.map
+        elif self.playing_mode == "host":
+            self.player_controller = HostController(
+                self.screen, self.moteur, (500, 500)
+            )
+            self.player_controller.moteur.map = self.map
+        elif self.playing_mode == "guest":
+            asyncio.run(self.connect())
+            self.player_controller = GuestController(
+                self.screen, None, (500, 500), self.reader, self.writer
+            )
 
     def event(self, events: list[pygame.event.Event]) -> bool:
         for event in events:
@@ -29,11 +61,11 @@ class Game:
                     pygame.mixer.music.play(-1)
                     self.manager.change_state("MENU_P")
 
-        self.player.event(pygame.key.get_pressed())
+        self.player_controller.event(pygame.key.get_pressed())
         return False
 
     def update(self):
-        self.player.update()
+        self.player_controller.update()
 
     def display(self):
         self.screen.fill((100, 100, 100))
@@ -45,4 +77,4 @@ class Game:
         pygame.draw.rect(self.screen, "black", self.map[5])
         # fin du temporaire
 
-        self.player.display()
+        self.player_controller.display()

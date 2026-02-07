@@ -26,6 +26,8 @@ class Manager:
 
     def change_state(self, name):
         self.state = self.states[name]
+        if name == "GAME":
+            self.state.initialize()
 
     def run(self):
         while self.running:
