@@ -15,6 +15,12 @@ class Game:
         largeur, hauteur = self.screen.get_size()
         self.playing_mode = None
         self.player_controller = None
+        self.keybinds = {
+            "up": pygame.K_UP,
+            "down": pygame.K_DOWN,
+            "left": pygame.K_LEFT,
+            "right": pygame.K_RIGHT,
+        }
 
         # ceci est temporaire (remplace la carte)
         self.map = [
@@ -27,12 +33,6 @@ class Game:
         ]
         self.adresse = "192.168.56.1"
         self.port = 8888
-
-    async def connect(self):
-
-        self.reader, self.writer = await asyncio.open_connection(
-            self.adresse, self.port
-        )
 
     def initialize(self):
         self.moteur = Moteur(self.screen)
@@ -47,10 +47,10 @@ class Game:
             )
             self.player_controller.moteur.map = self.map
         elif self.playing_mode == "guest":
-            asyncio.run(self.connect())
             self.player_controller = GuestController(
-                self.screen, None, (500, 500), self.reader, self.writer
+                self.screen, None, (500, 500), self.adresse, self.port
             )
+        self.player_controller.keybinds = self.keybinds
 
     def event(self, events: list[pygame.event.Event]) -> bool:
         for event in events:
