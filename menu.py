@@ -294,7 +294,7 @@ class Setting_Menu(Menu):
         for event in events:
             if event.type == p.KEYDOWN:
                 if event.key == p.K_ESCAPE and self.checkchangekey():
-                    self.manager.states["GAME"].player.keybinds = self.keybinds
+                    self.manager.states["GAME"].keybinds = self.keybinds
                     self.manager.change_state("MENU_P")
                 self.changekey(event)  # try to change the keybind
                 self.interchange(
@@ -339,7 +339,7 @@ class Setting_Menu(Menu):
                     self.retour.hover = True
                     if checkevent:
                         self.retour.hover = False
-                        self.manager.states["GAME"].player.keybinds = self.keybinds
+                        self.manager.states["GAME"].keybinds = self.keybinds
                         self.manager.change_state("MENU_P")
                 elif self.changeup.rec.collidepoint(coord):
                     self.changeup.hover = True
@@ -481,16 +481,20 @@ class Play_Menu(Menu):
                     self.solo.clicked = True
                     p.mixer.music.stop()
                     self.solo.hover = False
+                    self.manager.states["GAME"].playing_mode = "solo"
                     self.manager.change_state("GAME")
                 elif self.multiplayer.rec.collidepoint(coord):
                     self.multiplayer.clicked = True
                     p.mixer.music.stop()
                     self.multiplayer.hover = False
+                    self.manager.states["GAME"].playing_mode = "host"
                     self.manager.change_state("GAME")
                 elif self.joinmultiplayer.rec.collidepoint(coord):
                     self.joinmultiplayer.clicked = True
                     self.joinmultiplayer.hover = False
-                    self.manager.change_state("MENU_MULTI")
+                    self.manager.states["GAME"].playing_mode = "guest"
+                    self.manager.change_state("GAME")
+                    # self.manager.change_state("MENU_MULTI")
                 elif self.retour.rec.collidepoint(coord):
                     self.retour.clicked = True
                     self.retour.hover = False
