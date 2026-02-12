@@ -57,7 +57,6 @@ class Moteur:
             nearby_obstacles.append(other_hitbox)
         if velocity.x != 0:
             future_hitbox = hitbox.move(velocity.x * 2, 0)
-            print(len(nearby_obstacles))
             if any(
                 future_hitbox.colliderect(obstacle) for obstacle in nearby_obstacles
             ):
@@ -69,7 +68,7 @@ class Moteur:
                 future_hitbox.colliderect(obstacle) for obstacle in nearby_obstacles
             ):
                 velocity.y = 0
-        
+
         if other_hitbox != None:
             nearby_obstacles.pop(-1)
 

@@ -90,34 +90,6 @@ class PlayerControllerBase:
 
             self.update_animation()
 
-    """def update(self):
-
-        moving_intent = self.velocity.length_squared() > 0
-        if moving_intent:  # si le joueur veut se deplacer alors :
-
-            # gestion collision
-            self.moteur.collision(self.hitbox, self.velocity, None)
-
-            is_moving = self.velocity.length_squared()
-            if is_moving > 0:  # si on se deplace toujours alors :
-
-                # gestion des déplacements en diagonales
-                if is_moving > 1:  # si deplacement en diagonale
-                    self.velocity.normalize_ip()  # [1, 1] devient [0.707107, 0.707107]
-
-                # gestion du vecteur position
-                self.position += self.velocity * 2
-                # la position de la hitbox se cale sur le vecteur position
-                self.hitbox.topleft = self.position
-
-                # gestion de la direction /// en attente de animation up et down
-                if self.velocity.x < 0:
-                    self.direction = "left"
-                elif self.velocity.x > 0:
-                    self.direction = "right"
-
-        self.animation.update(moving_intent, self.direction)"""
-
     def display(self):
 
         self.animation.display((self.hitbox.x - 34, self.hitbox.y - 70))
@@ -174,6 +146,7 @@ class HostController(PlayerControllerBase):
         self.serveur: asyncio.Server
         self.serveur = None
         self.connected = False  # True si un invité est connecté
+        self.close = False
 
         self.loop = threading.Thread(target=self.initialize)
         self.loop.start()
@@ -198,7 +171,6 @@ class HostController(PlayerControllerBase):
         # Si un au client est connecté
         if self.connected:
             writer.close()
-            await writer.wait_closed()
             return
 
         # Si aucun autre client n'est connecté
@@ -207,27 +179,38 @@ class HostController(PlayerControllerBase):
 
         # Arrêt le serveur : n'accepte plus les connections
         self.serveur.close()
-        # await self.serveur.wait_closed()
         print("Serveur fermé")
-
-        # Gestion du client
-        player_id = id(writer)
-        self.writter = writer
 
         try:
             while True:
-                # print("aaaaaaaaaaaaaaaaaaaaaaaaa")
+
+                # Si le jeu est fermé, envoie l'info au client et ferme la connexion
+                if self.close:
+                    writer.write(bytes(json.dumps({"close": True}) + "\n", "utf-8"))
+                    await writer.drain()
+                    break
+
+                # Récupère les données et verifi leur existence
                 recieved_bytes = await reader.readline()
                 if not recieved_bytes:
                     break
-                # print("psjngonsdcovjn")
+
+                # Decode les donnée en un dictionnaire
                 recieved_str = recieved_bytes.decode().strip()
                 recieved_data = json.loads(recieved_str)
-                # print(recieved_data)
+
+                # Si le client ferme son jeu, ferme le jeu et la connexion
+                if recieved_data["close"] == True:
+                    print("Le client a fermé la connexion")
+                    self.close = True
+                    break
+
+                # Met à jour les varibles
                 self.guest.velocity.update(recieved_data["guest"]["velocity"])
                 self.guest.moving_intent = recieved_data["guest"]["moving_intent"]
                 self.guest.direction = recieved_data["guest"]["direction"]
 
+                # Défini les variables à envoyer
                 to_send_data = {
                     "guest": {
                         "position": list(self.guest.position),
@@ -238,15 +221,20 @@ class HostController(PlayerControllerBase):
                         "moving_intent": self.moving_intent,
                         "direction": self.direction,
                     },
+                    "close": False,
                 }
+                # Tranformer les variables en bits
                 to_send_bytes = bytes(json.dumps(to_send_data) + "\n", "utf-8")
 
+                # Envoie les données
                 writer.write(to_send_bytes)
                 await writer.drain()
 
+                # Attend de manière à envoyer seulement 30 fois par secondes
                 await asyncio.sleep(1 / 30)
         finally:
             writer.close()
+            print("Connexion fermé")
 
     async def tcp_server(self):
 
@@ -256,12 +244,14 @@ class HostController(PlayerControllerBase):
 
         print("Attente de client")
         async with self.serveur:
-            await self.serveur.serve_forever()
+            try:
+                await self.serveur.serve_forever()
+            except asyncio.CancelledError:
+                print("Serveur fermé")
 
     def update(self):
 
         self.moving_intent = self.velocity.length_squared() > 0
-        # print(self.moving_intent)
         if self.moving_intent:
 
             self.look_direction = self.velocity.normalize()
@@ -269,7 +259,7 @@ class HostController(PlayerControllerBase):
             self.moteur.collision(self.hitbox, self.velocity, self.guest.hitbox)
 
             super().update()
-        
+
         if self.guest.moving_intent:
 
             self.moteur.collision(self.guest.hitbox, self.guest.velocity, self.hitbox)
@@ -301,6 +291,7 @@ class GuestController(PlayerControllerBase):
 
         self.adresse = adresse
         self.port = port
+        self.close = False
 
         self.loop = threading.Thread(target=self.run)
         self.loop.start()
@@ -333,62 +324,72 @@ class GuestController(PlayerControllerBase):
 
         try:
             while True:
+
+                # Si le jeu est fermé, envoyer l'info à l'hôte et ferme la connexion
+                if self.close:
+                    self.writer.write(
+                        bytes(json.dumps({"close": True}) + "\n", "utf-8")
+                    )
+                    await self.writer.drain()
+                    break
+
+                # Défini les variables à envoyer à l'hôte
                 to_send_data = {
                     "guest": {
                         "velocity": list(self.velocity),
                         "moving_intent": self.moving_intent,
                         "direction": self.direction,
-                    }
+                    },
+                    "close": False,
                 }
-                # print(True)
+                # Tranforme les données en bits
                 to_send_bytes = bytes(json.dumps(to_send_data) + "\n", "utf-8")
-                #print("writer:", self.writer)
-                #print("socket:", self.writer.get_extra_info("socket"))
-                #print(to_send_data)
-                #print(to_send_bytes)
+
+                # Envoie les données
                 self.writer.write(to_send_bytes)
                 await self.writer.drain()
 
+                # Récupère les donnée et verifie leur existence
                 recieved_bytes = await self.reader.readline()
                 if not recieved_bytes:
                     break
+
+                # Transforme les donnée en dictionnaire
                 recieved_str = recieved_bytes.decode().strip()
                 recieved_data = json.loads(recieved_str)
 
-                # Update variables
-                #print("Guest position : ", recieved_data["guest"]["position"])
-                #print("Guest velocity : ", recieved_data["guest"]["velocity"])
-                # print("Host position : ", recieved_data["host"]["position"])
-                #print("Host moving intent : ", recieved_data["host"]["moving_intent"])
-                #print("Host direction : ", recieved_data["host"]["direction"])
+                # Si l'hôte a fermé son jeu, fermer le jeu
+                if recieved_data["close"] == True:
+                    self.close = True
+                    print("L'hôte a fermé la connexion")
+                    break
+
+                # Met à jour les variables
                 self.position.update(recieved_data["guest"]["position"])
                 self.velocity.update(recieved_data["guest"]["velocity"])
                 self.host.position.update(recieved_data["host"]["position"])
-                #print(recieved_data["host"]["moving_intent"])
                 self.host.moving_intent = recieved_data["host"]["moving_intent"]
                 self.host.direction = recieved_data["host"]["direction"]
 
+                # Attend de manière à ce qu'il y ai 30 envoie par secondes
                 await asyncio.sleep(1 / 30)
         finally:
-            pass
+            print("Connexion fermé")
 
     def update(self):
 
-        #print(self.host.moving_intent)
         self.moving_intent = self.velocity.length_squared() > 0
         if self.moving_intent:
 
             self.look_direction = self.velocity.normalize()
 
             super().update()
-        
+
         if self.host.moving_intent:
 
-            # print("moving intent")
             self.host.update()
             self.host.hitbox.topleft = self.host.position
 
-        print("Host position : ", self.host.hitbox.topleft)
         self.animation.update(self.moving_intent, self.direction)
         self.host.animation.update(self.host.moving_intent, self.host.direction)
 

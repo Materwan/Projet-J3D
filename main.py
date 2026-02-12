@@ -1,6 +1,8 @@
 import pygame
 from menu import *
 from game import *
+from player import HostController, GuestController
+import asyncio
 
 pygame.init()
 pygame.mixer.init()
@@ -9,7 +11,7 @@ pygame.mixer.init()
 class Manager:
 
     def __init__(self):
-        self.screen = pygame.display.set_mode((0, 0))
+        self.screen = pygame.display.set_mode((500, 500))
         self.running = True
 
         self.states = {
@@ -46,6 +48,19 @@ class Manager:
             pygame.display.flip()
 
             self.clock.tick(60)  # à ne pas toucher
+
+        # Arrêt les processus multijoueur
+        if isinstance(
+            self.states["GAME"].player_controller, (HostController, GuestController)
+        ):
+            # Arrête les processus de communication
+            self.states["GAME"].player_controller.close = True
+            # Si c'est le serveur, arrête d'accepter les connexions
+            if (
+                isinstance(self.states["GAME"].player_controller, HostController)
+                and self.states["GAME"].player_controller.serveur.is_serving()
+            ):
+                self.states["GAME"].player_controller.serveur.close()
 
 
 Manager().run()

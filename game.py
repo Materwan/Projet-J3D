@@ -66,6 +66,8 @@ class Game:
 
     def update(self):
         self.player_controller.update()
+        if self.player_controller.close:
+            self.manager.running = False
 
     def display(self):
         self.screen.fill((100, 100, 100))
