@@ -38,17 +38,17 @@ class Game:
         self.moteur = Moteur(self.screen)
         if self.playing_mode == "solo":
             self.player_controller = SoloPlayerController(
-                self.screen, self.moteur, (500, 500)
+                self.screen, self.moteur, (100, 100)
             )
             self.player_controller.moteur.map = self.map
         elif self.playing_mode == "host":
             self.player_controller = HostController(
-                self.screen, self.moteur, (500, 500)
+                self.screen, self.moteur, (100, 100)
             )
             self.player_controller.moteur.map = self.map
         elif self.playing_mode == "guest":
             self.player_controller = GuestController(
-                self.screen, None, (500, 500), self.adresse, self.port
+                self.screen, None, (100, 100), self.adresse, self.port
             )
         self.player_controller.keybinds = self.keybinds
 

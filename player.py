@@ -4,6 +4,7 @@ from animations import AnimationController, create_player_animation
 from typing import Tuple, Dict
 import asyncio
 import json
+import threading
 
 
 class PlayerControllerBase:
@@ -30,12 +31,8 @@ class PlayerControllerBase:
         self.animation = AnimationController(animation_images, self.screen)
 
         # Initialise les données nécessaires pour un joueur
-        self.keybinds = {
-            "up": pygame.K_UP,
-            "down": pygame.K_DOWN,
-            "left": pygame.K_LEFT,
-            "right": pygame.K_RIGHT,
-        }
+        self.keybinds = None
+        self.keybinds: Dict
         self.position = pygame.Vector2(start_position)
         self.hitbox = pygame.Rect(start_position[0], start_position[1], 32, 15)
         self.velocity = pygame.Vector2(0, 0)
@@ -171,20 +168,27 @@ class HostController(PlayerControllerBase):
         super().__init__(screen, moteur, start_position)
 
         # Initialise les données de l'invité
-        self.guest = PlayerControllerBase(self.screen, moteur, (700, 500))
+        self.guest = PlayerControllerBase(self.screen, moteur, (200, 200))
         self.recieved_data = {"Guest": {"velocity": [0, 0]}}
 
         self.serveur: asyncio.Server
         self.serveur = None
         self.connected = False  # True si un invité est connecté
 
-        asyncio.run(self.initialize())
+        self.loop = threading.Thread(target=self.initialize)
+        self.loop.start()
+        """self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+        self.loop.create_task(self.tcp_server())
+        self.loop.run_forever()"""
+        # asyncio.run(self.initialize())
 
-    async def initialize(self):
+    def initialize(self):
 
-        self.serveur_task = await asyncio.create_task(self.tcp_server())
+        self.serveur_task = asyncio.run(self.tcp_server())
 
     def event(self, keys: Tuple[bool]):
+
         super().event(keys)
 
     async def handle_client(
@@ -203,7 +207,7 @@ class HostController(PlayerControllerBase):
 
         # Arrêt le serveur : n'accepte plus les connections
         self.serveur.close()
-        await self.serveur.wait_closed()
+        # await self.serveur.wait_closed()
         print("Serveur fermé")
 
         # Gestion du client
@@ -212,12 +216,14 @@ class HostController(PlayerControllerBase):
 
         try:
             while True:
+                # print("aaaaaaaaaaaaaaaaaaaaaaaaa")
                 recieved_bytes = await reader.readline()
                 if not recieved_bytes:
                     break
-
+                # print("psjngonsdcovjn")
                 recieved_str = recieved_bytes.decode().strip()
                 recieved_data = json.loads(recieved_str)
+                # print(recieved_data)
                 self.guest.velocity.update(recieved_data["guest"]["velocity"])
                 self.guest.moving_intent = recieved_data["guest"]["moving_intent"]
                 self.guest.direction = recieved_data["guest"]["direction"]
@@ -233,10 +239,12 @@ class HostController(PlayerControllerBase):
                         "direction": self.direction,
                     },
                 }
-                to_send_bytes = bytes(json.dumps(to_send_data + "\n", "utf-8"))
+                to_send_bytes = bytes(json.dumps(to_send_data) + "\n", "utf-8")
 
                 writer.write(to_send_bytes)
                 await writer.drain()
+
+                await asyncio.sleep(1 / 30)
         finally:
             writer.close()
 
@@ -253,14 +261,18 @@ class HostController(PlayerControllerBase):
     def update(self):
 
         self.moving_intent = self.velocity.length_squared() > 0
+        # print(self.moving_intent)
         if self.moving_intent:
 
             self.look_direction = self.velocity.normalize()
 
             self.moteur.collision(self.hitbox, self.velocity, self.guest.hitbox)
-            self.moteur.collision(self.guest.hitbox, self.guest.velocity, self.hitbox)
 
             super().update()
+        
+        if self.guest.moving_intent:
+
+            self.moteur.collision(self.guest.hitbox, self.guest.velocity, self.hitbox)
             self.guest.update()
 
         self.animation.update(self.moving_intent, self.direction)
@@ -280,21 +292,38 @@ class GuestController(PlayerControllerBase):
         screen: pygame.Surface,
         moteur: Moteur | None,
         start_position: Tuple[int, int],
-        reader: asyncio.StreamReader,
-        writer: asyncio.StreamWriter,
+        adresse: asyncio.StreamReader,
+        port: asyncio.StreamWriter,
     ):
 
         super().__init__(screen, moteur, start_position)
         self.host = PlayerControllerBase(self.screen, moteur, start_position)
 
-        self.reader = reader
-        self.writer = writer
+        self.adresse = adresse
+        self.port = port
+
+        self.loop = threading.Thread(target=self.run)
+        self.loop.start()
+        """self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+        self.loop.create_task(self.initialize())
+        self.loop.run_forever()"""
+        # asyncio.run(self.initialize())
+
+    async def connect(self):
+
+        self.reader, self.writer = await asyncio.open_connection(
+            self.adresse, self.port
+        )
+
+    def run(self):
 
         asyncio.run(self.initialize())
 
     async def initialize(self):
 
-        self.serveur_task = await asyncio.create_task(self.handle_host())
+        await self.connect()
+        await self.handle_host()
 
     def event(self, keys: Tuple[bool]):
 
@@ -311,8 +340,12 @@ class GuestController(PlayerControllerBase):
                         "direction": self.direction,
                     }
                 }
-                print(True)
+                # print(True)
                 to_send_bytes = bytes(json.dumps(to_send_data) + "\n", "utf-8")
+                #print("writer:", self.writer)
+                #print("socket:", self.writer.get_extra_info("socket"))
+                #print(to_send_data)
+                #print(to_send_bytes)
                 self.writer.write(to_send_bytes)
                 await self.writer.drain()
 
@@ -323,24 +356,39 @@ class GuestController(PlayerControllerBase):
                 recieved_data = json.loads(recieved_str)
 
                 # Update variables
+                #print("Guest position : ", recieved_data["guest"]["position"])
+                #print("Guest velocity : ", recieved_data["guest"]["velocity"])
+                # print("Host position : ", recieved_data["host"]["position"])
+                #print("Host moving intent : ", recieved_data["host"]["moving_intent"])
+                #print("Host direction : ", recieved_data["host"]["direction"])
                 self.position.update(recieved_data["guest"]["position"])
                 self.velocity.update(recieved_data["guest"]["velocity"])
                 self.host.position.update(recieved_data["host"]["position"])
+                #print(recieved_data["host"]["moving_intent"])
                 self.host.moving_intent = recieved_data["host"]["moving_intent"]
                 self.host.direction = recieved_data["host"]["direction"]
+
+                await asyncio.sleep(1 / 30)
         finally:
             pass
 
     def update(self):
 
+        #print(self.host.moving_intent)
         self.moving_intent = self.velocity.length_squared() > 0
         if self.moving_intent:
 
             self.look_direction = self.velocity.normalize()
 
             super().update()
-            self.host.update()
+        
+        if self.host.moving_intent:
 
+            # print("moving intent")
+            self.host.update()
+            self.host.hitbox.topleft = self.host.position
+
+        print("Host position : ", self.host.hitbox.topleft)
         self.animation.update(self.moving_intent, self.direction)
         self.host.animation.update(self.host.moving_intent, self.host.direction)
 
