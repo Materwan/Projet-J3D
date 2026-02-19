@@ -2,9 +2,14 @@ import pygame
 from moteur import Moteur
 from animations import AnimationController, create_player_animation
 from typing import Tuple, Dict
+import time
 import asyncio
+import socket
 import json
 import threading
+
+UDP_IP = socket.gethostbyname(socket.gethostname())
+UDP_PORT = 9999
 
 
 class PlayerControllerBase:
@@ -148,17 +153,38 @@ class HostController(PlayerControllerBase):
         self.connected = False  # True si un invité est connecté
         self.close = False
 
-        self.loop = threading.Thread(target=self.initialize)
+        self.loop = threading.Thread(target=self.initialize_tcp)
         self.loop.start()
+        self.udp_prot = threading.Thread(target=self.upd_broadcast)
+        self.udp_event = threading.Event()
+        self.udp_prot.start()
+        self.udp_event.set()
         """self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
         self.loop.create_task(self.tcp_server())
         self.loop.run_forever()"""
         # asyncio.run(self.initialize())
 
-    def initialize(self):
+    def initialize_tcp(self):
 
         self.serveur_task = asyncio.run(self.tcp_server())
+
+    def upd_broadcast(self):
+        """A modifier"""
+        message = bytes(json.dumps({"Game name": "My game", "Port": 8888}) + "\n", encoding="utf-8")
+
+        print("UDP sending protocole start")
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # Internet  # UDP
+
+        while not self.close:
+            if self.udp_event.is_set():
+                sock.sendto(message, (UDP_IP, UDP_PORT))
+                print("Send")
+                time.sleep(0.5)
+        
+        print("UDP sending protocole stopped")
+        sock.close()
 
     def event(self, keys: Tuple[bool]):
 
@@ -179,6 +205,7 @@ class HostController(PlayerControllerBase):
 
         # Arrêt le serveur : n'accepte plus les connections
         self.serveur.close()
+        self.udp_event.clear()
         print("Serveur fermé")
 
         try:

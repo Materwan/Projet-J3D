@@ -1,7 +1,14 @@
 import pygame as p
 import animations as a
+from typing import List, Dict
+import threading
+import socket
+import json
+import asyncio
 
 EMPTY_BUTTON = "Ressources/UI_&_élements_graphiques/"
+UDP_IP = "0.0.0.0"
+UDP_PORT = 9999
 
 p.font.init()
 p.mixer.init()
@@ -492,9 +499,10 @@ class Play_Menu(Menu):
                 elif self.joinmultiplayer.rec.collidepoint(coord):
                     self.joinmultiplayer.clicked = True
                     self.joinmultiplayer.hover = False
-                    self.manager.states["GAME"].playing_mode = "guest"
-                    self.manager.change_state("GAME")
-                    # self.manager.change_state("MENU_MULTI")
+                    # self.manager.states["GAME"].playing_mode = "guest"
+                    # self.manager.change_state("GAME")
+                    self.manager.states["MENU_MULTI"].udp_event.set()
+                    self.manager.change_state("MENU_MULTI")
                 elif self.retour.rec.collidepoint(coord):
                     self.retour.clicked = True
                     self.retour.hover = False
@@ -544,6 +552,22 @@ class Join_Multi_Menu(Menu):
             (170, 67),
             (301, 95),
         )
+        """
+        Un dictionnaire ou les clé sont les addresses ip et les valeurs sont un dictionnaire contennant le nom de la partie et l'addresses :
+        <une ip>: {
+            "Game name": <le nom de la partie>,
+            "Port": <port pour se connecter>
+        }
+        <une autre ip>: {
+            "Game name": <le nom de la partie>,
+            "Port": <port pour se connecter>
+        }
+        .
+        .
+        .
+        """
+        self.serveurs = {}
+        self.serveurs: Dict[Dict]
         self.retour_t = [Text("Impact", 30, "<--", (0, 0, 0), self.screen)]
         self.retour_t.append(
             (
@@ -554,16 +578,55 @@ class Join_Multi_Menu(Menu):
             )
         )
 
+        self.upd_prot = threading.Thread(target=self.recieve_udp)
+        self.udp_event = threading.Event()
+        self.upd_prot.start()
+
+    def initialize_udp(self):
+
+        self.upd_func = asyncio.run(self.recieve_udp())
+
+    def recieve_udp(self):
+
+        sock_set = False
+        sock = None
+
+        while self.manager.running:
+
+            try:
+                if self.udp_event.is_set():
+                    if not sock_set:
+                        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # Internet  # UDP
+                        sock.bind((UDP_IP, UDP_PORT))
+                        sock.settimeout(0.5)
+                        sock_set = True
+                        print("UDP recieve protocol start")
+
+                    data, addr = sock.recvfrom(1024)  # buffer size is 1024 bytes
+                    data = data.decode().strip()
+                    data = json.loads(data)
+                    if addr[0] not in self.serveurs:
+                        self.serveurs[addr[0]] = data
+                        print(self.serveurs)
+            except socket.timeout:
+                continue
+        
+        print("UDP recieve protocol stopped")
+        if sock:
+            sock.close()
+
     def event(self, events):
         coord = p.mouse.get_pos()
         for event in events:
             if event.type == p.KEYDOWN:
                 if event.key == p.K_ESCAPE:
+                    self.udp_event.clear()
                     self.manager.change_state("MENU_PLAY")
             if event.type == p.MOUSEBUTTONDOWN:
                 if self.retour.rec.collidepoint(coord):
                     self.retour.clicked = True
                     self.retour.hover = False
+                    self.udp_event.clear()
                     self.manager.change_state("MENU_PLAY")
             else:
                 self.retour.hover = False
