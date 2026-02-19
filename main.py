@@ -6,6 +6,7 @@ import asyncio
 
 pygame.init()
 pygame.mixer.init()
+pygame.display.set_caption("MoleTale")
 
 
 class Manager:
