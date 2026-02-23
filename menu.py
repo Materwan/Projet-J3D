@@ -608,9 +608,11 @@ class Join_Multi_Menu(Menu):
             try:
                 if self.udp_event.is_set():
                     if not sock_set:
-                        sock = socket.socket(
-                            socket.AF_INET, socket.SOCK_DGRAM
-                        )  # Internet  # UDP
+                        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+                        sock.bind(("", UDP_PORT))
+                        sock.settimeout(0.5)
                         sock.bind((UDP_IP, UDP_PORT))
                         sock.settimeout(0.5)
                         sock_set = True
