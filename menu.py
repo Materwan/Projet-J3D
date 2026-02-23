@@ -77,7 +77,6 @@ class Menu:
 
     def pagedisplay(self, eltpages):
         """draw the page"""
-        self.screen.blit(self.bg_img, self.bg_img.get_rect())
         for elt in eltpages:
             elt.display()
 
@@ -154,6 +153,7 @@ class Principal_Menu(Menu):
         pass
 
     def display(self):
+        self.screen.blit(self.bg_img, self.bg_img.get_rect())
         super().textdisplay([self.titre])
         super().pagedisplay([self.start, self.settings, self.quit])
         self.start.clicked = False
@@ -163,9 +163,11 @@ class Principal_Menu(Menu):
 
 class Setting_Menu(Menu):
 
-    def __init__(self, screen, manager):
+    def __init__(self, screen, manager, menu_appel="MENU_P"):
         super().__init__(screen, manager)
         self.manager.running = True
+        self.surface_copie = None
+        self.menu_appel = menu_appel
         self.retour = a.Button(
             EMPTY_BUTTON + "EMPTY.png",
             self.screen,
@@ -299,10 +301,12 @@ class Setting_Menu(Menu):
     def event(self, events):
         coord = p.mouse.get_pos()
         for event in events:
+            if event.type == p.QUIT:
+                self.manager.running = False
             if event.type == p.KEYDOWN:
                 if event.key == p.K_ESCAPE and self.checkchangekey():
                     self.manager.states["GAME"].keybinds = self.keybinds
-                    self.manager.change_state("MENU_P")
+                    self.manager.change_state(self.menu_appel)
                 self.changekey(event)  # try to change the keybind
                 self.interchange(
                     self.up_t,
@@ -347,7 +351,7 @@ class Setting_Menu(Menu):
                     if checkevent:
                         self.retour.hover = False
                         self.manager.states["GAME"].keybinds = self.keybinds
-                        self.manager.change_state("MENU_P")
+                        self.manager.change_state(self.menu_appel)
                 elif self.changeup.rec.collidepoint(coord):
                     self.changeup.hover = True
                     if checkevent:
@@ -375,6 +379,10 @@ class Setting_Menu(Menu):
         pass
 
     def display(self):
+        if self.menu_appel == "MENU_P":
+            self.screen.blit(self.bg_img, self.bg_img.get_rect())
+        else:
+            self.screen.blit(self.surface_copie, (0, 0))
         super().pagedisplay(
             [
                 self.retour,
@@ -480,6 +488,8 @@ class Play_Menu(Menu):
     def event(self, events):
         coord = p.mouse.get_pos()
         for event in events:
+            if event.type == p.QUIT:
+                self.manager.running = False
             if event.type == p.KEYDOWN:
                 if event.key == p.K_ESCAPE:
                     self.manager.change_state("MENU_P")
@@ -527,6 +537,7 @@ class Play_Menu(Menu):
         pass
 
     def display(self):
+        self.screen.blit(self.bg_img, self.bg_img.get_rect())
         super().pagedisplay(
             [self.retour, self.solo, self.multiplayer, self.joinmultiplayer]
         )
@@ -545,6 +556,7 @@ class Join_Multi_Menu(Menu):
 
     def __init__(self, screen, manager):
         super().__init__(screen, manager)
+        self.list_button = []
         self.manager.running = True
         self.retour = a.Button(
             EMPTY_BUTTON + "EMPTY.png",
@@ -596,7 +608,9 @@ class Join_Multi_Menu(Menu):
             try:
                 if self.udp_event.is_set():
                     if not sock_set:
-                        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # Internet  # UDP
+                        sock = socket.socket(
+                            socket.AF_INET, socket.SOCK_DGRAM
+                        )  # Internet  # UDP
                         sock.bind((UDP_IP, UDP_PORT))
                         sock.settimeout(0.5)
                         sock_set = True
@@ -610,14 +624,43 @@ class Join_Multi_Menu(Menu):
                         print(self.serveurs)
             except socket.timeout:
                 continue
-        
+
         print("UDP recieve protocol stopped")
         if sock:
             sock.close()
 
+    def create_list_button(self, serveurs):
+        self.list_button = []
+        count = 0
+        for serveur in serveurs.keys():
+            button = a.Button(
+                EMPTY_BUTTON + "EMPTY.png",
+                self.screen,
+                (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 200 + count * 100),
+                (301, 95),
+            )
+            button_t = [
+                Text(
+                    "Impact",
+                    30,
+                    serveur,
+                    (0, 0, 0),
+                    self.screen,
+                )
+            ]
+            button_t.append(
+                (
+                    (button.rec.width - button_t[0].l[0]) // 2 + button.rec.left,
+                    (button.rec.height - button_t[0].l[1]) // 2 + button.rec.top,
+                )
+            )
+            self.list_button.append((button, button_t))
+
     def event(self, events):
         coord = p.mouse.get_pos()
         for event in events:
+            if event.type == p.QUIT:
+                self.manager.running = False
             if event.type == p.KEYDOWN:
                 if event.key == p.K_ESCAPE:
                     self.udp_event.clear()
@@ -637,6 +680,87 @@ class Join_Multi_Menu(Menu):
         pass
 
     def display(self):
+        self.screen.blit(self.bg_img, self.bg_img.get_rect())
         super().pagedisplay([self.retour])
         super().textdisplay([self.retour_t])
+        self.create_list_button(self.serveurs)
+        for elt in self.list_button:
+            super().pagedisplay([elt[0]])
+            super().textdisplay([elt[1]])
         self.retour.clicked = False
+
+
+class Pause_Menu(Menu):
+
+    def __init__(self, screen, manager):
+        super().__init__(screen, manager)
+        self.surface_copie = None
+        self.manager.running = True
+        self.start = a.Button(
+            EMPTY_BUTTON + "PLAY.png",
+            self.screen,
+            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 150),
+            (301, 95),
+        )
+        self.settings = a.Button(
+            EMPTY_BUTTON + "SETTINGS.png",
+            self.screen,
+            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2),
+            (497 * 0.80, 184 * 0.80),
+        )
+        self.quit = a.Button(
+            EMPTY_BUTTON + "EXIT.png",
+            self.screen,
+            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 150),
+            (322 * 0.97, 82 * 0.97),
+        )
+
+    def event(self, events):
+        coord = p.mouse.get_pos()
+        for event in events:
+            if event.type == p.QUIT:
+                self.manager.running = False
+            if event.type == p.MOUSEBUTTONDOWN:
+                if self.quit.rec.collidepoint(coord):
+                    self.quit.clicked = True
+                    self.manager.change_state("MENU_P")
+                elif self.start.rec.collidepoint(coord):
+                    self.start.clicked = True
+                    self.manager.change_state("GAME")
+                elif self.settings.rec.collidepoint(coord):
+                    self.settings.clicked = True
+                    self.manager.states["MENU_SETTING_PAUSE"].surface_copie = (
+                        self.surface_copie
+                    )
+                    self.manager.change_state("MENU_SETTING_PAUSE")
+            else:
+                if self.quit.rec.collidepoint(coord):
+                    self.quit.hover, self.start.hover, self.settings.hover = (
+                        True,
+                        False,
+                        False,
+                    )
+                elif self.start.rec.collidepoint(coord):
+                    self.start.hover, self.quit.hover = True, False
+                elif self.settings.rec.collidepoint(coord):
+                    self.quit.hover, self.start.hover, self.settings.hover = (
+                        False,
+                        False,
+                        True,
+                    )
+                else:
+                    self.quit.hover, self.start.hover, self.settings.hover = (
+                        False,
+                        False,
+                        False,
+                    )
+
+    def update(self):
+        pass
+
+    def display(self):
+        self.screen.blit(self.surface_copie, (0, 0))
+        super().pagedisplay([self.start, self.settings, self.quit])
+        self.start.clicked = False
+        self.settings.clicked = False
+        self.quit.clicked = False

@@ -18,9 +18,11 @@ class Manager:
         self.states = {
             "MENU_P": Principal_Menu(self.screen, self),
             "MENU_SETTING": Setting_Menu(self.screen, self),
+            "MENU_SETTING_PAUSE": Setting_Menu(self.screen, self, "MENU_PAUSE"),
             "GAME": Game(self.screen, self),
             "MENU_PLAY": Play_Menu(self.screen, self),
             "MENU_MULTI": Join_Multi_Menu(self.screen, self),
+            "MENU_PAUSE": Pause_Menu(self.screen, self),
         }
         self.state = self.states["MENU_P"]
 

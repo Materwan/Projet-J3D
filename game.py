@@ -31,7 +31,7 @@ class Game:
             pygame.Rect(largeur // 2 + 200, hauteur // 2 - 300, 300, 150),
             pygame.Rect(400, 200, 30, 400),
         ]
-        self.adresse = "192.168.56.1"
+        self.adresse = "10.187.208.69"
         self.port = 8888
 
     def initialize(self):
@@ -59,7 +59,8 @@ class Game:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     pygame.mixer.music.play(-1)
-                    self.manager.change_state("MENU_P")
+                    self.manager.states["MENU_PAUSE"].surface_copie = self.screen.copy()
+                    self.manager.change_state("MENU_PAUSE")
 
         self.player_controller.event(pygame.key.get_pressed())
         return False
