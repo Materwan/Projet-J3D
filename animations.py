@@ -4,7 +4,7 @@ import os
 
 
 def load_image(
-    directory: os.path, name: str, size: Tuple | List | None = None
+    directory: str, name: str, size: Tuple | List | None = None
 ) -> pygame.surface.Surface:
     """Load image with good size (normal if None)"""
     path = os.path.join(directory, name)
@@ -15,7 +15,7 @@ def load_image(
 
 
 def create_player_animation(
-    idle_directory: os.path, run_directory: os.path, size: Tuple | List | None = None
+    idle_directory: str, run_directory: str, size: Tuple | List | None = None
 ) -> Dict[str, pygame.surface.Surface]:
     """Create a dictionnary of this type for player animations :
     animations = {
@@ -109,7 +109,7 @@ class Button:
 
     def __init__(
         self,
-        path: os.path,
+        path: str,
         screen: pygame.surface.Surface,
         position: Tuple | List,
         size: Tuple | List | None = None,
@@ -127,6 +127,8 @@ class Button:
         if size != None:
             assert len(size) == 2
             self.image = pygame.transform.scale(self.image, size)
+        else:
+            size = self.image.get_size()
         self.rec = pygame.rect.Rect(
             position[0] - size[0] // 2, position[1] - size[1] // 2, size[0], size[1]
         )

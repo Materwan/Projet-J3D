@@ -5,8 +5,15 @@ import threading
 import socket
 import json
 import asyncio
+import time
 
-EMPTY_BUTTON = "Ressources/UI_&_élements_graphiques/"
+MENU_ASSET_DIRECTORY = "Ressources/UI_&_élements_graphiques/"
+BACKGROUND = MENU_ASSET_DIRECTORY + "fond ecran menu.png"
+PLAY_BUTTON = MENU_ASSET_DIRECTORY + "PLAY.png"
+SETTING_BUTTON = MENU_ASSET_DIRECTORY + "SETTINGS.png"
+EXIT_BUTTON = MENU_ASSET_DIRECTORY + "EXIT.png"
+EMPTY_BUTTON = MENU_ASSET_DIRECTORY + "EMPTY.png"
+
 UDP_IP = "0.0.0.0"
 UDP_PORT = 9999
 
@@ -32,10 +39,10 @@ class Text:
 
 class Menu:
 
-    def __init__(self, screen, manager):
+    def __init__(self, screen: p.Surface, manager):
         self.WINDOWS = screen.get_size()
         self.screen = screen
-        self.bg_img = p.image.load(EMPTY_BUTTON + "fond ecran menu.png")
+        self.bg_img = p.image.load(BACKGROUND).convert()
         self.manager = manager
         self.keybinds = {
             "up": p.K_UP,
@@ -88,35 +95,47 @@ class Menu:
 
 class Principal_Menu(Menu):
 
-    def __init__(self, screen, manager):
+    def __init__(self, screen: p.Surface, manager):
         super().__init__(screen, manager)
         self.manager.running = True
+        half = (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2)
         self.start = a.Button(
-            EMPTY_BUTTON + "PLAY.png",
+            PLAY_BUTTON,
             self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 150),
-            (301, 95),
+            (half[0], half[1] - 150),
+            (301, 95),  # pourquoi ??
         )
         self.settings = a.Button(
-            EMPTY_BUTTON + "SETTINGS.png",
+            SETTING_BUTTON,
             self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2),
+            half,
             (497 * 0.80, 184 * 0.80),
         )
         self.quit = a.Button(
-            EMPTY_BUTTON + "EXIT.png",
+            EXIT_BUTTON,
             self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 150),
+            (half[0], half[1] + 150),
             (322 * 0.97, 82 * 0.97),
         )
         self.titre = [Text("Impact", 150, "Mole Tale", (255, 255, 255), self.screen)]
         self.titre.append(((self.WINDOWS[0] - self.titre[0].l[0]) // 2, 0))
 
     def event(self, events):
+        # Proposition
+        """
+        self.quit.hover, self.start.hover, self.settings.hover = (
+            False,
+            False,
+            False,
+        )
+        puis pour chaque truc juste :
+        self.quit.hover = True
+        """
         coord = p.mouse.get_pos()
         for event in events:
             if event.type == p.QUIT:
                 self.manager.running = False
+            # Ca marche aussi en clique droit ou molette ?
             if event.type == p.MOUSEBUTTONDOWN:
                 if self.quit.rec.collidepoint(coord):
                     self.quit.clicked = True
@@ -128,6 +147,7 @@ class Principal_Menu(Menu):
                     self.settings.clicked = True
                     self.manager.change_state("MENU_SETTING")
             else:
+                # Aprés les fonction ca existe !!
                 if self.quit.rec.collidepoint(coord):
                     self.quit.hover, self.start.hover, self.settings.hover = (
                         True,
@@ -135,7 +155,7 @@ class Principal_Menu(Menu):
                         False,
                     )
                 elif self.start.rec.collidepoint(coord):
-                    self.start.hover, self.quit.hover = True, False
+                    self.start.hover, self.quit.hover = True, False  # WTF ??
                 elif self.settings.rec.collidepoint(coord):
                     self.quit.hover, self.start.hover, self.settings.hover = (
                         False,
@@ -155,7 +175,9 @@ class Principal_Menu(Menu):
     def display(self):
         self.screen.blit(self.bg_img, self.bg_img.get_rect())
         super().textdisplay([self.titre])
-        super().pagedisplay([self.start, self.settings, self.quit])
+        super().pagedisplay(
+            [self.start, self.settings, self.quit]
+        )  # Pourquoi alors que tu as self ???
         self.start.clicked = False
         self.settings.clicked = False
         self.quit.clicked = False
@@ -169,35 +191,36 @@ class Setting_Menu(Menu):
         self.surface_copie = None
         self.menu_appel = menu_appel
         self.retour = a.Button(
-            EMPTY_BUTTON + "EMPTY.png",
+            EMPTY_BUTTON,
             self.screen,
             (170, 67),
             (301, 95),
         )
         self.changeup = a.Button(
-            EMPTY_BUTTON + "EMPTY.png",
+            EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 210),
             (301, 95),
         )
         self.changedown = a.Button(
-            EMPTY_BUTTON + "EMPTY.png",
+            EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 70),
             (301, 95),
         )
         self.changeleft = a.Button(
-            EMPTY_BUTTON + "EMPTY.png",
+            EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 70),
             (301, 95),
         )
         self.changeright = a.Button(
-            EMPTY_BUTTON + "EMPTY.png",
+            EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 210),
             (301, 95),
         )
+        # WTF ????
         self.up_t = [
             Text(
                 "Impact",
@@ -266,6 +289,7 @@ class Setting_Menu(Menu):
                 + self.changeright.rec.top,
             )
         )
+        # Encore plus ????
         self.retour_t = [Text("Impact", 30, "<--", (0, 0, 0), self.screen)]
         self.retour_t.append(
             (
@@ -276,6 +300,7 @@ class Setting_Menu(Menu):
             )
         )
 
+    # Je vais t'éclater ta Maman
     def changekey(self, event):
         """take the last keybind to replace the old one"""
         for elt in self.key.keys():
@@ -291,6 +316,7 @@ class Setting_Menu(Menu):
                 return False
         return True
 
+    # Les fonctions de classes ca existe !!!!
     def interchange(self, changetext, button, direction, caractere, bool):
         """change the texte of the button that you want to change the keybind"""
         changetext[0].text = changetext[0].font.render(caractere, False, (0, 0, 0))
@@ -346,6 +372,7 @@ class Setting_Menu(Menu):
                     self.changeright.hover,
                 ) = (False, False, False, False, False)
                 checkevent = event.type == p.MOUSEBUTTONDOWN
+                # Les fonctions ca existe !!!!
                 if self.retour.rec.collidepoint(coord):
                     self.retour.hover = True
                     if checkevent:
@@ -380,6 +407,7 @@ class Setting_Menu(Menu):
 
     def display(self):
         if self.menu_appel == "MENU_P":
+            # Euhhhhh Non
             self.screen.blit(self.bg_img, self.bg_img.get_rect())
         else:
             self.screen.blit(self.surface_copie, (0, 0))
@@ -403,25 +431,25 @@ class Play_Menu(Menu):
         super().__init__(screen, manager)
         self.manager.running = True
         self.retour = a.Button(
-            EMPTY_BUTTON + "EMPTY.png",
+            EMPTY_BUTTON,
             self.screen,
             (170, 67),
             (301, 95),
         )
         self.solo = a.Button(
-            EMPTY_BUTTON + "EMPTY.png",
+            EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 150),
             (301, 95),
         )
         self.multiplayer = a.Button(
-            EMPTY_BUTTON + "EMPTY.png",
+            EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2),
             (301, 95),
         )
         self.joinmultiplayer = a.Button(
-            EMPTY_BUTTON + "EMPTY.png",
+            EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 150),
             (301, 95),
@@ -486,6 +514,7 @@ class Play_Menu(Menu):
         )
 
     def event(self, events):
+        # Stp aére ton code
         coord = p.mouse.get_pos()
         for event in events:
             if event.type == p.QUIT:
@@ -559,7 +588,7 @@ class Join_Multi_Menu(Menu):
         self.list_button = []
         self.manager.running = True
         self.retour = a.Button(
-            EMPTY_BUTTON + "EMPTY.png",
+            EMPTY_BUTTON,
             self.screen,
             (170, 67),
             (301, 95),
@@ -619,6 +648,8 @@ class Join_Multi_Menu(Menu):
                     data = json.loads(data)
                     if addr[0] not in self.serveurs:
                         self.serveurs[addr[0]] = data
+                else:
+                    time.sleep(0.5)
             except socket.timeout:
                 continue
 
@@ -627,11 +658,12 @@ class Join_Multi_Menu(Menu):
             print("UDP recieve protocol stopped")
 
     def create_list_button(self, serveurs):
+        # Ca non
         self.list_button = []
         count = 0
         for serveur in serveurs.keys():
             button = a.Button(
-                EMPTY_BUTTON + "EMPTY.png",
+                EMPTY_BUTTON,
                 self.screen,
                 (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 200 + count * 100),
                 (301, 95),
@@ -694,19 +726,19 @@ class Pause_Menu(Menu):
         self.surface_copie = None
         self.manager.running = True
         self.start = a.Button(
-            EMPTY_BUTTON + "PLAY.png",
+            PLAY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 150),
             (301, 95),
         )
         self.settings = a.Button(
-            EMPTY_BUTTON + "SETTINGS.png",
+            SETTING_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2),
             (497 * 0.80, 184 * 0.80),
         )
         self.quit = a.Button(
-            EMPTY_BUTTON + "EXIT.png",
+            EXIT_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 150),
             (322 * 0.97, 82 * 0.97),
