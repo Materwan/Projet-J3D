@@ -1,10 +1,10 @@
 import pygame
 from player import SoloPlayerController, HostController, GuestController
 from moteur import Moteur
-import asyncio
 
 
 class Game:
+
     def __init__(
         self,
         screen: pygame.Surface,
@@ -67,7 +67,7 @@ class Game:
 
     def update(self):
         self.player_controller.update()
-        if self.player_controller.close:
+        if self.playing_mode != "solo" and self.player_controller.close:
             self.manager.running = False
 
     def display(self):

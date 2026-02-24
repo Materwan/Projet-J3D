@@ -608,14 +608,10 @@ class Join_Multi_Menu(Menu):
             try:
                 if self.udp_event.is_set():
                     if not sock_set:
-                        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-                        sock.bind(("", UDP_PORT))
-                        sock.settimeout(0.5)
-                        sock.bind((UDP_IP, UDP_PORT))
-                        sock.settimeout(0.5)
                         sock_set = True
+                        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                        sock.settimeout(0.5)
+                        sock.bind(("", UDP_PORT))
                         print("UDP recieve protocol start")
 
                     data, addr = sock.recvfrom(1024)  # buffer size is 1024 bytes
@@ -623,13 +619,12 @@ class Join_Multi_Menu(Menu):
                     data = json.loads(data)
                     if addr[0] not in self.serveurs:
                         self.serveurs[addr[0]] = data
-                        print(self.serveurs)
             except socket.timeout:
                 continue
 
-        print("UDP recieve protocol stopped")
         if sock:
             sock.close()
+            print("UDP recieve protocol stopped")
 
     def create_list_button(self, serveurs):
         self.list_button = []

@@ -2,7 +2,8 @@ import pygame
 from menu import *
 from game import *
 from player import HostController, GuestController
-import asyncio
+import logging
+import traceback
 
 pygame.init()
 pygame.mixer.init()
@@ -66,5 +67,21 @@ class Manager:
                 self.states["GAME"].player_controller.serveur.close()
 
 
-Manager().run()
-pygame.quit()
+manager = Manager()
+
+try:
+    manager.run()
+except Exception as e:
+    # Arrête le jeu en cas d'erreure
+    manager.running = False
+    manager.states["MENU_MULTI"].udp_event.clear()
+    if manager.states["GAME"].player_controller != None and isinstance(
+        manager.states["GAME"].player_controller, (HostController, GuestController)
+    ):
+        manager.states["GAME"].player_controller.close = True
+        if isinstance(manager.states["GAME"].player_controller, HostController):
+            manager.states["GAME"].player_controller.udp_event.clear()
+
+    logging.error(traceback.format_exc())  # affiche quand-même l'erreure
+finally:
+    pygame.quit()

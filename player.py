@@ -7,9 +7,32 @@ import asyncio
 import socket
 import json
 import threading
+import psutil
+import ipaddress
 
-UDP_IP = socket.gethostbyname(socket.gethostname())
 UDP_PORT = 9999
+HOST_IP = socket.gethostbyname(socket.gethostname())
+
+
+def get_broadcast_ip():
+
+    interfaces = psutil.net_if_addrs()
+
+    for interface in interfaces.values():
+
+        for addr in interface:
+
+            if addr.family == socket.AF_INET:
+
+                ip = addr.address
+                mask = addr.netmask
+
+                if ip.startswith("127."):
+                    continue
+
+                network = ipaddress.IPv4Network(f"{ip}/{mask}", strict=False)
+
+                return str(network.broadcast_address)
 
 
 class PlayerControllerBase:
@@ -171,20 +194,25 @@ class HostController(PlayerControllerBase):
 
     def upd_broadcast(self):
         """A modifier"""
-        message = bytes(json.dumps({"Game name": "My game", "Port": 8888}) + "\n", encoding="utf-8")
-
         print("UDP sending protocole start")
 
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # Internet  # UDP
+        broadcast_ip = get_broadcast_ip()
+
+        print(f"Broadcast on subnet mask : {broadcast_ip}")
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+
+        message = bytes(
+            json.dumps({"Game name": "My game", "Port": 8888}) + "\n", encoding="utf-8"
+        )
 
         while not self.close:
-            if self.udp_event.is_set():
-                sock.sendto(message, (UDP_IP, UDP_PORT))
-                print("Send")
-                time.sleep(0.5)
-        
+            sock.sendto(message, (broadcast_ip, UDP_PORT))
+            # print("Broadcast envoyé :", message)
+            time.sleep(0.5)
+
         print("UDP sending protocole stopped")
-        sock.close()
 
     def event(self, keys: Tuple[bool]):
 
@@ -209,7 +237,7 @@ class HostController(PlayerControllerBase):
         print("Serveur fermé")
 
         try:
-            while True:
+            while not self.close:
 
                 # Si le jeu est fermé, envoie l'info au client et ferme la connexion
                 if self.close:
