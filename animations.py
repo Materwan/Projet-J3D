@@ -44,22 +44,31 @@ def create_player_animation(
             "left": [],
         },
     }
-    for name in os.listdir(run_directory):
 
-        right_image = load_image(run_directory, name, size)
+    right_path = os.path.join(run_directory, "right")
+    for name in os.listdir(right_path):
+
+        right_image = load_image(right_path, name, size)
         animations["run"]["right"].append(right_image)
         animations["run"]["up"].append(right_image)
 
-        left_image = pygame.transform.flip(right_image, True, False)
+    left_path = os.path.join(run_directory, "left")
+    for name in os.listdir(left_path):
+
+        left_image = load_image(left_path, name, size)
         animations["run"]["left"].append(left_image)
         animations["run"]["down"].append(left_image)
 
-    for name in os.listdir(idle_directory):
+    right_path = os.path.join(idle_directory, "right")
+    for name in os.listdir(right_path):
 
-        right_image = load_image(idle_directory, name, size)
+        right_image = load_image(right_path, name, size)
         animations["idle"]["right"].append(right_image)
 
-        left_image = pygame.transform.flip(right_image, True, False)
+    left_path = os.path.join(idle_directory, "left")
+    for name in os.listdir(left_path):
+
+        left_image = load_image(left_path, name, size)
         animations["idle"]["left"].append(left_image)
 
     return animations
@@ -92,7 +101,7 @@ class AnimationController:
             self.length = len(self.animations[self.current_state][self.current_dir])
         else:
             # Update frame index
-            self.frame_index += 1
+            self.frame_index = (self.frame_index + 1) % (self.length * 10)
 
     def display(self, position: Tuple | List):
         """Display animation"""
@@ -113,9 +122,12 @@ class Button:
         screen: pygame.surface.Surface,
         position: Tuple | List,
         size: Tuple | List | None = None,
+        scale: int | None = 1,
     ):
         """Load and create image for the button.\n
-        Image size will be original if size is None"""
+        Image size will be original if size is None
+        Can set size and scale"""
+        assert not (scale != 1 and size != None)
         assert len(position) == 2  # Verify that position is valid
         # Load image
         self.path = path
@@ -129,6 +141,9 @@ class Button:
             self.image = pygame.transform.scale(self.image, size)
         else:
             size = self.image.get_size()
+        if scale != 1:
+            size = (size[0] * scale, size[1] * scale)
+            self.image = pygame.transform.scale(self.image, size)
         self.rec = pygame.rect.Rect(
             position[0] - size[0] // 2, position[1] - size[1] // 2, size[0], size[1]
         )
