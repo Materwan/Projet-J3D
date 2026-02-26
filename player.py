@@ -10,6 +10,7 @@ import threading
 import psutil
 import ipaddress
 
+# Défini le port et l'addresse sur laquel broadcast
 UDP_PORT = 9999
 HOST_IP = socket.gethostbyname(socket.gethostname())
 
@@ -65,7 +66,8 @@ class PlayerControllerBase:
         self.hitbox = pygame.Rect(start_position[0], start_position[1], 32, 15)
         self.velocity = pygame.Vector2(0, 0)
         self.direction = "right"
-        self.connected = False
+        self.connected = False  # True si un invité est connecté
+        self.close = False
 
     def event(self, keys: Tuple[bool]):
         """
@@ -132,7 +134,9 @@ class SoloPlayerController(PlayerControllerBase):
         moteur: Moteur | None,
         start_position: Tuple[int, int],
     ):
-
+        # Appel le init de PlayerControllerBase, qui partage ses variables
+        # avec SoloPlayerController, exemple :
+        # (super().screen == self.screen) = True
         super().__init__(screen, moteur, start_position)
 
     def event(self, keys: Tuple[bool]):
@@ -171,32 +175,32 @@ class HostController(PlayerControllerBase):
         self.guest = PlayerControllerBase(self.screen, moteur, (200, 200))
         self.recieved_data = {"Guest": {"velocity": [0, 0]}}
 
-        self.serveur: asyncio.Server
-        self.serveur = None
-        self.connected = False  # True si un invité est connecté
-        self.close = False
+        self.serveur: asyncio.Server  # pour savoir le type
+        self.serveur = None  # initialise
 
+        # Créer des processus sur d'autre thread du processeur
+        # Pour le fonctionnement du serveur et du broadcast
+        # Créer un event pour savoir quand broadcast
+        # Démare les processus
         self.loop = threading.Thread(target=self.initialize_tcp)
         self.loop.start()
         self.udp_prot = threading.Thread(target=self.upd_broadcast)
         self.udp_event = threading.Event()
         self.udp_prot.start()
         self.udp_event.set()
-        """self.loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self.loop)
-        self.loop.create_task(self.tcp_server())
-        self.loop.run_forever()"""
-        # asyncio.run(self.initialize())
 
     def initialize_tcp(self):
 
+        # Lance la fonction en thread partagé
         self.serveur_task = asyncio.run(self.tcp_server())
 
     def upd_broadcast(self):
-        """A modifier"""
+        """Permet d'envoyer des messages au autres appareils sur le réseau
+        afin qu'il puisse se connecter automatiquement"""
+
         print("UDP sending protocole start")
 
-        broadcast_ip = get_broadcast_ip()
+        broadcast_ip = "192.168.56.255"  # get_broadcast_ip() à corriger
 
         print(f"Broadcast on subnet mask : {broadcast_ip}")
 
@@ -205,11 +209,10 @@ class HostController(PlayerControllerBase):
 
         message = bytes(
             json.dumps({"Game name": "My game", "Port": 8888}) + "\n", encoding="utf-8"
-        )
+        )  # définit le message à envoyer
 
-        while not self.close:
+        while not self.close:  # tourne tant que le serveur n'es pas fermé
             sock.sendto(message, (broadcast_ip, UDP_PORT))
-            # print("Broadcast envoyé :", message)
             time.sleep(0.5)
 
         print("UDP sending protocole stopped")
@@ -221,6 +224,12 @@ class HostController(PlayerControllerBase):
     async def handle_client(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ):
+        """Une instance de cette fonction est executé pour chaque joueur
+        qui se connecte.\n
+        La fonction vérifie que aucun joueur n'est déjà connecté, sinon la
+        connexion est refusé.\n
+        Il fait tourner la boucle de communication entre le serveur
+        et le joueur"""
 
         # Si un au client est connecté
         if self.connected:
@@ -288,15 +297,19 @@ class HostController(PlayerControllerBase):
                 # Attend de manière à envoyer seulement 30 fois par secondes
                 await asyncio.sleep(1 / 30)
         finally:
+            # Ferme la connexion
             writer.close()
             print("Connexion fermé")
 
     async def tcp_server(self):
 
+        # Défini un serveur sur le port 8888
         self.serveur = await asyncio.start_server(
             self.handle_client, host="0.0.0.0", port=8888
         )
 
+        # Lance le serveur qui s'execute tant que
+        # le jeu tourne et que le client est connecté
         print("Attente de client")
         async with self.serveur:
             try:
@@ -307,7 +320,7 @@ class HostController(PlayerControllerBase):
     def update(self):
 
         self.moving_intent = self.velocity.length_squared() > 0
-        if self.moving_intent:
+        if self.moving_intent:  # Si le joueur veux bouger
 
             self.look_direction = self.velocity.normalize()
 
@@ -315,7 +328,7 @@ class HostController(PlayerControllerBase):
 
             super().update()
 
-        if self.guest.moving_intent:
+        if self.guest.moving_intent:  # Si le client veux bouger
 
             self.moteur.collision(self.guest.hitbox, self.guest.velocity, self.hitbox)
             self.guest.update()
@@ -342,34 +355,35 @@ class GuestController(PlayerControllerBase):
     ):
 
         super().__init__(screen, moteur, start_position)
+        # Défini un player pour l'hôte
         self.host = PlayerControllerBase(self.screen, moteur, start_position)
 
         self.adresse = adresse
         self.port = port
-        self.close = False
 
+        # Défini un processus pour la connexion
+        # sur un autre thread du processeur
         self.loop = threading.Thread(target=self.run)
         self.loop.start()
-        """self.loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self.loop)
-        self.loop.create_task(self.initialize())
-        self.loop.run_forever()"""
-        # asyncio.run(self.initialize())
 
     async def connect(self):
+        """Se connecte au serveur"""
 
         self.reader, self.writer = await asyncio.open_connection(
             self.adresse, self.port
         )
 
-    def run(self):
-
-        asyncio.run(self.initialize())
-
     async def initialize(self):
+        """Fonction de lancement du réseau"""
 
         await self.connect()
         await self.handle_host()
+
+    def run(self):
+        """Lance le serveur en se connectant à l'hôte puis
+        en lancant le processus de communication"""
+
+        asyncio.run(self.initialize())
 
     def event(self, keys: Tuple[bool]):
 
@@ -429,18 +443,19 @@ class GuestController(PlayerControllerBase):
                 # Attend de manière à ce qu'il y ai 30 envoie par secondes
                 await asyncio.sleep(1 / 30)
         finally:
+            self.writer.close()
             print("Connexion fermé")
 
     def update(self):
 
         self.moving_intent = self.velocity.length_squared() > 0
-        if self.moving_intent:
+        if self.moving_intent:  # Si le joueur veux bouger
 
             self.look_direction = self.velocity.normalize()
 
             super().update()
 
-        if self.host.moving_intent:
+        if self.host.moving_intent:  # Si l'hôte veux bouger
 
             self.host.update()
             self.host.hitbox.topleft = self.host.position
