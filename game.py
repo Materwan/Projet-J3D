@@ -5,11 +5,7 @@ from moteur import Moteur
 
 class Game:
 
-    def __init__(
-        self,
-        screen: pygame.Surface,
-        manager,
-    ):
+    def __init__(self, screen: pygame.Surface, manager):
         self.screen = screen
         self.manager = manager
         largeur, hauteur = self.screen.get_size()
