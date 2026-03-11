@@ -4,6 +4,7 @@ from moteur import Moteur
 
 
 class Game:
+    """Classe de gestion du jeu : joueur et carte."""
 
     def __init__(self, screen: pygame.Surface, manager):
         self.screen = screen
@@ -31,6 +32,7 @@ class Game:
         self.port = 8888
 
     def initialize(self):
+        """Initialise le moteur et le controlleur à utiliser"""
         self.moteur = Moteur(self.screen)
         if self.playing_mode == "solo":
             self.player_controller = SoloPlayerController(
@@ -49,6 +51,7 @@ class Game:
         self.player_controller.keybinds = self.keybinds
 
     def event(self, events: list[pygame.event.Event]) -> bool:
+        """Gére les entré de l'utilisateur."""
         for event in events:
             if event.type == pygame.QUIT:
                 self.manager.running = False
@@ -62,11 +65,13 @@ class Game:
         return False
 
     def update(self):
+        """Met à jour le jeu."""
         self.player_controller.update()
         if self.playing_mode != "solo" and self.player_controller.close:
             self.manager.running = False
 
     def display(self):
+        """Affiche tout les éléments."""
         self.screen.fill((100, 100, 100))
 
         # ceci est temporaire (remplace la carte)

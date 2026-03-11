@@ -64,7 +64,7 @@ class Manager:
                 isinstance(self.states["GAME"].player_controller, HostController)
                 and self.states["GAME"].player_controller.serveur.is_serving()
             ):
-                self.states["GAME"].player_controller.serveur.close()
+                self.states["GAME"].player_controller.stop_server()
 
 
 manager = Manager()
@@ -75,13 +75,18 @@ except Exception as e:
     # Arrête le jeu en cas d'erreure
     manager.running = False
     manager.states["MENU_MULTI"].udp_event.clear()
-    if manager.states["GAME"].player_controller != None and isinstance(
+    if isinstance(
         manager.states["GAME"].player_controller, (HostController, GuestController)
     ):
         manager.states["GAME"].player_controller.close = True
-        if isinstance(manager.states["GAME"].player_controller, HostController):
-            manager.states["GAME"].player_controller.udp_event.clear()
 
     logging.error(traceback.format_exc())  # affiche quand-même l'erreure
+
+else:
+    if isinstance(
+        manager.states["GAME"].player_controller, (HostController, GuestController)
+    ):
+        manager.states["GAME"].player_controller.close = True
+
 finally:
     pygame.quit()

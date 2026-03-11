@@ -8,35 +8,47 @@ import socket
 import json
 import threading
 import psutil
-import ipaddress
+
+
+def get_netmask_for_ip(ip: str) -> str | None:
+    """Donne le mask du sous-réseau"""
+    for _, addrs in psutil.net_if_addrs().items():
+        for addr in addrs:
+            if addr.family == socket.AF_INET and addr.address == ip:
+                return addr.netmask
+    return None
+
+
+def get_broadcast_ip(ip: str, subnet_mask: str):
+    """Renvoie l'addresse pour le broadcast"""
+    broadcst_ip = []
+    for ip_byte, submask_byte in zip(ip.split("."), subnet_mask.split(".")):
+        broadcst_ip.append(ip_byte if submask_byte == "255" else "255")
+
+    return ".".join(broadcst_ip)
+
+
+def dict_to_bytes(data: Dict) -> bytes:
+    """Transforme un dictionnaire en octet pour l'envoi"""
+    return bytes(json.dumps(data) + "\n", "utf-8")
+
+
+def bytes_to_dict(byte: bytes) -> Dict:
+    """Prend des octets et les décodes en dictionnaires"""
+    if not byte:
+        return None
+    return json.loads(byte.decode().strip())
+
 
 # Défini le port et l'addresse sur laquel broadcast
 UDP_PORT = 9999
 HOST_IP = socket.gethostbyname(socket.gethostname())
-
-
-def get_broadcast_ip():
-
-    interfaces = psutil.net_if_addrs()
-
-    for interface in interfaces.values():
-
-        for addr in interface:
-
-            if addr.family == socket.AF_INET:
-
-                ip = addr.address
-                mask = addr.netmask
-
-                if ip.startswith("127."):
-                    continue
-
-                network = ipaddress.IPv4Network(f"{ip}/{mask}", strict=False)
-
-                return str(network.broadcast_address)
+SUBNET_MASK = get_netmask_for_ip(HOST_IP)
 
 
 class PlayerControllerBase:
+    """Classe de joueur basique.\n
+    Implémente les interactions et l'affichage"""
 
     def __init__(
         self,
@@ -65,6 +77,7 @@ class PlayerControllerBase:
         self.position = pygame.Vector2(start_position)
         self.hitbox = pygame.Rect(start_position[0], start_position[1], 32, 15)
         self.velocity = pygame.Vector2(0, 0)
+        self.look_direction = pygame.Vector2(0, 1)
         self.direction = "right"
         self.connected = False  # True si un invité est connecté
         self.close = False
@@ -121,12 +134,14 @@ class PlayerControllerBase:
             self.update_animation()
 
     def display(self):
+        """Affiche le joueur"""
 
         self.animation.display((self.hitbox.x - 34, self.hitbox.y - 70))
         # pygame.draw.rect(self.screen, "red", self.hitbox, 2) # pour voir la hitbox du joueur (pas touche)
 
 
 class SoloPlayerController(PlayerControllerBase):
+    """Classe pour un joueur solo"""
 
     def __init__(
         self,
@@ -138,10 +153,6 @@ class SoloPlayerController(PlayerControllerBase):
         # avec SoloPlayerController, exemple :
         # (super().screen == self.screen) = True
         super().__init__(screen, moteur, start_position)
-
-    def event(self, keys: Tuple[bool]):
-
-        return super().event(keys)
 
     def update(self):
 
@@ -161,6 +172,10 @@ class SoloPlayerController(PlayerControllerBase):
 
 
 class HostController(PlayerControllerBase):
+    """Classe pour un hôte de partie.\n
+    Implémente les joueurs et les fonctions nécessaires ainsi
+    que les fonctions de communication avec le client
+    ainsi que la fonction de découverte dans les menus."""
 
     def __init__(
         self,
@@ -182,16 +197,16 @@ class HostController(PlayerControllerBase):
         # Pour le fonctionnement du serveur et du broadcast
         # Créer un event pour savoir quand broadcast
         # Démare les processus
+        self.asyncio_loop = None
         self.loop = threading.Thread(target=self.initialize_tcp)
         self.loop.start()
         self.udp_prot = threading.Thread(target=self.upd_broadcast)
-        self.udp_event = threading.Event()
         self.udp_prot.start()
-        self.udp_event.set()
+        self.udp_run = True
 
     def initialize_tcp(self):
+        """Lance la fonction en thread partagé"""
 
-        # Lance la fonction en thread partagé
         self.serveur_task = asyncio.run(self.tcp_server())
 
     def upd_broadcast(self):
@@ -200,26 +215,28 @@ class HostController(PlayerControllerBase):
 
         print("UDP sending protocole start")
 
-        broadcast_ip = "192.168.56.255"  # get_broadcast_ip() à corriger
+        broadcast_ip = get_broadcast_ip(HOST_IP, SUBNET_MASK)
 
         print(f"Broadcast on subnet mask : {broadcast_ip}")
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        sock.settimeout(0.5)
 
         message = bytes(
             json.dumps({"Game name": "My game", "Port": 8888}) + "\n", encoding="utf-8"
         )  # définit le message à envoyer
 
-        while not self.close:  # tourne tant que le serveur n'es pas fermé
-            sock.sendto(message, (broadcast_ip, UDP_PORT))
+        while self.udp_run:  # tourne tant que le serveur n'es pas fermé
+            try:
+                sock.sendto(message, (broadcast_ip, UDP_PORT))
+            except socket.timeout:
+                pass
+            if self.connected:
+                self.udp_run = False
             time.sleep(0.5)
 
         print("UDP sending protocole stopped")
-
-    def event(self, keys: Tuple[bool]):
-
-        super().event(keys)
 
     async def handle_client(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
@@ -230,6 +247,20 @@ class HostController(PlayerControllerBase):
         connexion est refusé.\n
         Il fait tourner la boucle de communication entre le serveur
         et le joueur"""
+
+        def get_to_send_data() -> Dict:
+            return {
+                "guest": {
+                    "position": list(self.guest.position),
+                    "velocity": list(self.guest.velocity),
+                },
+                "host": {
+                    "position": list(self.position),
+                    "moving_intent": self.moving_intent,
+                    "direction": self.direction,
+                },
+                "close": False,
+            }
 
         # Si un au client est connecté
         if self.connected:
@@ -242,26 +273,27 @@ class HostController(PlayerControllerBase):
 
         # Arrêt le serveur : n'accepte plus les connections
         self.serveur.close()
-        self.udp_event.clear()
         print("Serveur fermé")
 
+        # Défini les variables à envoyer
+        to_send_data = get_to_send_data()
+        writer.write(dict_to_bytes(to_send_data))
+        await writer.drain()
+
         try:
-            while not self.close:
+            while True:
 
                 # Si le jeu est fermé, envoie l'info au client et ferme la connexion
                 if self.close:
-                    writer.write(bytes(json.dumps({"close": True}) + "\n", "utf-8"))
+                    writer.write(dict_to_bytes({"close": True}))
                     await writer.drain()
                     break
 
-                # Récupère les données et verifi leur existence
-                recieved_bytes = await reader.readline()
+                # Récupère les données, les décodes et verifie leur existence
+                recieved_bytes = await asyncio.wait_for(reader.readline(), timeout=1.0)
+                recieved_data = bytes_to_dict(recieved_bytes)
                 if not recieved_bytes:
                     break
-
-                # Decode les donnée en un dictionnaire
-                recieved_str = recieved_bytes.decode().strip()
-                recieved_data = json.loads(recieved_str)
 
                 # Si le client ferme son jeu, ferme le jeu et la connexion
                 if recieved_data["close"] == True:
@@ -274,21 +306,9 @@ class HostController(PlayerControllerBase):
                 self.guest.moving_intent = recieved_data["guest"]["moving_intent"]
                 self.guest.direction = recieved_data["guest"]["direction"]
 
-                # Défini les variables à envoyer
-                to_send_data = {
-                    "guest": {
-                        "position": list(self.guest.position),
-                        "velocity": list(self.guest.velocity),
-                    },
-                    "host": {
-                        "position": list(self.position),
-                        "moving_intent": self.moving_intent,
-                        "direction": self.direction,
-                    },
-                    "close": False,
-                }
-                # Tranformer les variables en bits
-                to_send_bytes = bytes(json.dumps(to_send_data) + "\n", "utf-8")
+                # Défini les variables à envoyer et les encodes
+                to_send_data = get_to_send_data()
+                to_send_bytes = dict_to_bytes(to_send_data)
 
                 # Envoie les données
                 writer.write(to_send_bytes)
@@ -302,7 +322,9 @@ class HostController(PlayerControllerBase):
             print("Connexion fermé")
 
     async def tcp_server(self):
+        """Lance le server et donc autorise le client à se connecter;"""
 
+        self.asyncio_loop = asyncio.get_running_loop()
         # Défini un serveur sur le port 8888
         self.serveur = await asyncio.start_server(
             self.handle_client, host="0.0.0.0", port=8888
@@ -316,6 +338,16 @@ class HostController(PlayerControllerBase):
                 await self.serveur.serve_forever()
             except asyncio.CancelledError:
                 print("Serveur fermé")
+
+    def stop_server(self):
+        """Arrête le protocole de commuinication avec le client."""
+
+        async def stop_server():
+            if self.serveur and self.serveur.is_serving():
+                self.serveur.close()
+                await self.serveur.wait_closed()
+
+        asyncio.run_coroutine_threadsafe(stop_server(), self.asyncio_loop)
 
     def update(self):
 
@@ -344,21 +376,24 @@ class HostController(PlayerControllerBase):
 
 
 class GuestController(PlayerControllerBase):
+    """Classe pour un client.\n
+    Implémente les joueurs et les fonctions nécessaires ainsi
+    que les fonction de communications avec l'hôte."""
 
     def __init__(
         self,
         screen: pygame.Surface,
         moteur: Moteur | None,
         start_position: Tuple[int, int],
-        adresse: asyncio.StreamReader,
-        port: asyncio.StreamWriter,
+        address: str,
+        port: int,
     ):
 
         super().__init__(screen, moteur, start_position)
         # Défini un player pour l'hôte
         self.host = PlayerControllerBase(self.screen, moteur, start_position)
 
-        self.adresse = adresse
+        self.address = address
         self.port = port
 
         # Défini un processus pour la connexion
@@ -370,8 +405,23 @@ class GuestController(PlayerControllerBase):
         """Se connecte au serveur"""
 
         self.reader, self.writer = await asyncio.open_connection(
-            self.adresse, self.port
+            self.address, self.port
         )
+
+        # Récupère la position initiale des joueurs
+        recieved_bytes = await self.reader.readline()
+        recieved_data = bytes_to_dict(recieved_bytes)
+
+        # Met à jour les variable correspondantes
+        self.position.update(recieved_data["guest"]["position"])
+        self.host.position.update(recieved_data["host"]["position"])
+        self.host.moving_intent = recieved_data["host"]["moving_intent"]
+        self.host.direction = recieved_data["host"]["direction"]
+
+        # Met à jour la position des hitbox
+        self.hitbox.topleft = self.position
+        self.host.hitbox.topleft = self.host.position
+        self.host.update()
 
     async def initialize(self):
         """Fonction de lancement du réseau"""
@@ -385,50 +435,46 @@ class GuestController(PlayerControllerBase):
 
         asyncio.run(self.initialize())
 
-    def event(self, keys: Tuple[bool]):
-
-        super().event(keys)
-
     async def handle_host(self):
+        """Gére les communications entre le client et l'hôte."""
+
+        def get_to_send_data() -> Dict:
+            return {
+                "guest": {
+                    "velocity": list(self.velocity),
+                    "moving_intent": self.moving_intent,
+                    "direction": self.direction,
+                },
+                "close": False,
+            }
 
         try:
             while True:
 
                 # Si le jeu est fermé, envoyer l'info à l'hôte et ferme la connexion
                 if self.close:
-                    self.writer.write(
-                        bytes(json.dumps({"close": True}) + "\n", "utf-8")
-                    )
+                    self.writer.write(dict_to_bytes({"close": True}))
                     await self.writer.drain()
                     break
 
-                # Défini les variables à envoyer à l'hôte
-                to_send_data = {
-                    "guest": {
-                        "velocity": list(self.velocity),
-                        "moving_intent": self.moving_intent,
-                        "direction": self.direction,
-                    },
-                    "close": False,
-                }
-                # Tranforme les données en bits
-                to_send_bytes = bytes(json.dumps(to_send_data) + "\n", "utf-8")
+                # Défini les variables à envoyer à l'hôte et les encodes
+                to_send_data = get_to_send_data()
+                to_send_bytes = dict_to_bytes(to_send_data)
 
                 # Envoie les données
                 self.writer.write(to_send_bytes)
                 await self.writer.drain()
 
-                # Récupère les donnée et verifie leur existence
-                recieved_bytes = await self.reader.readline()
-                if not recieved_bytes:
+                # Récupère les donnée les décode et verifie leur existence
+                recieved_bytes = await asyncio.wait_for(
+                    self.reader.readline(), timeout=1.0
+                )
+                recieved_data = bytes_to_dict(recieved_bytes)
+                if not recieved_data:
                     break
 
-                # Transforme les donnée en dictionnaire
-                recieved_str = recieved_bytes.decode().strip()
-                recieved_data = json.loads(recieved_str)
-
                 # Si l'hôte a fermé son jeu, fermer le jeu
-                if recieved_data["close"] == True:
+                if recieved_data["close"] is True:
                     self.close = True
                     print("L'hôte a fermé la connexion")
                     break
