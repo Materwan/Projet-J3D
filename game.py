@@ -27,7 +27,7 @@ class Game:
             pygame.Rect(largeur // 2 + 200, hauteur // 2 - 300, 300, 150),
             pygame.Rect(400, 200, 30, 400),
         ]
-        self.adresse = "10.187.208.69"
+        self.address = "10.187.208.69"
         self.port = 8888
 
     def initialize(self):
@@ -44,7 +44,7 @@ class Game:
             self.player_controller.moteur.map = self.map
         elif self.playing_mode == "guest":
             self.player_controller = GuestController(
-                self.screen, None, (100, 100), self.adresse, self.port
+                self.screen, None, (100, 100), self.address, self.port
             )
         self.player_controller.keybinds = self.keybinds
 

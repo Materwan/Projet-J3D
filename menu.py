@@ -28,6 +28,7 @@ class Text:
 
     def __init__(self, name, size, text, t_color, screen=None, antialias=False):
         self.screen = screen
+        self.caractere = text
         self.font = p.font.SysFont(name, size)
         self.text = self.font.render(text, antialias, t_color)
         self.lenth = self.text.get_size()
@@ -691,8 +692,8 @@ class Join_Multi_Menu(Menu):
                             elt[0].clicked = True
                             elt[0].hover = False
                             self.udp_event.clear()
-                            self.manager.states["GAME"].playing_mode = "guess"
-                            self.manager.states["GAME"].addresse = elt[1].text
+                            self.manager.states["GAME"].playing_mode = "guest"
+                            self.manager.states["GAME"].address = elt[1][0].caractere
                             self.manager.change_state("GAME")
                             break
             else:
@@ -705,12 +706,13 @@ class Join_Multi_Menu(Menu):
 
     def display(self):
         self.screen.blit(self.bg_img, self.bg_img_coord)
-        self.pagedisplay()
-        self.textdisplay()
         self.create_list_button(self.serveurs)
         for elt in self.list_button:
-            super().pagedisplay([elt[0]])
-            super().textdisplay([elt[1]])
+            if elt[0] not in self.eltpages:
+                self.eltpages.append(elt[0])
+                self.elttexts.append(elt[1])
+        self.pagedisplay()
+        self.textdisplay()
         self.retour.clicked = False
 
 
