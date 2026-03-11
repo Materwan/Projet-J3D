@@ -1,6 +1,7 @@
 import pygame
 from player import SoloPlayerController, HostController, GuestController
 from moteur import Moteur
+from map import Map
 
 
 class Game:
@@ -30,15 +31,7 @@ class Game:
             "down": (-25, 0, 80, 70),
         }
 
-        # ceci est temporaire (remplace la carte)
-        self.map = [
-            pygame.Rect(0, 0, largeur, 5),
-            pygame.Rect(0, hauteur - 5, largeur, 5),
-            pygame.Rect(0, 0, 5, hauteur),
-            pygame.Rect(largeur - 5, 0, 5, hauteur),
-            pygame.Rect(largeur // 2 + 200, hauteur // 2 - 300, 300, 150),
-            pygame.Rect(400, 200, 30, 400),
-        ]
+        self.map = Map((256, 256), (8, 8), (32, 32), (32, 32), 0, self.screen)
         self.address = "10.187.208.69"
         self.port = 8888
 
@@ -47,24 +40,22 @@ class Game:
         self.moteur = Moteur(self.screen)
         if self.playing_mode == "solo":
             self.player_controller = SoloPlayerController(
-                self.screen, self.moteur, (100, 100)
+                self.screen, self.moteur, self.map, (4096, 4096)
             )
-            self.player_controller.moteur.map = self.map
         elif self.playing_mode == "host":
             self.player_controller = HostController(
-                self.screen, self.moteur, (100, 100)
+                self.screen, self.moteur, self.map, (4096, 4096)
             )
-            self.player_controller.moteur.map = self.map
         elif self.playing_mode == "guest":
             self.player_controller = GuestController(
-                self.screen, None, (100, 100), self.address, self.port
+                self.screen, self.map, self.address, self.port
             )
         self.player_controller.keybinds = self.keybinds
 
     def create_rect_attaque(self):
         dec_x, dec_y, wide, high = self.attaque_config[self.player_controller.direction]
 
-        pos_joueur = self.player_controller.position
+        pos_joueur = self.player_controller.abs_position
         return pygame.Rect(pos_joueur.x + dec_x, pos_joueur.y + dec_y, wide, high)
 
     def event(self, events: list[pygame.event.Event]) -> bool:
@@ -108,14 +99,18 @@ class Game:
         """Affiche tout les éléments."""
         self.screen.fill((100, 100, 100))
 
-        # ceci est temporaire (remplace la carte)
-        for i in range(4):
-            pygame.draw.rect(self.screen, "gold", self.map[i])
-        pygame.draw.rect(self.screen, (0, 119, 190), self.map[4])
-        pygame.draw.rect(self.screen, "black", self.map[5])
-        # fin du temporaire
+        self.map.display(
+            self.player_controller.abs_position - self.player_controller.rel_position
+        )
 
         self.player_controller.display()
+
+        pygame.draw.circle(
+            self.screen,
+            (255, 255, 255),
+            self.player_controller.rel_position,
+            5,
+        )
 
         # TEST affichage de l'attaque
         if self.attaque:

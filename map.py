@@ -184,7 +184,7 @@ class Map:
                 if (
                     0 <= x <= self.chunks[0]
                     and 0 <= y <= self.chunks[1]
-                    and not (x, y) in self.chunks
+                    and not (x, y) in self.loaded_chunks
                 ):
                     self.loaded_chunks[(x, y)] = self.render_chunk((x, y))
 
@@ -219,6 +219,18 @@ class Map:
                     sur.blit(self.grass_tile, rel * self.tile_size)
 
         return sur
+
+    def get_obstacles(self, position: Tuple[int, int]) -> List[Tuple[int, int]]:
+        pos = np.array(position, dtype=np.int32)
+        case_pos = pos // 32
+
+        L = []
+        for x in range(case_pos[0] - 1, case_pos[0] + 2):
+            for y in range(case_pos[1] - 1, case_pos[1] + 2):
+                if self.map[x][y] < 0.5:
+                    L.append((x, y))
+
+        return L
 
     def add_structure(
         map: np.ndarray,

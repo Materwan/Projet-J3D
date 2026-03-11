@@ -87,6 +87,9 @@ class AnimationController:
         self.current_state = "idle"
         self.current_dir = "right"
         self.frame_index = 0
+        self.im_size = self.animations[self.current_state][self.current_dir][
+            self.frame_index
+        ].get_size()
         self.length = len(self.animations[self.current_state][self.current_dir])
 
     def update(self, running: str, direction: str):
@@ -103,9 +106,8 @@ class AnimationController:
             # Update frame index
             self.frame_index = (self.frame_index + 1) % (self.length * 10)
 
-    def display(self, position: Tuple | List):
+    def display(self, position: Tuple | List | pygame.Vector2):
         """Display animation"""
-        assert len(position) == 2  # Verify that position is valid
         self.screen.blit(
             self.animations[self.current_state][self.current_dir][
                 self.frame_index // 10 % self.length

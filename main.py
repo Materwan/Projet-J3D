@@ -79,6 +79,25 @@ except Exception as e:
         manager.states["GAME"].player_controller, (HostController, GuestController)
     ):
         manager.states["GAME"].player_controller.close = True
+        if isinstance(manager.states["GAME"].player_controller, HostController):
+            manager.states["GAME"].player_controller.asyncio_loop.call_soon_threadsafe(
+                manager.states["GAME"].player_controller.serveur.close()
+            )
+
+    logging.error(traceback.format_exc())  # affiche quand-même l'erreure
+
+except KeyboardInterrupt:
+
+    manager.running = False
+    manager.states["MENU_MULTI"].udp_event.clear()
+    if isinstance(
+        manager.states["GAME"].player_controller, (HostController, GuestController)
+    ):
+        manager.states["GAME"].player_controller.close = True
+        if isinstance(manager.states["GAME"].player_controller, HostController):
+            manager.states["GAME"].player_controller.asyncio_loop.call_soon_threadsafe(
+                manager.states["GAME"].player_controller.serveur.close()
+            )
 
     logging.error(traceback.format_exc())  # affiche quand-même l'erreure
 
