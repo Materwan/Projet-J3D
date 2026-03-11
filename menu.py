@@ -695,6 +695,7 @@ class Join_Multi_Menu(Menu):
                             self.manager.states["GAME"].playing_mode = "guest"
                             self.manager.states["GAME"].address = elt[1][0].caractere
                             self.manager.change_state("GAME")
+                            p.mixer.music.stop()
                             break
             else:
                 self.retour.hover = False
