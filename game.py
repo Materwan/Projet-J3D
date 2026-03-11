@@ -55,7 +55,8 @@ class Game:
     def create_rect_attaque(self):
         dec_x, dec_y, wide, high = self.attaque_config[self.player_controller.direction]
 
-        pos_joueur = self.player_controller.abs_position
+        pos_joueur = self.player_controller.rel_position
+        # pos_joueur = self.player_controller.abs_position
         return pygame.Rect(pos_joueur.x + dec_x, pos_joueur.y + dec_y, wide, high)
 
     def event(self, events: list[pygame.event.Event]) -> bool:
