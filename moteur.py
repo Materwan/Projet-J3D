@@ -7,7 +7,6 @@ class Moteur:
     def __init__(self, screen):
         self.screen = screen
         self.map = None
-        self.map = None
         self.map: Map
 
     def get_nearby_obstacles(self, hitbox: pygame.Rect):
