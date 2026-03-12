@@ -77,6 +77,7 @@ class PlayerControllerBase:
         # Initialise les données nécessaires pour un joueur
         self.keybinds = None
         self.keybinds: Dict
+        self.max_pos = pygame.Vector2(self.screen.get_size()) - pygame.Vector2(100, 100)
         self.abs_position = pygame.Vector2(start_position)
         self.rel_position = pygame.Vector2(self.screen.get_size()) / 2
         self.hitbox = pygame.Rect(start_position[0], start_position[1], 32, 15)
@@ -136,15 +137,15 @@ class PlayerControllerBase:
 
             if self.rel_position.x < 100:
                 self.rel_position.x = 100
-            elif self.rel_position.x > 400:
-                self.rel_position.x = 400
+            elif self.rel_position.x > self.max_pos.x:
+                self.rel_position.x = self.max_pos.x
             if self.rel_position.y < 100:
                 self.rel_position.y = 100
-            elif self.rel_position.y > 400:
-                self.rel_position.y = 400
+            elif self.rel_position.y > self.max_pos.y:
+                self.rel_position.y = self.max_pos.y
             # la position de la hitbox se cale sur le vecteur position
             # self.hitbox.topleft = self.rel_position  # avant
-            self.hitbox.center = self.rel_position
+            self.hitbox.center = self.abs_position
             self.hitbox.bottom += 20
 
             self.update_animation()
@@ -184,12 +185,7 @@ class SoloPlayerController(PlayerControllerBase):
 
             self.look_direction = self.velocity.normalize()
 
-            # Obstacles est une liste de coordonnée de tuile de taille
-            # self.map.tile_size inacessible
-            # En résume une liste de carré
-            obstacles = self.map.get_obstacles(self.abs_position)
-
-            # self.moteur.collision(self.hitbox, self.velocity, None)
+            self.moteur.collision(self.hitbox, self.velocity, None)
             super().update()
 
         self.animation.update(self.moving_intent, self.direction)
