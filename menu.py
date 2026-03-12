@@ -789,10 +789,12 @@ class Pause_Menu(Menu):
                     )
 
     def update(self):
-        pass
+        if self.manager.states["GAME"].playing_mode != "solo":
+            print(True)
+            self.manager.states["GAME"].update()
 
     def display(self):
-        self.screen.blit(self.surface_copie, (0, 0))
+        self.manager.states["GAME"].display()
         self.pagedisplay()
         self.start.clicked = False
         self.settings.clicked = False
