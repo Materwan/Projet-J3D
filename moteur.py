@@ -1,11 +1,14 @@
 import pygame
 from typing import List
+from map import Map
 
 
 class Moteur:
     def __init__(self, screen):
         self.screen = screen
         self.map = None
+        self.map = None
+        self.map: Map
 
     def get_nearby_obstacles(self, hitbox: pygame.Rect):
         """
@@ -21,16 +24,23 @@ class Moteur:
         nearby_obstacles = []
 
         # Trouver la position du joueur dans la grille
-        grid_x = hitbox.centerx // 16
-        grid_y = (hitbox.y - 10) // 16
+        grid_x = hitbox.centerx // 32
+        grid_y = hitbox.centery // 32
 
         # Vérifier un carré de 3x3 tuiles autour du joueur
         for x in range(grid_x - 1, grid_x + 2):
             for y in range(grid_y - 1, grid_y + 2):
                 # Si la valeur est de l'eau (< 0.5)
-                if self.map[x][y] < 0.5:
+                if self.map.map[x][y] < 0.5:
                     # On crée le rectangle de collision pour cette tuile
-                    nearby_obstacles.append(pygame.Rect(x * 16, y * 16, 16, 16))
+                    nearby_obstacles.append(
+                        pygame.Rect(
+                            x * self.map.tile_size[0],
+                            y * self.map.tile_size[1],
+                            self.map.tile_size[0],
+                            self.map.tile_size[1],
+                        )
+                    )
 
         return nearby_obstacles
 
@@ -52,7 +62,7 @@ class Moteur:
             velocity (pygame.Vector2): Vecteur de déplacement souhaité (modifié sur place).
             other_hitbox (pygame.Rect|None): La boîte de collision actuelle de l'autre joueur.
         """
-        nearby_obstacles = self.map  # temporaire /// get_nearby_obstacles(hitbox)
+        nearby_obstacles = self.get_nearby_obstacles(hitbox)
         if other_hitbox != None:
             nearby_obstacles.append(other_hitbox)
         if velocity.x != 0:
