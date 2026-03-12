@@ -13,7 +13,7 @@ pygame.display.set_caption("MoleTale")
 class Manager:
 
     def __init__(self):
-        self.screen = pygame.display.set_mode((500, 500))
+        self.screen = pygame.display.set_mode()
         self.running = True
 
         self.states = {
@@ -32,8 +32,6 @@ class Manager:
 
     def change_state(self, name):
         self.state = self.states[name]
-        if name == "GAME":
-            self.state.initialize()
 
     def run(self):
         while self.running:

@@ -510,7 +510,7 @@ class Play_Menu(Menu):
         for event in events:
             if event.type == p.QUIT:
                 self.manager.running = False
-            if event.type == p.KEYDOWN and event.button == p.BUTTON_LEFT:
+            if event.type == p.KEYDOWN:
                 if event.key == p.K_ESCAPE:
                     self.manager.change_state("MENU_P")
             if event.type == p.MOUSEBUTTONDOWN:
@@ -520,12 +520,14 @@ class Play_Menu(Menu):
                     self.solo.hover = False
                     self.manager.states["GAME"].playing_mode = "solo"
                     self.manager.change_state("GAME")
+                    self.manager.state.initialize()
                 elif self.multiplayer.rec.collidepoint(coord):
                     self.multiplayer.clicked = True
                     p.mixer.music.stop()
                     self.multiplayer.hover = False
                     self.manager.states["GAME"].playing_mode = "host"
                     self.manager.change_state("GAME")
+                    self.manager.state.initialize()
                 elif self.joinmultiplayer.rec.collidepoint(coord):
                     self.joinmultiplayer.clicked = True
                     self.joinmultiplayer.hover = False
@@ -695,6 +697,7 @@ class Join_Multi_Menu(Menu):
                             self.manager.states["GAME"].playing_mode = "guest"
                             self.manager.states["GAME"].address = elt[1][0].caractere
                             self.manager.change_state("GAME")
+                            self.manager.state.initialize()
                             p.mixer.music.stop()
                             break
             else:
