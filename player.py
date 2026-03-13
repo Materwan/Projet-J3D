@@ -69,6 +69,7 @@ class PlayerControllerBase:
         animation_images = create_player_animation(
             r"Ressources\Animations\Idle_Animations",
             r"Ressources\Animations\runAnimation",
+            r"Ressources\Animations\attack",
             (100, 100),
         )
         self.animation = AnimationController(animation_images, self.screen)

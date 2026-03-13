@@ -14,8 +14,84 @@ def load_image(
     return image
 
 
+def load_run_animation(run_directory: str, size: Tuple | List | None = None) -> Dict:
+
+    animations = {
+        "right": [],
+        "left": [],
+        "up": [],
+        "down": [],
+    }
+
+    right_path = os.path.join(run_directory, "right")
+    for name in os.listdir(right_path):
+
+        right_image = load_image(right_path, name, size)
+        animations["right"].append(right_image)
+        animations["up"].append(right_image)
+
+    left_path = os.path.join(run_directory, "left")
+    for name in os.listdir(left_path):
+
+        left_image = load_image(left_path, name, size)
+        animations["left"].append(left_image)
+        animations["down"].append(left_image)
+
+    return animations
+
+
+def load_idle_animation(idle_directory: str, size: Tuple | List | None = None) -> Dict:
+
+    animations = {
+        "right": [],
+        "left": [],
+    }
+
+    right_path = os.path.join(idle_directory, "right")
+    for name in os.listdir(right_path):
+
+        right_image = load_image(right_path, name, size)
+        animations["right"].append(right_image)
+
+    left_path = os.path.join(idle_directory, "left")
+    for name in os.listdir(left_path):
+
+        left_image = load_image(left_path, name, size)
+        animations["left"].append(left_image)
+
+    return animations
+
+
+def load_attack_animation(
+    attack_directory: str,
+    size: Tuple | List | None = None,
+    background_opacity: int | None = 128,
+) -> Dict:
+
+    animations = {
+        "right": [],
+        "left": [],
+    }
+
+    player_path = os.path.join(attack_directory, "player")
+    back_path = os.path.join(attack_directory, "back")
+    for name_play, name_back in zip(os.listdir(player_path), os.listdir(back_path)):
+
+        image = load_image(player_path, name_play, size)
+        back = load_image(back_path, name_back, size)
+        back.fill((255, 255, 255, background_opacity), None, pygame.BLEND_RGBA_MULT)
+        image.blit(back, (0, 0))
+        animations["right"].append(image)
+        animations["left"].append(pygame.transform.flip(image, 1, 0))
+
+    return animations
+
+
 def create_player_animation(
-    idle_directory: str, run_directory: str, size: Tuple | List | None = None
+    idle_directory: str,
+    run_directory: str,
+    attack_directory: str,
+    size: Tuple | List | None = None,
 ) -> Dict[str, pygame.surface.Surface]:
     """Create a dictionnary of this type for player animations :
     animations = {
@@ -24,10 +100,15 @@ def create_player_animation(
             "down": [ ... ],
             "left": [ ... ],
             "right":[ ... ],
+            "len": int,
         },
         "idle": {
             "up":   [ ... ],
             "down": [ ... ],
+            "len": int,
+        },
+        "attack": {
+            ...
         }
     }\n
     Image size will be original if size is None
@@ -45,31 +126,9 @@ def create_player_animation(
         },
     }
 
-    right_path = os.path.join(run_directory, "right")
-    for name in os.listdir(right_path):
-
-        right_image = load_image(right_path, name, size)
-        animations["run"]["right"].append(right_image)
-        animations["run"]["up"].append(right_image)
-
-    left_path = os.path.join(run_directory, "left")
-    for name in os.listdir(left_path):
-
-        left_image = load_image(left_path, name, size)
-        animations["run"]["left"].append(left_image)
-        animations["run"]["down"].append(left_image)
-
-    right_path = os.path.join(idle_directory, "right")
-    for name in os.listdir(right_path):
-
-        right_image = load_image(right_path, name, size)
-        animations["idle"]["right"].append(right_image)
-
-    left_path = os.path.join(idle_directory, "left")
-    for name in os.listdir(left_path):
-
-        left_image = load_image(left_path, name, size)
-        animations["idle"]["left"].append(left_image)
+    animations["run"] = load_run_animation(run_directory, size)
+    animations["idle"] = load_idle_animation(idle_directory, size)
+    animations["attack"] = load_attack_animation(attack_directory, size)
 
     return animations
 
@@ -78,7 +137,7 @@ class AnimationController:
 
     def __init__(
         self,
-        animations: Dict[str, List[pygame.surface.Surface]],
+        animations: Dict[str, Dict[str, List[pygame.surface.Surface]]],
         screen: pygame.surface.Surface,
     ):
         # Load animations
