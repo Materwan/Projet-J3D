@@ -303,6 +303,11 @@ class HostController(PlayerControllerBase):
 
         # Défini les variables à envoyer
         to_send_data = get_to_send_data()
+        to_send_data["map"] = {
+            "size": self.map.size.tolist(),
+            "octaves": self.map.octaves,
+            "seed": self.map.seed,
+        }
         writer.write(dict_to_bytes(to_send_data))
         await writer.drain()
 
@@ -436,6 +441,7 @@ class GuestController(PlayerControllerBase):
 
         self.address = address
         self.port = port
+        self.loaded = False
 
         # Défini un processus pour la connexion
         # sur un autre thread du processeur
@@ -459,11 +465,22 @@ class GuestController(PlayerControllerBase):
         self.host.moving_intent = recieved_data["host"]["moving_intent"]
         self.host.direction = recieved_data["host"]["direction"]
 
+        self.map = Map(
+            recieved_data["map"]["size"],
+            recieved_data["map"]["octaves"],
+            (32, 32),
+            (32, 32),
+            recieved_data["map"]["seed"],
+            self.screen,
+        )
+
         # Met à jour la position des hitbox
         self.hitbox.center = self.rel_position
         self.hitbox.bottom += 20
         self.host.hitbox.topleft = self.host.abs_position
         self.host.update()
+
+        self.loaded = True
 
     async def initialize(self):
         """Fonction de lancement du réseau"""

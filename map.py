@@ -7,6 +7,10 @@ from matplotlib.colors import ListedColormap
 import math
 import pygame
 
+GRASS_TILE = pygame.image.load(
+    r"Ressources\Pixel Art Top Down - Basic v1.2.3\Texture\Grass.png"
+).convert()
+
 
 def invert(val: np.ndarray) -> np.ndarray:
     """Renvoie l'inverse d'une matrice de valeur entre 0 et 1. (0 -> 1, 1 -> 0)"""
@@ -103,6 +107,7 @@ class Map:
         screen: pygame.Surface,
     ):
         self.size = np.array(size, dtype=np.int32)
+        self.octaves = octaves
         self.tile_size = np.array(tile_size, dtype=np.int32)
         self.chunk_size_tile = np.array(chunk_size, dtype=np.int32)
         self.chunk_size_pix = self.chunk_size_tile * self.tile_size
@@ -114,9 +119,7 @@ class Map:
         self.map_scale = (0, 1)
         self.map = self.create_map(octaves)
         self.loaded_chunks = {}
-        self.grass_tile = pygame.image.load(
-            r"Ressources\Pixel Art Top Down - Basic v1.2.3\Texture\Grass.png"
-        ).convert()
+        self.grass_tile = GRASS_TILE
         self.screen = screen
 
     def create_map(

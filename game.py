@@ -2,6 +2,7 @@ import pygame
 from player import SoloPlayerController, HostController, GuestController
 from moteur import Moteur
 from map import Map
+import time
 
 
 class Game:
@@ -31,7 +32,8 @@ class Game:
             "down": (-25, 0, 80, 70),
         }
 
-        self.map = Map((256, 256), (8, 8), (32, 32), (32, 32), 0, self.screen)
+        self.map = None
+        self.map: Map
         self.address = "10.187.208.69"
         self.port = 8888
 
@@ -39,10 +41,12 @@ class Game:
         """Initialise le moteur et le controlleur à utiliser"""
         self.moteur = Moteur(self.screen)
         if self.playing_mode == "solo":
+            self.map = Map((256, 256), (8, 8), (32, 32), (32, 32), 0, self.screen)
             self.player_controller = SoloPlayerController(
                 self.screen, self.moteur, self.map, (4096, 4096)
             )
         elif self.playing_mode == "host":
+            self.map = Map((256, 256), (8, 8), (32, 32), (32, 32), 0, self.screen)
             self.player_controller = HostController(
                 self.screen, self.moteur, self.map, (4096, 4096)
             )
@@ -50,6 +54,9 @@ class Game:
             self.player_controller = GuestController(
                 self.screen, self.map, self.address, self.port
             )
+            while not self.player_controller.loaded:
+                time.sleep(0.2)
+            self.map = self.player_controller.map
         self.player_controller.keybinds = self.keybinds
 
     def create_rect_attaque(self):

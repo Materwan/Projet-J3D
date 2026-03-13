@@ -1,19 +1,21 @@
 import pygame
+
+pygame.init()
+pygame.mixer.init()
+pygame.display.set_caption("MoleTale")
+screen = pygame.display.set_mode((500, 500))
+
 from menu import *
 from game import *
 from player import HostController, GuestController
 import logging
 import traceback
 
-pygame.init()
-pygame.mixer.init()
-pygame.display.set_caption("MoleTale")
-
 
 class Manager:
 
     def __init__(self):
-        self.screen = pygame.display.set_mode()
+        self.screen = screen
         self.running = True
 
         self.states = {
