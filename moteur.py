@@ -32,14 +32,7 @@ class Moteur:
                 # Si la valeur est de l'eau (< 0.5)
                 if self.map.map[x][y] < 0.5:
                     # On crée le rectangle de collision pour cette tuile
-                    nearby_obstacles.append(
-                        pygame.Rect(
-                            x * self.map.tile_size[0],
-                            y * self.map.tile_size[1],
-                            self.map.tile_size[0],
-                            self.map.tile_size[1],
-                        )
-                    )
+                    nearby_obstacles.append(pygame.Rect(x * 32, y * 32, 32, 32))
 
         return nearby_obstacles
 

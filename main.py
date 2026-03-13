@@ -29,6 +29,7 @@ class Manager:
         }
         self.state = self.states["MENU_P"]
 
+        self.fps = False
         self.font = pygame.font.SysFont(None, 24)  # fps
         self.clock = pygame.time.Clock()
 
@@ -43,12 +44,15 @@ class Manager:
             self.state.update()
 
             self.state.display()
-            self.screen.blit(
-                self.font.render(
-                    f"FPS: {int(self.clock.get_fps())}", True, (255, 255, 255)
-                ),
-                (10, 10),
-            )  # fps
+
+            if self.fps:  # fps
+                self.screen.blit(
+                    self.font.render(
+                        f"FPS: {int(self.clock.get_fps())}", True, (255, 255, 255)
+                    ),
+                    (10, 10),
+                )
+
             pygame.display.flip()
 
             self.clock.tick(60)  # à ne pas toucher

@@ -11,7 +11,6 @@ class Game:
     def __init__(self, screen: pygame.Surface, manager):
         self.screen = screen
         self.manager = manager
-        largeur, hauteur = self.screen.get_size()
         self.playing_mode = None
         self.player_controller = None
         self.keybinds = {
@@ -48,7 +47,7 @@ class Game:
         elif self.playing_mode == "host":
             self.map = Map((256, 256), (8, 8), (32, 32), (32, 32), 0, self.screen)
             self.player_controller = HostController(
-                self.screen, self.moteur, self.map, (4096, 4096)
+                self.screen, self.moteur, self.map, (4000, 4096)
             )
         elif self.playing_mode == "guest":
             self.player_controller = GuestController(
@@ -79,6 +78,8 @@ class Game:
                 elif event.key == pygame.K_SPACE:
                     self.attaque = True
                     self.attaque_rect = self.create_rect_attaque()
+                elif event.key == pygame.K_F1:
+                    self.manager.fps = not self.manager.fps
 
         self.player_controller.event(pygame.key.get_pressed())
         return False

@@ -62,6 +62,8 @@ class PlayerControllerBase:
 
         self.screen = screen
         self.moteur = moteur
+        if moteur != None:
+            self.moteur.map = map
         self.map = map
         self.moving_intent = False
 
@@ -83,7 +85,6 @@ class PlayerControllerBase:
         self.rel_position = pygame.Vector2(self.screen.get_size()) / 2
         self.hitbox = pygame.Rect(start_position[0], start_position[1], 32, 15)
         self.velocity = pygame.Vector2(0, 0)
-        self.look_direction = pygame.Vector2(0, 1)
         self.direction = "right"
         self.connected = False  # True si un invité est connecté
         self.close = False
@@ -108,8 +109,6 @@ class PlayerControllerBase:
 
     def update_animation(self):
         """Update the direction of the animation"""
-
-        self.look_direction = self.velocity.normalize()
 
         if self.velocity.x < 0:
             self.direction = "left"
@@ -144,21 +143,22 @@ class PlayerControllerBase:
                 self.rel_position.y = 100
             elif self.rel_position.y > self.max_pos.y:
                 self.rel_position.y = self.max_pos.y
-            # la position de la hitbox se cale sur le vecteur position
-            # self.hitbox.topleft = self.rel_position  # avant
-            self.hitbox.center = self.abs_position
-            self.hitbox.bottom += 20
+
+            self.hitbox.center = self.abs_position  # probleme si sur rel_position
+            self.hitbox.bottom += 28
 
             self.update_animation()
 
     def display(self):
         """Affiche le joueur"""
 
-        # self.animation.display((self.hitbox.x - 34, self.hitbox.y - 70)) # avant
         self.animation.display(self.rel_position - self.im_size // 2)
-        pygame.draw.rect(
-            self.screen, "red", self.hitbox, 2
-        )  # pour voir la hitbox du joueur (pas touche)
+
+        # pour voir la hitbox du joueur (pas touche)
+        hitbox_visuelle = self.hitbox.copy()
+        hitbox_visuelle.center = self.rel_position
+        hitbox_visuelle.bottom += 28
+        pygame.draw.rect(self.screen, "red", hitbox_visuelle, 2)
 
 
 class SoloPlayerController(PlayerControllerBase):
@@ -175,7 +175,10 @@ class SoloPlayerController(PlayerControllerBase):
         # avec SoloPlayerController, exemple :
         # (super().screen == self.screen) = True
         super().__init__(screen, moteur, map, start_position)
-        self.moteur.map = map
+
+    def event(self, keys):
+
+        super().event(keys)
 
     def update(self):
 
@@ -183,8 +186,6 @@ class SoloPlayerController(PlayerControllerBase):
 
         self.moving_intent = self.velocity.length_squared() > 0
         if self.moving_intent:  # si le joueur veut se deplacer alors :
-
-            self.look_direction = self.velocity.normalize()
 
             self.moteur.collision(self.hitbox, self.velocity, None)
             super().update()
@@ -211,10 +212,11 @@ class HostController(PlayerControllerBase):
     ):
 
         super().__init__(screen, moteur, map, start_position)
-        self.moteur.map = map
 
         # Initialise les données de l'invité
-        self.guest = PlayerControllerBase(self.screen, moteur, self.map, (4096, 4096))
+        self.guest = PlayerControllerBase(
+            self.screen, moteur, self.map, (start_position[0] + 50, start_position[1])
+        )
         self.recieved_data = {"Guest": {"velocity": [0, 0]}}
 
         self.serveur: asyncio.Server  # pour savoir le type
@@ -277,10 +279,7 @@ class HostController(PlayerControllerBase):
 
         def get_to_send_data() -> Dict:
             return {
-                "guest": {
-                    "position": list(self.guest.abs_position),
-                    "velocity": list(self.guest.velocity),
-                },
+                "guest": {"position": list(self.guest.abs_position)},
                 "host": {
                     "position": list(self.abs_position),
                     "moving_intent": self.moving_intent,
@@ -335,8 +334,9 @@ class HostController(PlayerControllerBase):
 
                 # Met à jour les varibles
                 self.guest.velocity.update(recieved_data["guest"]["velocity"])
-                self.guest.moving_intent = recieved_data["guest"]["moving_intent"]
-                self.guest.direction = recieved_data["guest"]["direction"]
+                # calcule le moving_intent et la direction du guest a partir de la vélocité
+                self.guest.moving_intent = self.guest.velocity.length_squared() > 0
+                self.guest.update_animation()
 
                 # Défini les variables à envoyer et les encodes
                 to_send_data = get_to_send_data()
@@ -372,7 +372,7 @@ class HostController(PlayerControllerBase):
                 print("Serveur fermé")
 
     def stop_server(self):
-        """Arrête le protocole de commuinication avec le client."""
+        """Arrête le protocole de communication avec le client."""
 
         async def stop_server():
             if self.serveur and self.serveur.is_serving():
@@ -381,17 +381,20 @@ class HostController(PlayerControllerBase):
 
         asyncio.run_coroutine_threadsafe(stop_server(), self.asyncio_loop)
 
+    def event(self, keys):
+
+        super().event(keys)
+
     def update(self):
 
         self.map.load_chunks(self.abs_position)
 
         self.moving_intent = self.velocity.length_squared() > 0
-        if self.moving_intent:  # Si le joueur veux bouger
+        if self.moving_intent:  # Si l'hote veux bouger
 
-            self.look_direction = self.velocity.normalize()
-
-            # self.moteur.collision(self.hitbox, self.velocity, self.guest.hitbox)
-
+            self.moteur.collision(self.hitbox, self.velocity, self.guest.hitbox)
+            print(self.hitbox)
+            print(self.guest.hitbox)
             super().update()
 
         if self.guest.moving_intent:  # Si le client veux bouger
@@ -475,12 +478,6 @@ class GuestController(PlayerControllerBase):
             self.screen,
         )
 
-        # Met à jour la position des hitbox
-        self.hitbox.center = self.rel_position
-        self.hitbox.bottom += 20
-        self.host.hitbox.topleft = self.host.abs_position
-        self.host.update()
-
         self.loaded = True
 
     async def initialize(self):
@@ -500,11 +497,7 @@ class GuestController(PlayerControllerBase):
 
         def get_to_send_data() -> Dict:
             return {
-                "guest": {
-                    "velocity": list(self.velocity),
-                    "moving_intent": self.moving_intent,
-                    "direction": self.direction,
-                },
+                "guest": {"velocity": list(self.velocity)},
                 "close": False,
             }
 
@@ -541,7 +534,6 @@ class GuestController(PlayerControllerBase):
 
                 # Met à jour les variables
                 self.abs_position.update(recieved_data["guest"]["position"])
-                self.velocity.update(recieved_data["guest"]["velocity"])
                 self.host.abs_position.update(recieved_data["host"]["position"])
                 self.host.moving_intent = recieved_data["host"]["moving_intent"]
                 self.host.direction = recieved_data["host"]["direction"]
@@ -552,25 +544,17 @@ class GuestController(PlayerControllerBase):
             self.writer.close()
             print("Connexion fermé")
 
+    def event(self, keys):
+
+        super().event(keys)
+
     def update(self):
 
         self.map.load_chunks(self.abs_position)
 
         self.moving_intent = self.velocity.length_squared() > 0
-        if self.moving_intent:  # Si le joueur veux bouger
-
-            self.look_direction = self.velocity.normalize()
-
-            super().update()
-
-        if self.host.moving_intent:  # Si l'hôte veux bouger
-
-            # self.host.update()
-
-            is_moving = self.host.velocity.length_squared()
-            if is_moving > 0:  # si on se deplace toujours alors :
-
-                self.host.update_animation()
+        if self.moving_intent:  # Si le guest veux bouger
+            self.update_animation()
 
         self.animation.update(self.moving_intent, self.direction)
         self.host.animation.update(self.host.moving_intent, self.host.direction)
@@ -579,8 +563,8 @@ class GuestController(PlayerControllerBase):
         """Affiche le joueur ainsi que l'hôte"""
 
         super().display()
-        # self.host.display()
 
+        # affichage de l'host
         self.host.animation.display(
             self.host.abs_position
             - self.abs_position
