@@ -3,7 +3,7 @@ from player import SoloPlayerController, HostController, GuestController
 from moteur import Moteur
 from map import Map
 import time
-
+from camera_system import Camera
 
 class Game:
     """Classe de gestion du jeu : joueur et carte."""
@@ -23,6 +23,9 @@ class Game:
         self.count = 0
         self.liste_ennemie = []
         self.attaque_rect = pygame.Rect(0, 0, 0, 0)
+        width, height = self.screen.get_size()
+        
+        self.camera = Camera(width, height, 0, 0) # on initialise a 0 pour pas que ca plante 
         # Configuration : { "direction": (decalage_x, decalage_y, largeur, hauteur) }
         self.attaque_config = {
             "right": (20, -60, 70, 80),
@@ -57,6 +60,8 @@ class Game:
                 time.sleep(0.2)
             self.map = self.player_controller.map
         self.player_controller.keybinds = self.keybinds
+        self.camera.map_width = self.map.size[0] * self.map.tile_size[0] # setup la taille de la map pour la caméra 
+        self.camera.map_height = self.map.size[1] * self.map.tile_size[1]
 
     def create_rect_attaque(self):
         dec_x, dec_y, wide, high = self.attaque_config[self.player_controller.direction]
@@ -103,17 +108,14 @@ class Game:
 
         if self.playing_mode != "solo" and self.player_controller.close:
             self.manager.running = False
+        self.map.load_chunks(self.player_controller.abs_position)  # load la map pour la camera
+        self.camera.update(self.player_controller.hitbox)
 
     def display(self):
         """Affiche tout les éléments."""
         self.screen.fill((100, 100, 100))
-
-        self.map.display(
-            self.player_controller.abs_position - self.player_controller.rel_position
-        )
-
-        self.player_controller.display()
-
+        self.camera.display_map(self.map)
+        self.player_controller.display(self.camera)
         pygame.draw.circle(
             self.screen,
             (255, 255, 255),

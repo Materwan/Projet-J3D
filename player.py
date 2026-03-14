@@ -9,6 +9,7 @@ import socket
 import json
 import threading
 import psutil
+from camera_system import Camera
 
 
 def get_netmask_for_ip(ip: str) -> str | None:
@@ -57,10 +58,12 @@ class PlayerControllerBase:
         moteur: Moteur | None,
         map: Map,
         start_position: Tuple[int, int],
+        
     ):
         """Créer les éléments nécessaires à un joueur"""
 
         self.screen = screen
+        
         self.moteur = moteur
         if moteur != None:
             self.moteur.map = map
@@ -133,33 +136,25 @@ class PlayerControllerBase:
 
             # gestion du vecteur position
             self.abs_position += self.velocity * 2
-            self.rel_position += self.velocity * 2
+            
 
-            if self.rel_position.x < 100:
-                self.rel_position.x = 100
-            elif self.rel_position.x > self.max_pos.x:
-                self.rel_position.x = self.max_pos.x
-            if self.rel_position.y < 100:
-                self.rel_position.y = 100
-            elif self.rel_position.y > self.max_pos.y:
-                self.rel_position.y = self.max_pos.y
+           
 
             self.hitbox.center = self.abs_position  # probleme si sur rel_position
             self.hitbox.bottom += 28
 
             self.update_animation()
 
-    def display(self):
-        """Affiche le joueur"""
+    def display(self, camera):
+        # La caméra convertit abs_position → position écran
+        screen_pos = pygame.Vector2(camera.apply(self.hitbox).center)
 
-        self.animation.display(self.rel_position - self.im_size // 2)
+        self.animation.display(screen_pos - self.im_size // 2)
 
-        # pour voir la hitbox du joueur (pas touche)
-        hitbox_visuelle = self.hitbox.copy()
-        hitbox_visuelle.center = self.rel_position
+        # pour voir la hitbox du joueur( ajusté par rapport a la caméra)
+        hitbox_visuelle = camera.apply(self.hitbox)
         hitbox_visuelle.bottom += 28
         pygame.draw.rect(self.screen, "red", hitbox_visuelle, 2)
-
 
 class SoloPlayerController(PlayerControllerBase):
     """Classe pour un joueur solo"""
@@ -191,10 +186,11 @@ class SoloPlayerController(PlayerControllerBase):
             super().update()
 
         self.animation.update(self.moving_intent, self.direction)
+        
 
-    def display(self):
+    def display(self, camera):
 
-        super().display()
+          super().display(camera)
 
 
 class HostController(PlayerControllerBase):
@@ -412,18 +408,15 @@ class HostController(PlayerControllerBase):
         self.animation.update(self.moving_intent, self.direction)
         self.guest.animation.update(self.guest.moving_intent, self.guest.direction)
 
-    def display(self):
+    def display(self, camera):
         """Affiche le joueur ainsi que l'invité"""
 
-        super().display()
-        # self.guest.display()
+        
+        super().display(camera)
 
-        self.guest.animation.display(
-            self.guest.abs_position
-            - self.abs_position
-            + self.rel_position
-            - self.im_size // 2
-        )
+        # Calcul de la position écran du guest via la caméra
+        guest_screen_pos = pygame.Vector2(camera.apply(self.guest.hitbox).center)
+        self.guest.animation.display(guest_screen_pos - self.im_size // 2)
 
 
 class GuestController(PlayerControllerBase):
