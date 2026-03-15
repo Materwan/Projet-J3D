@@ -87,7 +87,7 @@ class PlayerControllerBase:
         self.keybinds = None
         self.keybinds: Dict
         self.position = pygame.Vector2(start_position)
-        self.hitbox = pygame.Rect(0, 0, 32, 15)
+        self.hitbox = pygame.Rect(0, 0, 28, 15)
         self.hitbox.center = self.position
         self.velocity = pygame.Vector2(0, 0)
         self.direction = "right"
