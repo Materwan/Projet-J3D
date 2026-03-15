@@ -138,7 +138,6 @@ class AnimationController:
         self.current_state = "idle"
         self.current_dir = "right"
         self.frame_index = 0
-        print(self.animations[self.current_state][self.current_dir])
         self.im_size = self.animations[self.current_state][self.current_dir][
             self.frame_index
         ].get_size()
