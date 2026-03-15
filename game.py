@@ -32,7 +32,7 @@ class Game:
 
     def initialize(self):
         """Initialise le moteur, le controlleur à utiliser, les keybinds et la camera"""
-        self.moteur = Moteur()
+        self.moteur = Moteur(self.screen, self.camera)
 
         if self.playing_mode == "guest":
             self.player_controller = GuestController(
@@ -68,6 +68,8 @@ class Game:
                     pygame.mixer.music.play(-1)
                     self.manager.states["MENU_PAUSE"].surface_copie = self.screen.copy()
                     self.manager.change_state("MENU_PAUSE")
+                elif event.key == pygame.K_SPACE:
+                    self.player_controller.attaque = True
                 elif event.key == pygame.K_F2:
                     self.player_controller.toggle_hitbox()
 

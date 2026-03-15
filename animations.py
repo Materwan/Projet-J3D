@@ -81,8 +81,8 @@ def load_attack_animation(
         back = load_image(back_path, name_back, size)
         back.fill((255, 255, 255, background_opacity), None, pygame.BLEND_RGBA_MULT)
         image.blit(back, (0, 0))
-        animations["right"].append(image)
-        animations["left"].append(pygame.transform.flip(image, 1, 0))
+        animations["left"].append(image)
+        animations["right"].append(pygame.transform.flip(image, 1, 0))
 
     return animations
 
@@ -93,25 +93,13 @@ def create_player_animation(
     attack_directory: str,
     size: Tuple | List | None = None,
 ) -> Dict[str, pygame.surface.Surface]:
-    """Create a dictionnary of this type for player animations :
-    animations = {
-        "run": {
-            "up":   [Surface, Surface, ...],
-            "down": [ ... ],
-            "left": [ ... ],
-            "right":[ ... ],
-            "len": int,
-        },
-        "idle": {
-            "up":   [ ... ],
-            "down": [ ... ],
-            "len": int,
-        },
-        "attack": {
-            ...
-        }
-    }\n
-    Image size will be original if size is None
+    """Retourne un dictionnaire d'animations pour le joueur :
+    {
+        "run":    { "right": [...], "left": [...], "up": [...], "down": [...] },
+        "idle":   { "right": [...], "left": [...] },
+        "attack": { "right": [...], "left": [...] }
+    }
+    Chaque liste contient des Surface pygame. Taille originale si size=None.
     """
     animations = {
         "run": {
@@ -121,6 +109,10 @@ def create_player_animation(
             "down": [],
         },
         "idle": {
+            "right": [],
+            "left": [],
+        },
+        "attack": {
             "right": [],
             "left": [],
         },
@@ -146,33 +138,61 @@ class AnimationController:
         self.current_state = "idle"
         self.current_dir = "right"
         self.frame_index = 0
+        print(self.animations[self.current_state][self.current_dir])
         self.im_size = self.animations[self.current_state][self.current_dir][
             self.frame_index
         ].get_size()
         self.length = len(self.animations[self.current_state][self.current_dir])
 
+        self.attacking = False
+        self.attack_length = 0
+
+    def trigger_attack(self):
+        """Déclenche l'animation d'attaque (une seule fois, non interruptible)."""
+        if not self.attacking:
+            self.attacking = True
+            self.frame_index = 0
+            self.attack_length = len(self.animations["attack"][self.current_dir])
+
     def update(self, running: str, direction: str):
         """Change state and direction if neccesary, otherwise, update frame index"""
-        new_state = "run" if running else "idle"
-        if new_state != self.current_state or direction != self.current_dir:
-            # Change state and direction
-            self.current_state = new_state
-            self.current_dir = direction
-            # Reset frame index and number of images
-            self.frame_index = 0
-            self.length = len(self.animations[self.current_state][self.current_dir])
+
+        if self.attacking:
+            self.frame_index += 1
+            # Fin de l'animation d'attaque
+            if self.frame_index >= self.attack_length * 10:
+                self.attacking = False
+                self.frame_index = 0
+                self.length = len(self.animations[self.current_state][self.current_dir])
         else:
-            # Update frame index
-            self.frame_index = (self.frame_index + 1) % (self.length * 10)
+            new_state = "run" if running else "idle"
+            if new_state != self.current_state or direction != self.current_dir:
+                # Change state and direction
+                self.current_state = new_state
+                self.current_dir = direction
+                # Reset frame index and number of images
+                self.frame_index = 0
+                self.length = len(self.animations[self.current_state][self.current_dir])
+            else:
+                # Update frame index
+                self.frame_index = (self.frame_index + 1) % (self.length * 10)
 
     def display(self, position: Tuple | List | pygame.Vector2):
         """Display animation"""
-        self.screen.blit(
-            self.animations[self.current_state][self.current_dir][
-                self.frame_index // 10 % self.length
-            ],
-            position,
-        )
+        if self.attacking:
+            self.screen.blit(
+                self.animations["attack"][self.current_dir][
+                    self.frame_index // 10 % self.attack_length
+                ],
+                position,
+            )
+        else:
+            self.screen.blit(
+                self.animations[self.current_state][self.current_dir][
+                    self.frame_index // 10 % self.length
+                ],
+                position,
+            )
 
 
 class Button:

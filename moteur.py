@@ -3,16 +3,19 @@ from map import Map
 
 
 class Moteur:
-    def __init__(self):
+    def __init__(self, screen, camera):
+        self.screen = screen
+        self.camera = camera
         self.map = None
         self.map: Map
+        self.nearby_obstacles = []
 
         # Configuration : { "direction": (decalage_x, decalage_y, largeur, hauteur) }
         self.attaque_config = {
-            "right": (20, -60, 70, 80),
-            "left": (-50, -60, 70, 80),
-            "up": (-25, -70, 80, 70),
-            "down": (-25, 0, 80, 70),
+            "right": (0, -55, 70, 60),
+            "left": (-70, -55, 70, 60),
+            # "up": (-25, -70, 80, 70),
+            # "down": (-25, 0, 80, 70),
         }
 
     def get_nearby_obstacles(self, hitbox: pygame.Rect):
@@ -60,25 +63,25 @@ class Moteur:
             velocity (pygame.Vector2): Vecteur de déplacement souhaité (modifié sur place).
             other_hitbox (pygame.Rect|None): La boîte de collision actuelle de l'autre joueur.
         """
-        nearby_obstacles = self.get_nearby_obstacles(hitbox)
+        self.nearby_obstacles = self.get_nearby_obstacles(hitbox)
         if other_hitbox != None:
-            nearby_obstacles.append(other_hitbox)
+            self.nearby_obstacles.append(other_hitbox)
+
         if velocity.x != 0:
             future_hitbox = hitbox.move(velocity.x * 3, 0)
             if any(
-                future_hitbox.colliderect(obstacle) for obstacle in nearby_obstacles
+                future_hitbox.colliderect(obstacle)
+                for obstacle in self.nearby_obstacles
             ):
                 velocity.x = 0
 
         if velocity.y != 0:
             future_hitbox = hitbox.move(0, velocity.y * 3)
             if any(
-                future_hitbox.colliderect(obstacle) for obstacle in nearby_obstacles
+                future_hitbox.colliderect(obstacle)
+                for obstacle in self.nearby_obstacles
             ):
                 velocity.y = 0
-
-        if other_hitbox != None:
-            nearby_obstacles.pop(-1)
 
     def verif_velocity(self, velocity: list) -> pygame.Vector2:
         """

@@ -70,6 +70,9 @@ class PlayerControllerBase:
         self.moving_intent = False
         self.show_hitbox = False
 
+        self.attaque = False
+        self.attaque_rect = None
+
         # Initialise les animations
         animation_images = create_player_animation(
             r"Ressources\Animations\Idle_Animations",
@@ -140,11 +143,16 @@ class PlayerControllerBase:
         # La caméra convertit position → position écran
         screen_pos = pygame.Vector2(self.camera.apply(self.hitbox).center)
         self.animation.display(
-            screen_pos - pygame.Vector2(self.im_size[0] // 2, self.im_size[1] - 20)
+            screen_pos - pygame.Vector2(self.im_size[0] // 2, self.im_size[1] - 22)
         )  # -20 pour afficher le joueur un peu au dessus de la hitbox
 
         if self.show_hitbox:
             pygame.draw.rect(self.screen, "red", self.camera.apply(self.hitbox), 2)
+
+        if self.show_hitbox and self.attaque_rect and self.animation.attacking:
+            pygame.draw.rect(
+                self.screen, "red", self.camera.apply(self.attaque_rect), 2
+            )
 
 
 class SoloPlayerController(PlayerControllerBase):
@@ -182,11 +190,22 @@ class SoloPlayerController(PlayerControllerBase):
 
             super().update()
 
+        if self.attaque:
+            self.animation.trigger_attack()
+            self.attaque_rect = self.moteur.create_rect_attaque(
+                self.position, self.direction
+            )
+            self.attaque = False  # consommé, on attend le prochain appui
+
         self.animation.update(self.moving_intent, self.direction)
 
     def display(self):
 
         super().display()
+
+        if self.show_hitbox:
+            for obstacle in self.moteur.nearby_obstacles:
+                pygame.draw.rect(self.screen, "red", self.camera.apply(obstacle), 2)
 
 
 class HostController(PlayerControllerBase):
@@ -278,11 +297,24 @@ class HostController(PlayerControllerBase):
 
         def get_to_send_data() -> Dict:
             return {
-                "guest": {"position": list(self.guest.position)},
+                "guest": {
+                    "position": list(self.guest.position),
+                    "attaque_rect": (
+                        list(self.guest.attaque_rect)
+                        if self.guest.attaque_rect and self.guest.animation.attacking
+                        else None
+                    ),
+                },
                 "host": {
                     "position": list(self.position),
                     "moving_intent": self.moving_intent,
                     "direction": self.direction,
+                    "attaque": self.attaque,
+                    "attaque_rect": (
+                        list(self.attaque_rect)
+                        if self.attaque_rect and self.animation.attacking
+                        else None
+                    ),  # attaque_rect sert juste pour affichage de la hitbox d'attaque si F2 enclencher
                 },
                 "close": False,
             }
@@ -335,9 +367,11 @@ class HostController(PlayerControllerBase):
                 self.guest.velocity = self.moteur.verif_velocity(
                     recieved_data["guest"]["velocity"]
                 )  # verification de la vélocité dès qu'on le recoit
+                self.guest.attaque = recieved_data["guest"]["attaque"]
 
                 # Défini les variables à envoyer et les encodes
                 to_send_data = get_to_send_data()
+                self.attaque = False
                 to_send_bytes = dict_to_bytes(to_send_data)
 
                 # Envoie les données
@@ -397,6 +431,20 @@ class HostController(PlayerControllerBase):
 
             super().update()
 
+        if self.attaque and not self.connected:
+            self.animation.trigger_attack()
+            self.attaque_rect = self.moteur.create_rect_attaque(
+                self.position, self.direction
+            )
+            self.attaque = False
+
+        elif self.attaque:
+            self.animation.trigger_attack()
+            self.attaque_rect = self.moteur.create_rect_attaque(
+                self.position, self.direction
+            )
+            # le self.attaque = False de l'hôte est effectuer juste après l'avoir envoyer au client
+
         self.animation.update(self.moving_intent, self.direction)
 
         # Client
@@ -409,6 +457,13 @@ class HostController(PlayerControllerBase):
 
             self.guest.update()
 
+        if self.guest.attaque:  # regarde si client attaque
+            self.guest.animation.trigger_attack()
+            self.guest.attaque_rect = self.moteur.create_rect_attaque(
+                self.guest.position, self.guest.direction
+            )
+            self.guest.attaque = False
+
         self.guest.animation.update(self.guest.moving_intent, self.guest.direction)
 
     def display(self):
@@ -417,6 +472,10 @@ class HostController(PlayerControllerBase):
         self.guest.display()
 
         super().display()
+
+        if self.show_hitbox:
+            for obstacle in self.moteur.nearby_obstacles:
+                pygame.draw.rect(self.screen, "red", self.camera.apply(obstacle), 2)
 
 
 class GuestController(PlayerControllerBase):
@@ -498,7 +557,10 @@ class GuestController(PlayerControllerBase):
 
         def get_to_send_data() -> Dict:
             return {
-                "guest": {"velocity": list(self.velocity)},
+                "guest": {
+                    "velocity": list(self.velocity),
+                    "attaque": self.attaque,
+                },
                 "close": False,
             }
 
@@ -513,6 +575,7 @@ class GuestController(PlayerControllerBase):
 
                 # Défini les variables à envoyer à l'hôte et les encodes
                 to_send_data = get_to_send_data()
+                self.attaque = False  # consommé après envoi
                 to_send_bytes = dict_to_bytes(to_send_data)
 
                 # Envoie les données
@@ -535,9 +598,15 @@ class GuestController(PlayerControllerBase):
 
                 # Met à jour les variables
                 self.position.update(recieved_data["guest"]["position"])
+                raw_rect = recieved_data["guest"]["attaque_rect"]
+                self.attaque_rect = pygame.Rect(raw_rect) if raw_rect else None
+
                 self.host.position.update(recieved_data["host"]["position"])
                 self.host.moving_intent = recieved_data["host"]["moving_intent"]
                 self.host.direction = recieved_data["host"]["direction"]
+                self.host.attaque = recieved_data["host"]["attaque"]
+                raw_rect = recieved_data["host"]["attaque_rect"]
+                self.host.attaque_rect = pygame.Rect(raw_rect) if raw_rect else None
 
                 # Attend de manière à ce qu'il y ai 30 envoie par secondes
                 await asyncio.sleep(1 / 30)
@@ -557,6 +626,14 @@ class GuestController(PlayerControllerBase):
         self.moving_intent = self.velocity.length_squared() > 0
         if self.moving_intent:
             self.update_direction()
+
+        if self.attaque:
+            self.animation.trigger_attack()
+            # le self.attaque = False du client est effectuer juste après l'avoir envoyer a l'hôte
+
+        if self.host.attaque:
+            self.host.animation.trigger_attack()
+            self.host.attaque = False
 
         self.animation.update(self.moving_intent, self.direction)
         self.host.animation.update(self.host.moving_intent, self.host.direction)
