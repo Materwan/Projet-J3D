@@ -1,13 +1,19 @@
 import pygame
-from typing import List
 from map import Map
 
 
 class Moteur:
-    def __init__(self, screen):
-        self.screen = screen
+    def __init__(self):
         self.map = None
         self.map: Map
+
+        # Configuration : { "direction": (decalage_x, decalage_y, largeur, hauteur) }
+        self.attaque_config = {
+            "right": (20, -60, 70, 80),
+            "left": (-50, -60, 70, 80),
+            "up": (-25, -70, 80, 70),
+            "down": (-25, 0, 80, 70),
+        }
 
     def get_nearby_obstacles(self, hitbox: pygame.Rect):
         """
@@ -58,14 +64,14 @@ class Moteur:
         if other_hitbox != None:
             nearby_obstacles.append(other_hitbox)
         if velocity.x != 0:
-            future_hitbox = hitbox.move(velocity.x * 2, 0)
+            future_hitbox = hitbox.move(velocity.x * 3, 0)
             if any(
                 future_hitbox.colliderect(obstacle) for obstacle in nearby_obstacles
             ):
                 velocity.x = 0
 
         if velocity.y != 0:
-            future_hitbox = hitbox.move(0, velocity.y * 2)
+            future_hitbox = hitbox.move(0, velocity.y * 3)
             if any(
                 future_hitbox.colliderect(obstacle) for obstacle in nearby_obstacles
             ):
@@ -74,24 +80,18 @@ class Moteur:
         if other_hitbox != None:
             nearby_obstacles.pop(-1)
 
-    def verif_velocity(self, velocity: List[int]):
+    def verif_velocity(self, velocity: list) -> pygame.Vector2:
         """
-        Convertit la vélocité reçue (sous forme de liste : [x, y]) en vecteur.
-        Puis assure que les entrées sont comprises entre -1 et 1.
-        Si le joueur se déplace en diagonale, la vélocité est normalisée.
-
-        Returns:
-            tuple[pygame.Vector2, bool]:
-                - vel : Le vecteur de déplacement normalisé (longueur max = 1).
-                - moving_intent : True si le joueur essaie de se déplacer, False sinon.
+        Convertit et valide la vélocité reçue du réseau.
+        Bride les valeurs entre -1 et 1 pour éviter qu'un client
+        malveillant ou bugué n'envoie des valeurs aberrantes.
         """
         vel = pygame.Vector2(velocity)
-
         vel.x = max(-1.0, min(1.0, vel.x))
         vel.y = max(-1.0, min(1.0, vel.y))
+        return vel
 
-        length = vel.length_squared()
-        if length > 1.0:
-            vel.normalize_ip()
+    def create_rect_attaque(self, position, direction):
+        dec_x, dec_y, wide, high = self.attaque_config[direction]
 
-        return vel, length > 0
+        return pygame.Rect(position.x + dec_x, position.y + dec_y, wide, high)

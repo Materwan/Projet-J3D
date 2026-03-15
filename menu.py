@@ -790,7 +790,6 @@ class Pause_Menu(Menu):
 
     def update(self):
         if self.manager.states["GAME"].playing_mode != "solo":
-            print(True)
             self.manager.states["GAME"].update()
 
     def display(self):

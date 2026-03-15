@@ -39,7 +39,12 @@ class Manager:
     def run(self):
         while self.running:
 
-            self.state.event(pygame.event.get())
+            events = pygame.event.get()
+            for event in events:
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_F1:
+                        self.fps = not self.fps
+            self.state.event(events)
 
             self.state.update()
 
