@@ -7,9 +7,26 @@ from matplotlib.colors import ListedColormap
 import math
 import pygame
 
-GRASS_TILE = pygame.image.load(
-    r"Ressources\Pixel Art Top Down - Basic v1.2.3\Texture\Grass.png"
+GROUND_SURF = (0, 0, 32, 32)
+GRASS_SURF = (0, 32, 32, 32)
+ROCK_SURF = (160, 480, 32, 32)
+BUSH_SURF = (32, 192, 32, 32)
+
+
+TILE = pygame.image.load(
+    r"Ressources\Pixel Art Top Down - Basic v1.2.3\Texture\TX Tileset Grass.png"
 ).convert()
+PROS = pygame.image.load(
+    r"Ressources\Pixel Art Top Down - Basic v1.2.3\Texture\TX Props.png"
+).convert_alpha()
+PLANT = pygame.image.load(
+    r"Ressources\Pixel Art Top Down - Basic v1.2.3\Texture\TX Plant.png"
+).convert_alpha()
+
+GROUND_TILE = TILE.subsurface(GROUND_SURF)
+GRASS_TILE = TILE.subsurface(GRASS_SURF)
+ROCK_TILE = PROS.subsurface(ROCK_SURF)
+BUSH_TILE = PLANT.subsurface(BUSH_SURF)
 
 
 def invert(val: np.ndarray) -> np.ndarray:
@@ -118,8 +135,13 @@ class Map:
             self.seed = seed
         self.map_scale = (0, 1)
         self.map = self.create_map(octaves)
+        self.grass_mask = self.add_rn_tile(0.2)
+        self.rock_mask = self.add_rn_tile(0.01)
+        self.bush_mask = self.add_rn_tile(0.05)
+        self.ground_tiles = self.create_tile_map(self.grass_mask)
+        self.props_tiles = self.create_tile_map(self.rock_mask)
+        self.plat_tiles = self.create_tile_map(self.bush_mask)
         self.loaded_chunks = {}
-        self.grass_tile = GRASS_TILE
         self.screen = screen
 
     def create_map(
@@ -162,8 +184,8 @@ class Map:
         mask = scale(mask, mask_pad_value, mask_func)  # Applique la fonction de masque
         mask = normalize(mask, mask_scale)  # Change l'interval
 
-        print(np.min(mask), np.max(mask))
-        print(np.min(noise), np.max(noise))
+        # print(np.min(mask), np.max(mask))
+        # print(np.min(noise), np.max(noise))
 
         # Fusione le masque et le bruit de perlin Merge noise with mask
         noise = np.add(
@@ -171,9 +193,21 @@ class Map:
         )  # Additione le masque et le bruit de perlin
         noise = normalize(noise, self.map_scale)  # Change l'interval
 
-        print("\n", np.min(noise), np.max(noise))
+        # print("\n", np.min(noise), np.max(noise))
 
         return noise
+
+    def add_rn_tile(self, frequency: float) -> np.ndarray:
+        """Créer un mask sur la carte avec une probabilité d'apparition de fraquency."""
+        assert 0 <= frequency <= 1
+        prob_mask = np.random.choice([0, 1], (256, 256), p=[1 - frequency, frequency])
+        return (self.map > 0.5) & prob_mask
+
+    def create_tile_map(self, *args: np.ndarray) -> np.ndarray:
+        tile = self.map > 0.5
+        for i, mask in enumerate(args):
+            tile = np.where(mask, i + 2, tile)
+        return tile
 
     def load_chunks(self, absolute_position: Tuple[int, int]):
         """Prend la position du joueur sur la map, et charge les chunks atours"""
@@ -208,7 +242,9 @@ class Map:
         pos = np.array(position, dtype=np.int32)
         assert np.less_equal(pos, self.size // 32).all()
 
-        sur = pygame.Surface(self.chunk_size_pix)
+        ground_sur = pygame.Surface(self.chunk_size_pix)
+        plant_sur = pygame.Surface(self.chunk_size_pix, pygame.SRCALPHA)
+        asset_sur = pygame.Surface(self.chunk_size_pix, pygame.SRCALPHA)
 
         start = pos * 32
 
@@ -218,22 +254,18 @@ class Map:
                 rel = np.array([x, y], dtype=np.int32)
                 abs = start + rel
 
-                if self.map[abs[0]][abs[1]] >= 0.5:
-                    sur.blit(self.grass_tile, rel * self.tile_size)
+                if self.ground_tiles[abs[0]][abs[1]] == 1:
+                    ground_sur.blit(GROUND_TILE, rel * self.tile_size)
+                elif self.ground_tiles[abs[0]][abs[1]] == 2:
+                    ground_sur.blit(GRASS_TILE, rel * self.tile_size)
+                if self.plat_tiles[abs[0]][abs[1]] == 2:
+                    plant_sur.blit(BUSH_TILE, rel * self.tile_size)
+                elif self.props_tiles[abs[0]][abs[1]] == 2:
+                    asset_sur.blit(ROCK_TILE, rel * self.tile_size)
 
-        return sur
-
-    def get_obstacles(self, position: Tuple[int, int]) -> List[Tuple[int, int]]:
-        pos = np.array(position, dtype=np.int32)
-        case_pos = pos // 32
-
-        L = []
-        for x in range(case_pos[0] - 1, case_pos[0] + 2):
-            for y in range(case_pos[1] - 1, case_pos[1] + 2):
-                if self.map[x][y] < 0.5:
-                    L.append((x, y))
-
-        return L
+        ground_sur.blit(plant_sur, (0, 0))
+        ground_sur.blit(asset_sur, (0, 0))
+        return ground_sur
 
     def add_structure(
         map: np.ndarray,
@@ -307,13 +339,14 @@ class Map:
 
     def display(self, absolute_position: Tuple[int, int]):
         """Affiche les chunks les plus proches"""
-        abs_pos = np.array(absolute_position, dtype=np.int32)
+        abs_position = np.array(absolute_position, dtype=np.int32)
+
         for x, y in self.loaded_chunks.keys():
             self.screen.blit(
                 self.loaded_chunks[(x, y)],
                 (
-                    x * self.chunk_size_pix[0] - abs_pos[0],
-                    y * self.chunk_size_pix[1] - abs_pos[1],
+                    x * self.chunk_size_pix[0] - abs_position[0],
+                    y * self.chunk_size_pix[1] - abs_position[1],
                 ),
             )
 
@@ -327,20 +360,19 @@ class Map:
         # Display the map with in blue values < 0.5 and red > 0.5
         plt.subplot(2, 2, 2)
 
-        mask = (self.map > 0.5).astype(int)
-        cmap = ListedColormap(["blue", "green"])
-
-        plt.imshow(mask, cmap=cmap)
-        plt.colorbar(ticks=[0, 0.5, 1])
+        plt.imshow(self.grass_mask)
+        plt.colorbar()
 
         # Display zone (in black) where values > 0.7
         plt.subplot(2, 2, 3)
 
-        mask = (self.map > 0.7).astype(int)
-        cmap = ListedColormap(["blue", "black"])
+        plt.imshow(self.asset_tiles)
+        plt.colorbar()
 
-        plt.imshow(mask, cmap=cmap)
-        plt.colorbar(ticks=[0, 0.9, 1])
+        plt.subplot(2, 2, 4)
+
+        plt.imshow(self.ground_tiles)
+        plt.colorbar()
 
         plt.show()
 

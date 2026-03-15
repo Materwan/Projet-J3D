@@ -36,7 +36,7 @@ class Moteur:
         for x in range(grid_x - 1, grid_x + 2):
             for y in range(grid_y - 1, grid_y + 2):
                 # Si la valeur est de l'eau (< 0.5)
-                if self.map.map[x][y] < 0.5:
+                if self.map.ground_tiles[x][y] == 0 or self.map.props_tiles[x][y] >= 2:
                     # On crée le rectangle de collision pour cette tuile
                     nearby_obstacles.append(pygame.Rect(x * 32, y * 32, 32, 32))
 
