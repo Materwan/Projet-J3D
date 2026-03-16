@@ -32,15 +32,16 @@ class Game:
 
     def initialize(self):
         """Initialise le moteur, le controlleur à utiliser, les keybinds et la camera"""
-        self.moteur = Moteur(self.screen, self.camera)
+        self.moteur = Moteur()
 
         if self.playing_mode == "guest":
             self.player_controller = GuestController(
-                self.screen, self.map, self.address, self.port
+                self.screen, self.moteur, self.map, self.address, self.port
             )
             while not self.player_controller.loaded:
                 time.sleep(0.2)
-            self.map = self.player_controller.map
+            self.map = self.player_controller.map  # recupere la map de client
+            self.moteur.map = self.map  # donner à moteur pour Client-side prediction
         else:
             self.map = Map((256, 256), (8, 8), (32, 32), (32, 32), 0, self.screen)
             if self.playing_mode == "solo":
@@ -53,7 +54,6 @@ class Game:
                 )
 
         self.player_controller.keybinds = self.keybinds
-
         self.camera.map_width = self.map.size[0] * self.map.tile_size[0]
         self.camera.map_height = self.map.size[1] * self.map.tile_size[1]
         self.player_controller.set_camera(self.camera)

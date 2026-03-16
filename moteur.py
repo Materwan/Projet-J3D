@@ -3,9 +3,7 @@ from map import Map
 
 
 class Moteur:
-    def __init__(self, screen, camera):
-        self.screen = screen
-        self.camera = camera
+    def __init__(self):
         self.map = None
         self.map: Map
         self.nearby_obstacles = []
@@ -64,7 +62,7 @@ class Moteur:
             other_hitbox (pygame.Rect|None): La boîte de collision actuelle de l'autre joueur.
         """
         self.nearby_obstacles = self.get_nearby_obstacles(hitbox)
-        if other_hitbox != None:
+        if other_hitbox is not None:
             self.nearby_obstacles.append(other_hitbox)
 
         if velocity.x != 0:

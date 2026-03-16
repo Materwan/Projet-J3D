@@ -10,6 +10,8 @@ import json
 import threading
 import psutil
 
+SPEED = 3
+
 
 def get_netmask_for_ip(ip: str) -> str | None:
     """Donne le mask du sous-réseau"""
@@ -54,24 +56,19 @@ class PlayerControllerBase:
     def __init__(
         self,
         screen: pygame.Surface,
-        moteur: Moteur | None,
+        moteur: Moteur,
         map: Map,
         start_position: Tuple[int, int],
     ):
-        """Créer les éléments nécessaires à un joueur"""
-
+        """Initialise les éléments nécessaires à un joueur"""
         self.screen = screen
         self.camera = None
-
         self.moteur = moteur
-        if moteur != None:
-            self.moteur.map = map
         self.map = map
-        self.moving_intent = False
-        self.show_hitbox = False
+        if moteur is not None and map is not None:
+            self.moteur.map = map
 
-        self.attaque = False
-        self.attaque_rect = None
+        self.show_hitbox = False  # pour F2
 
         # Initialise les animations
         animation_images = create_player_animation(
@@ -90,9 +87,14 @@ class PlayerControllerBase:
         self.hitbox = pygame.Rect(0, 0, 28, 15)
         self.hitbox.center = self.position
         self.velocity = pygame.Vector2(0, 0)
-        self.input_velocity = pygame.Vector2(0, 0)
         self.direction = "right"
-        self.connected = False  # True si un invité est connecté
+        self.moving_intent = False
+
+        # attaque
+        self.attaque = False
+        self.attaque_rect = None
+
+        # reseau
         self.close = False
 
     def event(self, keys: Tuple[bool]):
@@ -107,7 +109,6 @@ class PlayerControllerBase:
         Le vecteur 'self.velocity' ainsi mis à jour contient des composantes
         x et y allant de -1 à 1, permettant aussi la gestion des diagonales.
         """
-
         self.velocity.update(
             keys[self.keybinds["right"]] - keys[self.keybinds["left"]],
             keys[self.keybinds["down"]] - keys[self.keybinds["up"]],
@@ -136,24 +137,23 @@ class PlayerControllerBase:
             if mov > 1:
                 self.velocity.normalize_ip()
 
-            self.position += self.velocity * 2
+            self.position += self.velocity * SPEED
             # on cale la hitbox sur le vecteur position
             self.hitbox.center = self.position
 
     def display(self):
-        # La caméra convertit position → position écran
+        # La caméra convertit la position en position écran
         screen_pos = pygame.Vector2(self.camera.apply(self.hitbox).center)
         self.animation.display(
             screen_pos - pygame.Vector2(self.im_size[0] // 2, self.im_size[1] - 22)
-        )  # -20 pour afficher le joueur un peu au dessus de la hitbox
+        )  # -22 pour afficher le joueur un peu au dessus de la hitbox
 
         if self.show_hitbox:
             pygame.draw.rect(self.screen, "red", self.camera.apply(self.hitbox), 2)
-
-        if self.show_hitbox and self.attaque_rect and self.animation.attacking:
-            pygame.draw.rect(
-                self.screen, "red", self.camera.apply(self.attaque_rect), 2
-            )
+            if self.attaque_rect and self.animation.attacking:
+                pygame.draw.rect(
+                    self.screen, "red", self.camera.apply(self.attaque_rect), 2
+                )
 
 
 class SoloPlayerController(PlayerControllerBase):
@@ -232,6 +232,7 @@ class HostController(PlayerControllerBase):
 
         self.serveur: asyncio.Server  # pour savoir le type
         self.serveur = None  # initialise
+        self.connected = False  # True si un invité est connecté
 
         # Créer des processus sur d'autre thread du processeur
         # Pour le fonctionnement du serveur et du broadcast
@@ -315,7 +316,7 @@ class HostController(PlayerControllerBase):
                         list(self.attaque_rect)
                         if self.attaque_rect and self.animation.attacking
                         else None
-                    ),  # attaque_rect sert juste pour affichage de la hitbox d'attaque si F2 enclencher
+                    ),  # attaque_rect sert juste pour l'affichage de la hitbox d'attaque si F2 enclencher
                 },
                 "close": False,
             }
@@ -368,9 +369,7 @@ class HostController(PlayerControllerBase):
                 self.guest.velocity = self.moteur.verif_velocity(
                     recieved_data["guest"]["velocity"]
                 )  # verification de la vélocité dès qu'on le recoit
-                # copie de la vélocité pour enlever saccade de animation (voir thibaut)
-                self.guest.input_velocity = pygame.Vector2(self.guest.velocity)
-
+                self.guest.moving_intent = recieved_data["guest"]["moving_intent"]
                 self.guest.attaque = recieved_data["guest"]["attaque"]
 
                 # Défini les variables à envoyer et les encodes
@@ -453,7 +452,6 @@ class HostController(PlayerControllerBase):
         self.animation.update(self.moving_intent, self.direction)
 
         # Client
-        self.guest.moving_intent = self.guest.input_velocity.length_squared() > 0
         if self.guest.moving_intent:  # Si le client veux bouger
 
             self.guest.update_direction()
@@ -491,12 +489,13 @@ class GuestController(PlayerControllerBase):
     def __init__(
         self,
         screen: pygame.Surface,
+        moteur: Moteur,
         map: Map,
         address: str,
         port: int,
     ):
 
-        super().__init__(screen, None, map, (0, 0))
+        super().__init__(screen, moteur, map, (0, 0))
         # Défini un player pour l'hôte
         self.host = PlayerControllerBase(self.screen, None, map, (0, 0))
 
@@ -508,6 +507,10 @@ class GuestController(PlayerControllerBase):
         # sur un autre thread du processeur
         self.loop = threading.Thread(target=self.run)
         self.loop.start()
+
+        # position du client et l'hôte reçu par le serveur/hôte
+        self.server_pos = None
+        self.host_target_pos = None
 
     def set_camera(self, camera):
         self.camera = camera
@@ -564,6 +567,7 @@ class GuestController(PlayerControllerBase):
             return {
                 "guest": {
                     "velocity": list(self.velocity),
+                    "moving_intent": self.moving_intent,
                     "attaque": self.attaque,
                 },
                 "close": False,
@@ -602,11 +606,11 @@ class GuestController(PlayerControllerBase):
                     break
 
                 # Met à jour les variables
-                self.position.update(recieved_data["guest"]["position"])
+                self.server_pos = pygame.Vector2(recieved_data["guest"]["position"])
                 raw_rect = recieved_data["guest"]["attaque_rect"]
                 self.attaque_rect = pygame.Rect(raw_rect) if raw_rect else None
 
-                self.host.position.update(recieved_data["host"]["position"])
+                self.host_target_pos = pygame.Vector2(recieved_data["host"]["position"])
                 self.host.moving_intent = recieved_data["host"]["moving_intent"]
                 self.host.direction = recieved_data["host"]["direction"]
                 self.host.attaque = recieved_data["host"]["attaque"]
@@ -628,10 +632,33 @@ class GuestController(PlayerControllerBase):
         self.map.load_chunks(self.position)
 
         # le client calcule de son côté ça propre direction et moving_intent
+        # + Client Side prediction : bouge sans attendre le serveur
         self.moving_intent = self.velocity.length_squared() > 0
         if self.moving_intent:
             self.update_direction()
+            self.moteur.collision(self.hitbox, self.velocity, self.host.hitbox)
+            super().update()
 
+        # mise à jour fluide de la position du client : corrige doucement l'écart
+        if self.server_pos is not None:
+            delta = (self.server_pos - self.position).length()
+            if delta > SPEED * 4:  # téléport si désync > 4 frames de mouvement
+                self.position.update(self.server_pos)
+            elif delta > SPEED * 0.5:
+                lerp = 0.3 if self.moving_intent else 0.6
+                self.position += (self.server_pos - self.position) * lerp
+            self.hitbox.center = self.position
+            self.server_pos = None
+
+        if self.host_target_pos is not None:
+            delta = (self.host_target_pos - self.host.position).length()
+            if delta > SPEED * 1.5:
+                self.host.position += (self.host_target_pos - self.host.position) * 0.3
+            else:
+                self.host.position.update(self.host_target_pos)
+            self.host.hitbox.center = self.host.position
+
+        # gestion animation attaque
         if self.attaque:
             self.animation.trigger_attack()
             # le self.attaque = False du client est effectuer juste après l'avoir envoyer a l'hôte
@@ -640,12 +667,9 @@ class GuestController(PlayerControllerBase):
             self.host.animation.trigger_attack()
             self.host.attaque = False
 
+        # gestion animation
         self.animation.update(self.moving_intent, self.direction)
         self.host.animation.update(self.host.moving_intent, self.host.direction)
-
-        # mise à jour des hitbox client et hôte car le display a besoin de hitbox maintenant
-        self.hitbox.center = self.position
-        self.host.hitbox.center = self.host.position
 
     def display(self):
         """Affiche le joueur ainsi que l'hôte"""
@@ -653,3 +677,7 @@ class GuestController(PlayerControllerBase):
         self.host.display()
 
         super().display()
+
+        if self.show_hitbox:
+            for obstacle in self.moteur.nearby_obstacles:
+                pygame.draw.rect(self.screen, "red", self.camera.apply(obstacle), 2)
