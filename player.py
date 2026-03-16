@@ -90,6 +90,7 @@ class PlayerControllerBase:
         self.hitbox = pygame.Rect(0, 0, 28, 15)
         self.hitbox.center = self.position
         self.velocity = pygame.Vector2(0, 0)
+        self.input_velocity = pygame.Vector2(0, 0)
         self.direction = "right"
         self.connected = False  # True si un invité est connecté
         self.close = False
@@ -367,10 +368,14 @@ class HostController(PlayerControllerBase):
                 self.guest.velocity = self.moteur.verif_velocity(
                     recieved_data["guest"]["velocity"]
                 )  # verification de la vélocité dès qu'on le recoit
+                # copie de la vélocité pour enlever saccade de animation (voir thibaut)
+                self.guest.input_velocity = pygame.Vector2(self.guest.velocity)
+
                 self.guest.attaque = recieved_data["guest"]["attaque"]
 
                 # Défini les variables à envoyer et les encodes
                 to_send_data = get_to_send_data()
+                # dès qu'on envoie attaque = True une fois au client on met sur False
                 self.attaque = False
                 to_send_bytes = dict_to_bytes(to_send_data)
 
@@ -448,7 +453,7 @@ class HostController(PlayerControllerBase):
         self.animation.update(self.moving_intent, self.direction)
 
         # Client
-        self.guest.moving_intent = self.guest.velocity.length_squared() > 0
+        self.guest.moving_intent = self.guest.input_velocity.length_squared() > 0
         if self.guest.moving_intent:  # Si le client veux bouger
 
             self.guest.update_direction()

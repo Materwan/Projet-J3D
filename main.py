@@ -3,7 +3,9 @@ import pygame
 pygame.init()
 pygame.mixer.init()
 pygame.display.set_caption("MoleTale")
-screen = pygame.display.set_mode((500, 500))
+FPS = 60
+TAILLE_ECRAN = (500, 500)  # (0, 0) pour plein écran
+screen = pygame.display.set_mode(TAILLE_ECRAN)
 
 from menu import *
 from game import *
@@ -60,7 +62,7 @@ class Manager:
 
             pygame.display.flip()
 
-            self.clock.tick(60)  # à ne pas toucher
+            self.clock.tick(FPS)  # à ne pas toucher
 
         # Arrêt les processus multijoueur
         if isinstance(
