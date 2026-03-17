@@ -43,7 +43,7 @@ class Game:
             self.map = self.player_controller.map  # recupere la map de client
             self.moteur.map = self.map  # donner à moteur pour Client-side prediction
         else:
-            self.map = Map((256, 256), (8, 8), (32, 32), (32, 32), 0, self.screen)
+            self.map = Map((8, 8), (32, 32), (8, 8), (32, 32), self.screen, 0)
             if self.playing_mode == "solo":
                 self.player_controller = SoloPlayerController(
                     self.screen, self.moteur, self.map, (4096, 4096)

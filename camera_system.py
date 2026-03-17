@@ -18,7 +18,10 @@ class Camera:
         self.shake_timer = duration
 
     def display_map(self, map_obj):
-        for (x, y), chunk_surface in map_obj.loaded_chunks.items():
+        L = list(map_obj.loaded_chunks.keys())
+        L.sort(key=lambda p: p[1] * 10 + p[0], reverse=True)
+
+        for x, y in L:
             chunk_world_x = x * map_obj.chunk_size_pix[0]
             chunk_world_y = y * map_obj.chunk_size_pix[1]
 
@@ -26,7 +29,7 @@ class Camera:
             screen_x = chunk_world_x + self.camera.x
             screen_y = chunk_world_y + self.camera.y
 
-            map_obj.screen.blit(chunk_surface, (screen_x, screen_y))
+            map_obj.screen.blit(map_obj.loaded_chunks[(x, y)], (screen_x, screen_y))
 
     def apply(self, entity):
         """

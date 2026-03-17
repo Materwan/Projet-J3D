@@ -30,14 +30,19 @@ class Moteur:
         nearby_obstacles = []
 
         # Trouver la position du joueur dans la grille
-        grid_x = hitbox.centerx // 32
-        grid_y = hitbox.centery // 32
+        grid_x = hitbox.centerx // self.map.tile_size[0]
+        grid_y = hitbox.centery // self.map.tile_size[1]
 
         # Vérifier un carré de 3x3 tuiles autour du joueur
         for x in range(grid_x - 1, grid_x + 2):
             for y in range(grid_y - 1, grid_y + 2):
-                # Si la valeur est de l'eau (< 0.5)
-                if self.map.ground_tiles[x][y] == 0 or self.map.props_tiles[x][y] >= 2:
+
+                x_chunk = x // self.map.chunk_size_tile[0]
+                y_chunk = y // self.map.chunk_size_tile[1]
+                rel_x = x % self.map.chunk_size_tile[0]
+                rel_y = y % self.map.chunk_size_tile[1]
+                # Collision sur la tuile
+                if self.map.chunks[(x_chunk, y_chunk)].collision[rel_x][rel_y]:
                     # On crée le rectangle de collision pour cette tuile
                     nearby_obstacles.append(pygame.Rect(x * 32, y * 32, 32, 32))
 

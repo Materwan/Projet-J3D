@@ -1,4 +1,4 @@
-from typing import Tuple, List
+from typing import Tuple, List, Dict
 from collections.abc import Callable
 import numpy as np
 from perlin_numpy import generate_perlin_noise_2d
@@ -7,11 +7,13 @@ from matplotlib.colors import ListedColormap
 import math
 import pygame
 
+# screen = pygame.display.set_mode((500, 500))
+
 GROUND_SURF = (0, 0, 32, 32)
 GRASS_SURF = (0, 32, 32, 32)
 ROCK_SURF = (160, 480, 32, 32)
 BUSH_SURF = (32, 192, 32, 32)
-
+TREE_SURF = (0, 0, 160, 160)
 
 TILE = pygame.image.load(
     r"Ressources\Pixel Art Top Down - Basic v1.2.3\Texture\TX Tileset Grass.png"
@@ -27,6 +29,34 @@ GROUND_TILE = TILE.subsurface(GROUND_SURF)
 GRASS_TILE = TILE.subsurface(GRASS_SURF)
 ROCK_TILE = PROS.subsurface(ROCK_SURF)
 BUSH_TILE = PLANT.subsurface(BUSH_SURF)
+TREE_TILE = PLANT.subsurface(TREE_SURF)
+
+ROCK = {
+    "type": "rock",
+    "size": (1, 1),
+    "occupied_tiles": [(0, 0)],
+    "collision_tiles": [(0, 0)],
+    "image": ROCK_TILE,
+}
+
+BUSH = {
+    "type": "bush",
+    "size": (1, 1),
+    "occupied_tiles": [(0, 0)],
+    "collision_tiles": [],
+    "image": BUSH_TILE,
+}
+
+TREE = {
+    "type": "tree",
+    "size": (5, 5),
+    "occupied_tiles": [(x, y) for x in range(1, 4) for y in range(1, 4)]
+    + [(2, 0), (2, 4)],
+    "collision_tiles": [(2, 4)],
+    "image": TREE_TILE,
+}
+
+IMAGES = {"rock": ROCK_TILE, "bush": BUSH_TILE, "tree": TREE_TILE}
 
 
 def invert(val: np.ndarray) -> np.ndarray:
@@ -112,37 +142,91 @@ def get_min_val_circle(val: np.ndarray, distance: int, size: Tuple[int, int]):
     return np.min(cp)  # Récupère la valeur minimale
 
 
+class Chunk:
+
+    def __init__(
+        self,
+        chunk_size: np.ndarray,
+        position: Tuple[int, int],
+        map: np.ndarray,
+        tile_size: np.ndarray,
+    ):
+        self.chunk_size = chunk_size
+        self.position = np.array(position)
+        self.tile_size = tile_size
+        self.ground = self.get_ground(map)
+        self.occupied = np.logical_not(self.ground.copy())
+        self.collision = np.logical_not(self.ground.copy())
+        self.object = []
+
+    def get_ground(self, map: np.ndarray):
+        topleft = self.position * self.chunk_size
+        bottomright = (self.position + 1) * self.chunk_size
+        sub_map = map[topleft[0] : bottomright[0], topleft[1] : bottomright[1]]
+        return sub_map > 0.5
+
+    def render(self) -> pygame.Surface:
+        """Prend une matrice de float [0, 1], ainsi qu'une position de chunk : couple d'entier,
+        et créer une surface de 32 par 32 tuiles correspondant au chunk à la position donnée
+        """
+        ground_sur = pygame.Surface(
+            (self.chunk_size + 5) * self.tile_size, pygame.SRCALPHA
+        )
+        asset_sur = pygame.Surface(
+            (self.chunk_size + 5) * self.tile_size, pygame.SRCALPHA
+        )
+
+        for x in range(self.chunk_size[0]):
+            for y in range(self.chunk_size[1]):
+                if self.ground[x][y]:
+                    ground_sur.blit(
+                        GROUND_TILE, (x * self.tile_size[0], y * self.tile_size[1])
+                    )
+
+        objects = sorted(self.object, key=lambda x: x["z"])
+
+        for object in objects:
+
+            type, x, y = object["type"], object["x"], object["y"]
+
+            asset_sur.blit(IMAGES[type], (x * self.tile_size[0], y * self.tile_size[1]))
+
+        ground_sur.blit(asset_sur, (0, 0))
+        return ground_sur
+
+
 class Map:
 
     def __init__(
         self,
-        size: Tuple[int, int],
+        nb_chunks: Tuple[int, int],
+        chunk_size: Tuple[int, int],
         octaves: Tuple[int, int],
         tile_size: Tuple[int, int],
-        chunk_size: Tuple[int, int],
-        seed: int,
         screen: pygame.Surface,
+        seed: int | None,
     ):
-        self.size = np.array(size, dtype=np.int32)
+        self.nb_chunks = np.array(nb_chunks, dtype=np.int32)
+        self.chunk_size_tile = np.array(chunk_size, dtype=np.int32)
+        self.size = self.nb_chunks * self.chunk_size_tile
         self.octaves = octaves
         self.tile_size = np.array(tile_size, dtype=np.int32)
-        self.chunk_size_tile = np.array(chunk_size, dtype=np.int32)
         self.chunk_size_pix = self.chunk_size_tile * self.tile_size
-        self.chunks = self.size // self.tile_size
+        self.screen = screen
         if seed is None:  # Si aucune graine n'est donnée, prend en une au hasard
             self.seed = np.random.randint(0, 999999999)
         else:
             self.seed = seed
+
         self.map_scale = (0, 1)
         self.map = self.create_map(octaves)
-        self.grass_mask = self.add_rn_tile(0.2)
-        self.rock_mask = self.add_rn_tile(0.01)
-        self.bush_mask = self.add_rn_tile(0.05)
-        self.ground_tiles = self.create_tile_map(self.grass_mask)
-        self.props_tiles = self.create_tile_map(self.rock_mask)
-        self.plat_tiles = self.create_tile_map(self.bush_mask)
+        self.chunks = self.create_chunks()
+
+        self.add_object(TREE, 0.01, 2)
+        self.add_object(BUSH, 0.1, 0)
+        self.add_object(ROCK, 0.01, 1)
+
         self.loaded_chunks = {}
-        self.screen = screen
 
     def create_map(
         self,
@@ -197,11 +281,71 @@ class Map:
 
         return noise
 
-    def add_rn_tile(self, frequency: float) -> np.ndarray:
-        """Créer un mask sur la carte avec une probabilité d'apparition de fraquency."""
-        assert 0 <= frequency <= 1
-        prob_mask = np.random.choice([0, 1], (256, 256), p=[1 - frequency, frequency])
-        return (self.map > 0.5) & prob_mask
+    def create_chunks(self) -> Dict[Tuple[int, int], Chunk]:
+
+        chunks = {}
+
+        for x in range(self.nb_chunks[0]):
+            for y in range(self.nb_chunks[1]):
+                chunks[(x, y)] = Chunk(
+                    self.chunk_size_tile,
+                    (x, y),
+                    self.map,
+                    self.tile_size,
+                )
+
+        return chunks
+
+    def add_object(self, object: Dict, prob: int, z: int | None = 0):
+        assert 0 <= prob <= 1
+
+        x_map_size, y_map_size = self.chunk_size_tile
+
+        for _ in range(int((self.size[0] * self.size[1]) * prob)):
+
+            x = np.random.randint(0, self.size[0])
+            y = np.random.randint(0, self.size[1])
+
+            occupied = False
+
+            for dx, dy in object["occupied_tiles"]:
+
+                tx, ty = x + dx, y + dy
+                x_chunk, y_chunk = tx // x_map_size, ty // y_map_size
+                rel_x, rel_y = tx % x_map_size, ty % y_map_size
+
+                if x_chunk >= self.nb_chunks[0] or y_chunk >= self.nb_chunks[1]:
+                    occupied = True
+                    break
+
+                if self.chunks[(x_chunk, y_chunk)].occupied[rel_x][rel_y]:
+                    occupied = True
+                    break
+
+            if not occupied:
+
+                for dx, dy in object["occupied_tiles"]:
+
+                    tx, ty = x + dx, y + dy
+                    x_chunk, y_chunk = tx // x_map_size, ty // y_map_size
+                    rel_x, rel_y = tx % x_map_size, ty % y_map_size
+
+                    self.chunks[(x_chunk, y_chunk)].occupied[rel_x][rel_y] = True
+
+                for dx, dy in object["collision_tiles"]:
+
+                    tx, ty = x + dx, y + dy
+                    x_chunk, y_chunk = tx // x_map_size, ty // y_map_size
+                    rel_x, rel_y = tx % x_map_size, ty % y_map_size
+
+                    self.chunks[(x_chunk, y_chunk)].collision[rel_x][rel_y] = True
+
+                x_chunk, y_chunk = x // x_map_size, y // y_map_size
+                rel_x, rel_y = x % x_map_size, y % y_map_size
+
+                self.chunks[(x_chunk, y_chunk)].object.append(
+                    {"type": object["type"], "x": rel_x, "y": rel_y, "z": z}
+                )
 
     def create_tile_map(self, *args: np.ndarray) -> np.ndarray:
         tile = self.map > 0.5
@@ -216,14 +360,14 @@ class Map:
 
         chunk = abs_position // self.chunk_size_pix
 
-        for x in range(int(chunk[0] - 1), chunk[0] + 2):
+        for x in range(chunk[0] - 1, chunk[0] + 2):
             for y in range(chunk[1] - 1, chunk[1] + 2):
                 if (
-                    0 <= x <= self.chunks[0]
-                    and 0 <= y <= self.chunks[1]
+                    0 <= x <= self.nb_chunks[0]
+                    and 0 <= y <= self.nb_chunks[1]
                     and not (x, y) in self.loaded_chunks
                 ):
-                    self.loaded_chunks[(x, y)] = self.render_chunk((x, y))
+                    self.loaded_chunks[(x, y)] = self.chunks[(x, y)].render()
 
         del_keys = []
         for x, y in self.loaded_chunks.keys():
@@ -242,28 +386,27 @@ class Map:
         pos = np.array(position, dtype=np.int32)
         assert np.less_equal(pos, self.size // 32).all()
 
-        ground_sur = pygame.Surface(self.chunk_size_pix)
-        plant_sur = pygame.Surface(self.chunk_size_pix, pygame.SRCALPHA)
-        asset_sur = pygame.Surface(self.chunk_size_pix, pygame.SRCALPHA)
+        ground_sur = pygame.Surface(
+            self.chunk_size_pix + (5 * self.tile_size), pygame.SRCALPHA
+        )
+        asset_sur = pygame.Surface(
+            self.chunk_size_pix + (5 * self.tile_size), pygame.SRCALPHA
+        )
 
-        start = pos * 32
+        start = pos * self.chunk_size_tile
 
-        for x in range(32):
-            for y in range(32):
+        for x in range(self.chunk_size_tile[0]):
+            for y in range(self.chunk_size_tile[1]):
 
                 rel = np.array([x, y], dtype=np.int32)
                 abs = start + rel
 
-                if self.ground_tiles[abs[0]][abs[1]] == 1:
+                tile = self.occupied_tiles[abs[0]][abs[1]]
+                if self.tiles[tile]:
+                    asset_sur.blit(self.tiles[tile], rel * self.tile_size)
+                if self.map[abs[0]][abs[1]] > 0.5:
                     ground_sur.blit(GROUND_TILE, rel * self.tile_size)
-                elif self.ground_tiles[abs[0]][abs[1]] == 2:
-                    ground_sur.blit(GRASS_TILE, rel * self.tile_size)
-                if self.plat_tiles[abs[0]][abs[1]] == 2:
-                    plant_sur.blit(BUSH_TILE, rel * self.tile_size)
-                elif self.props_tiles[abs[0]][abs[1]] == 2:
-                    asset_sur.blit(ROCK_TILE, rel * self.tile_size)
 
-        ground_sur.blit(plant_sur, (0, 0))
         ground_sur.blit(asset_sur, (0, 0))
         return ground_sur
 
@@ -340,38 +483,57 @@ class Map:
     def display(self, absolute_position: Tuple[int, int]):
         """Affiche les chunks les plus proches"""
         abs_position = np.array(absolute_position, dtype=np.int32)
+        assert np.less(abs_position, self.size * self.chunk_size_pix).all()
 
-        for x, y in self.loaded_chunks.keys():
-            self.screen.blit(
-                self.loaded_chunks[(x, y)],
-                (
-                    x * self.chunk_size_pix[0] - abs_position[0],
-                    y * self.chunk_size_pix[1] - abs_position[1],
-                ),
-            )
+        chunk = abs_position // self.chunk_size_pix
+
+        for x in range(chunk[0] + 1, chunk[0] - 2, -1):
+            for y in range(chunk[1] + 1, chunk[1] - 2, -1):
+                if (x, y) in self.loaded_chunks:
+                    self.screen.blit(
+                        self.loaded_chunks[(x, y)],
+                        (
+                            x * self.chunk_size_pix[0] - abs_position[0],
+                            y * self.chunk_size_pix[1] - abs_position[1],
+                        ),
+                    )
 
     def _display(self):
 
-        # Display raw map (grayscale)
-        plt.subplot(2, 2, 1)
+        plt.subplot(231)
+
+        plt.title("Map")
         plt.imshow(self.map, cmap="gray")
         plt.colorbar()
 
-        # Display the map with in blue values < 0.5 and red > 0.5
-        plt.subplot(2, 2, 2)
+        plt.subplot(234)
 
+        plt.title("Map Mask")
+        plt.imshow(self.map > 0.5, cmap="gray")
+        plt.colorbar()
+
+        plt.subplot(232)
+
+        plt.title("Grass Mask")
         plt.imshow(self.grass_mask)
         plt.colorbar()
 
-        # Display zone (in black) where values > 0.7
-        plt.subplot(2, 2, 3)
+        plt.subplot(233)
 
-        plt.imshow(self.asset_tiles)
+        plt.title("Ground Tiles")
+        plt.imshow(self.ground_tiles)
         plt.colorbar()
 
-        plt.subplot(2, 2, 4)
+        plt.subplot(235)
 
-        plt.imshow(self.ground_tiles)
+        plt.title("Buch Mask")
+        plt.imshow(self.bush_mask)
+        plt.colorbar()
+
+        plt.subplot(236)
+
+        plt.title("Plant Tiles")
+        plt.imshow(self.plant_tiles)
         plt.colorbar()
 
         plt.show()
@@ -381,6 +543,8 @@ if __name__ == "__main__":
 
     pygame.init()
 
+    screen = None
+
     class Loop:
 
         def __init__(self, screen: pygame.Surface):
@@ -389,14 +553,7 @@ if __name__ == "__main__":
             self.screen_size = pygame.Vector2(self.screen.get_size())
             self.abs_pos = pygame.Vector2([0, 0])
             self.clock = pygame.time.Clock()
-            self.map = Map(
-                (256, 256),
-                (8, 8),
-                (32, 32),
-                (32, 32),
-                0,
-                self.screen,
-            )
+            self.map = Map((64, 64), (32, 32), (8, 8), (32, 32), self.screen, 0)
 
         def event(self):
 
@@ -425,23 +582,23 @@ if __name__ == "__main__":
 
             self.map.display(self.abs_pos)
 
-            for x in range(self.map.chunks[0]):
+            for x in range(self.map.nb_chunks[0]):
                 pygame.draw.line(
                     self.screen,
                     (255, 0, 0),
                     (x * 32 * 32 - self.abs_pos[0], 0 - self.abs_pos[1]),
                     (
                         x * 32 * 32 - self.abs_pos[0],
-                        self.map.chunks[1] * 32 * 32 - self.abs_pos[1],
+                        self.map.nb_chunks[1] * 32 * 32 - self.abs_pos[1],
                     ),
                 )
-            for y in range(self.map.chunks[1]):
+            for y in range(self.map.nb_chunks[1]):
                 pygame.draw.line(
                     self.screen,
                     (255, 0, 0),
                     (0 - self.abs_pos[0], y * 32 * 32 - self.abs_pos[1]),
                     (
-                        self.map.chunks[0] * 32 * 32 - self.abs_pos[0],
+                        self.map.nb_chunks[0] * 32 * 32 - self.abs_pos[0],
                         y * 32 * 32 - self.abs_pos[1],
                     ),
                 )
@@ -457,11 +614,9 @@ if __name__ == "__main__":
 
                 self.clock.tick(60)
 
-    screen = pygame.display.set_mode((500, 500))
-
     loop = Loop(screen)
 
-    loop.map._display()
+    # loop.map._display()
 
     loop.run()
 
