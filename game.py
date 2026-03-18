@@ -52,7 +52,6 @@ class Game:
                 self.screen,
                 1,
             )
-            self.map._display()
             if self.playing_mode == "solo":
                 self.player_controller = SoloPlayerController(
                     self.screen, self.moteur, self.map, (4096, 4096)
