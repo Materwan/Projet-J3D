@@ -3,67 +3,99 @@ from collections.abc import Callable
 import numpy as np
 from perlin_numpy import generate_perlin_noise_2d
 import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap
 import math
 import pygame
+import heapq
+from os import path
+import json
 
-# screen = pygame.display.set_mode((500, 500))
 
-GROUND_SURF = (0, 0, 32, 32)
-GRASS_SURF = (0, 32, 32, 32)
-ROCK_SURF = (160, 480, 32, 32)
-BUSH_SURF = (32, 192, 32, 32)
-TREE_SURF = (0, 0, 160, 160)
+REPLACE_VALUE = 0.3
 
-TILE = pygame.image.load(
-    r"Ressources\Pixel Art Top Down - Basic v1.2.3\Texture\TX Tileset Grass.png"
-).convert()
-PROS = pygame.image.load(
-    r"Ressources\Pixel Art Top Down - Basic v1.2.3\Texture\TX Props.png"
-).convert_alpha()
-PLANT = pygame.image.load(
-    r"Ressources\Pixel Art Top Down - Basic v1.2.3\Texture\TX Plant.png"
-).convert_alpha()
 
-GROUND_TILE = TILE.subsurface(GROUND_SURF)
-GRASS_TILE = TILE.subsurface(GRASS_SURF)
-ROCK_TILE = PROS.subsurface(ROCK_SURF)
-BUSH_TILE = PLANT.subsurface(BUSH_SURF)
-TREE_TILE = PLANT.subsurface(TREE_SURF)
+def load_assets(file: str, asset_folder: str, tile_size: Tuple[int, int]):
 
-ROCK = {
-    "type": "rock",
-    "size": (1, 1),
-    "occupied_tiles": [(0, 0)],
-    "collision_tiles": [(0, 0)],
-    "image": ROCK_TILE,
-}
+    def _build_tile_list(size, raw_value) -> List:
+        if raw_value == -1:
+            return [[x, y] for x in range(size[0]) for y in range(size[1])]
+        return raw_value
 
-BUSH = {
-    "type": "bush",
-    "size": (1, 1),
-    "occupied_tiles": [(0, 0)],
-    "collision_tiles": [],
-    "image": BUSH_TILE,
-}
+    with open(file, "r") as f:
+        s = f.read()
+    dic = json.loads(s)
+    res = {}
+    for key, value in dic.items():
+        if isinstance(value["width"], list):
 
-TREE = {
-    "type": "tree",
-    "size": (5, 5),
-    "occupied_tiles": [(x, y) for x in range(1, 4) for y in range(1, 4)]
-    + [(2, 0), (2, 4)],
-    "collision_tiles": [(2, 4)],
-    "image": TREE_TILE,
-}
+            temp = []
+            directory = path.join(asset_folder, value["file"])
+            image = pygame.image.load(directory)
 
-IMAGES = {"rock": ROCK_TILE, "bush": BUSH_TILE, "tree": TREE_TILE}
+            for i in range(len(value["width"])):
+                temp2 = {}
+                top = value["top"][i]
+                left = value["left"][i]
+                width = value["width"][i]
+                height = value["height"][i]
+
+                # Size
+                temp2["size"] = (
+                    width // tile_size[0],
+                    height // tile_size[1],
+                )
+
+                # Occupied Tiles
+                temp2["occupied_tiles"] = _build_tile_list(
+                    temp2["size"], value["occupied_tiles"]
+                )
+
+                # Collision Tiles
+                temp2["collision_tiles"] = _build_tile_list(
+                    temp2["size"], value["collision_tiles"]
+                )
+
+                # Image
+                asset_image = image.subsurface(left, top, width, height)
+                temp2["image"] = asset_image
+                temp.append(temp2)
+
+            res[key] = temp
+
+        else:
+            temp = {}
+
+            # Size
+            temp["size"] = (
+                value["width"] // tile_size[0],
+                value["height"] // tile_size[1],
+            )
+
+            # Occupied Tiles
+            temp["occupied_tiles"] = _build_tile_list(
+                temp["size"], value["occupied_tiles"]
+            )
+
+            # Collision Tiles
+            temp["collision_tiles"] = _build_tile_list(
+                temp["size"], value["collision_tiles"]
+            )
+
+            # Image
+            directory = path.join(asset_folder, value["file"])
+            image = pygame.image.load(directory)
+            asset_image = image.subsurface(
+                value["left"], value["top"], value["width"], value["height"]
+            )
+            temp["image"] = asset_image
+            res[key] = temp
+
+    return res
 
 
 def invert(val: np.ndarray) -> np.ndarray:
     """Renvoie l'inverse d'une matrice de valeur entre 0 et 1. (0 -> 1, 1 -> 0)"""
-    assert (
-        0 <= np.min(val) <= 1 and 0 <= np.max(val) <= 1
-    )  # Vérifie que les valeurs sont entre 0 et 1
+    # Vérifie que les valeurs sont entre 0 et 1
+    assert 0 <= np.min(val) <= 1 and 0 <= np.max(val) <= 1
 
     return np.abs(val - 1)
 
@@ -76,14 +108,16 @@ def normalize(
     """Normalise toutes les valeurs d'une matrice dans un interval."""
 
     # Si aucun minimum n'est donné, on prend la valeur minimale de la matrice
+    min_value = np.min(val)
     if minimum is None:
-        minimum = np.min(val)
+        minimum = min_value
 
-    assert minimum != np.max(val)  # Vérifie que le minimum est différent du max
+    max_value = np.max(val)
+    assert minimum != max_value  # Vérifie que le minimum est différent du max
     assert scale[0] < scale[1]  # Vérifie si l'interval est valide
 
-    normalize_0_1 = (val - np.min(val)) / (
-        np.max(val) - np.min(val)
+    normalize_0_1 = (val - min_value) / (
+        max_value - min_value
     )  # Normalise entre 0 et 1
     return scale[0] + normalize_0_1 * (scale[1] - scale[0])  # Normalise sur l'interval
 
@@ -92,10 +126,7 @@ def scale(
     val: np.ndarray, pad_val: float, func: Callable[[float], float]
 ) -> np.ndarray:
     """Applique une fonction func sur toutes les valeur + pad_val d'une matrice."""
-
-    # Applique la fonction
-    vectorized_func = np.vectorize(func)
-    return vectorized_func(val + pad_val)
+    return func(val + pad_val)
 
 
 def calc_distance(
@@ -112,9 +143,8 @@ def mask_distance(val: np.ndarray, size: Tuple[int, int]) -> np.ndarray:
 
     center = (size[0] // 2, size[1] // 2)
 
-    points = np.ogrid[
-        : size[0], : size[1]
-    ]  # Récupère les positions de tous les d'une matrice
+    # Récupère les positions de tous les d'une matrice
+    points = np.ogrid[: size[0], : size[1]]
 
     return calc_distance(points, center)
 
@@ -125,21 +155,98 @@ def get_min_val_circle(val: np.ndarray, distance: int, size: Tuple[int, int]):
 
     center = (size[0] // 2, size[1] // 2)
 
-    cp = np.copy(val)
+    masked_val = np.copy(val)
     mask = np.zeros(shape=size, dtype=bool)
 
-    points = np.ogrid[
-        : size[0], : size[1]
-    ]  # Récupère les positions de tous les d'une matrice
+    # Récupère les positions de tous les d'une matrice
+    points = np.ogrid[: size[0], : size[1]]
 
     dist = calc_distance(points, center)  # Récupère le matrice de distance au centre
 
-    mask |= (
-        dist >= distance
-    )  # Récupère une matrice de booléen : Vrai si distance du centre > distance
-    cp[mask] = 1  # Suprime les valeurs qui sont trop proches du centre
+    # Récupère une matrice de booléen : Vrai si distance du centre > distance
+    mask = dist >= distance
+    masked_val[mask] = 1  # Suprime les valeurs qui sont trop proches du centre
 
-    return np.min(cp)  # Récupère la valeur minimale
+    return np.min(masked_val)  # Récupère la valeur minimale
+
+
+def create_node(
+    position: Tuple[int, int],
+    g: float = float("inf"),
+    h: float = 0.0,
+    parent: Dict = None,
+) -> Dict:
+    """Crée un noeud pour A*."""
+    return {"position": position, "g": g, "h": h, "f": g + h, "parent": parent}
+
+
+def heuristic(pos1: Tuple[int, int], pos2: Tuple[int, int]) -> float:
+    """Distance euclidienne (heuristique admissible)."""
+    x1, y1 = pos1
+    x2, y2 = pos2
+    return math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+
+
+def get_neighbors(grid: np.ndarray, pos: Tuple[int, int]) -> List[Tuple[int, int]]:
+    """Voisins valides (8 directions, sans obstacles)."""
+    x, y = pos
+    rows, cols = grid.shape
+    moves = [
+        (x + dx, y + dy) for dx in [-1, 0, 1] for dy in [-1, 0, 1] if dx != 0 or dy != 0
+    ]
+    return [
+        (nx, ny)
+        for nx, ny in moves
+        if 0 <= nx < rows and 0 <= ny < cols and grid[nx, ny] >= 0
+    ]
+
+
+def reconstruct_path(node: Dict) -> List[Tuple[int, int]]:
+    """Reconstruit le chemin via les parents."""
+    path = []
+    current = node
+    while current:
+        path.append(current["position"])
+        current = current["parent"]
+    return path[::-1]
+
+
+def a_star(
+    grid: np.ndarray, start: Tuple[int, int], goal: Tuple[int, int], randomness: float
+) -> List[Tuple[int, int]]:
+    """Algorithme A* principal."""
+    start_node = create_node(start, 0, heuristic(start, goal))
+    open_list = [(start_node["f"], start)]
+    open_dict = {start: start_node}
+    closed = set()
+
+    while open_list:
+        _, current_pos = heapq.heappop(open_list)
+        current = open_dict[current_pos]
+
+        if current_pos == goal:
+            return reconstruct_path(current)
+
+        closed.add(current_pos)
+
+        for neigh_pos in get_neighbors(grid, current_pos):
+            if neigh_pos in closed:
+                continue
+            road_bonus = 0.1 if grid[neigh_pos] == REPLACE_VALUE else 1.0
+            tent_g = current["g"] + heuristic(current_pos, neigh_pos) * road_bonus
+
+            if neigh_pos not in open_dict or tent_g < open_dict[neigh_pos]["g"]:
+                neigh_node = create_node(
+                    neigh_pos,
+                    tent_g
+                    + np.random.choice([0, 10000], p=[1 - randomness, randomness]),
+                    heuristic(neigh_pos, goal),
+                    current,
+                )
+                open_dict[neigh_pos] = neigh_node
+                heapq.heappush(open_list, (neigh_node["f"], neigh_pos))
+
+    return []  # Pas de chemin
 
 
 class Chunk:
@@ -150,25 +257,29 @@ class Chunk:
         position: Tuple[int, int],
         map: np.ndarray,
         tile_size: np.ndarray,
+        asset: Dict,
     ):
         self.chunk_size = chunk_size
         self.position = np.array(position)
         self.tile_size = tile_size
+        self.asset = asset
         self.ground = self.get_ground(map)
-        self.occupied = np.logical_not(self.ground.copy())
-        self.collision = np.logical_not(self.ground.copy())
+        not_ground = ~self.ground
+        self.occupied = not_ground.copy()
+        self.collision = not_ground.copy()
         self.object = []
 
     def get_ground(self, map: np.ndarray):
+        """Récupère les tuiles non vides."""
         topleft = self.position * self.chunk_size
         bottomright = (self.position + 1) * self.chunk_size
         sub_map = map[topleft[0] : bottomright[0], topleft[1] : bottomright[1]]
         return sub_map > 0.5
 
     def render(self) -> pygame.Surface:
-        """Prend une matrice de float [0, 1], ainsi qu'une position de chunk : couple d'entier,
-        et créer une surface de 32 par 32 tuiles correspondant au chunk à la position donnée
-        """
+        """Génére une image correspondant au chunk.\n
+        Créer une surface pour le sol, puis un mask d'éléments qu'il supperpose
+        au sol."""
         ground_sur = pygame.Surface(
             (self.chunk_size + 5) * self.tile_size, pygame.SRCALPHA
         )
@@ -180,16 +291,31 @@ class Chunk:
             for y in range(self.chunk_size[1]):
                 if self.ground[x][y]:
                     ground_sur.blit(
-                        GROUND_TILE, (x * self.tile_size[0], y * self.tile_size[1])
+                        self.asset["ground"]["image"],
+                        (x * self.tile_size[0], y * self.tile_size[1]),
                     )
 
         objects = sorted(self.object, key=lambda x: x["z"])
 
         for object in objects:
 
-            type, x, y = object["type"], object["x"], object["y"]
+            type = object["type"]
+            x = object["x"]
+            y = object["y"]
+            variant = object["variant"]
 
-            asset_sur.blit(IMAGES[type], (x * self.tile_size[0], y * self.tile_size[1]))
+            if variant == -1:
+                asset_sur.blit(
+                    self.asset[type]["image"],
+                    (x * self.tile_size[0], y * self.tile_size[1]),
+                )
+
+            else:
+
+                asset_sur.blit(
+                    self.asset[type][variant]["image"],
+                    (x * self.tile_size[0], y * self.tile_size[1]),
+                )
 
         ground_sur.blit(asset_sur, (0, 0))
         return ground_sur
@@ -203,6 +329,7 @@ class Map:
         chunk_size: Tuple[int, int],
         octaves: Tuple[int, int],
         tile_size: Tuple[int, int],
+        asset_directory: str,
         screen: pygame.Surface,
         seed: int | None,
     ):
@@ -212,6 +339,7 @@ class Map:
         self.octaves = octaves
         self.tile_size = np.array(tile_size, dtype=np.int32)
         self.chunk_size_pix = self.chunk_size_tile * self.tile_size
+        self.asset = load_assets("tile_data.json", asset_directory, self.tile_size)
         self.screen = screen
         if seed is None:  # Si aucune graine n'est donnée, prend en une au hasard
             self.seed = np.random.randint(0, 999999999)
@@ -221,10 +349,18 @@ class Map:
         self.map_scale = (0, 1)
         self.map = self.create_map(octaves)
         self.chunks = self.create_chunks()
+        self.road_map = np.where(self.map < 0.5, -np.inf, self.map)
+        self.structures = []
 
-        self.add_object(TREE, 0.01, 2)
-        self.add_object(BUSH, 0.1, 0)
-        self.add_object(ROCK, 0.01, 1)
+        self.add_object_pos("place", 128, 128, 3)
+        self.structures.append((128, 128))
+        self.add_structure("place", nb=8, z=3, distance=50)
+        self.generate_paths(0.3, prop=1)
+        self.add_road(0, 2)
+        self.add_objects("grass", prob=0.1, z=-1, occupe=True)
+        self.add_objects("tree", prob=0.01, z=2)
+        self.add_objects("bush", prob=0.1, z=0)
+        self.add_objects("rock", prob=0.01, z=1)
 
         self.loaded_chunks = {}
 
@@ -232,7 +368,7 @@ class Map:
         self,
         octaves: Tuple[int, int],
         mask_weight: float | None = 0.5,
-        mask_func: Callable[[float], float] | str | None = math.log,
+        mask_func: Callable[[float], float] | str | None = np.log,
         mask_pad_value: float | int | None = math.e,
         mask_scale: Tuple[float, float] | None = (0, 1),
     ) -> np.ndarray:
@@ -282,49 +418,46 @@ class Map:
         return noise
 
     def create_chunks(self) -> Dict[Tuple[int, int], Chunk]:
+        """Créer l'ensemble des chunks."""
+        return {
+            (x, y): Chunk(
+                self.chunk_size_tile, (x, y), self.map, self.tile_size, self.asset
+            )
+            for x in range(self.nb_chunks[0])
+            for y in range(self.nb_chunks[1])
+        }
 
-        chunks = {}
+    def is_occupied(self, x, y, dx, dy) -> bool:
+        """Renvoie si une tuile en xy + dxdy est occupé."""
 
-        for x in range(self.nb_chunks[0]):
-            for y in range(self.nb_chunks[1]):
-                chunks[(x, y)] = Chunk(
-                    self.chunk_size_tile,
-                    (x, y),
-                    self.map,
-                    self.tile_size,
-                )
+        tx, ty = x + dx, y + dy
+        x_chunk, y_chunk = tx // self.chunk_size_tile[0], ty // self.chunk_size_tile[1]
+        rel_x, rel_y = tx % self.chunk_size_tile[0], ty % self.chunk_size_tile[1]
 
-        return chunks
+        return (
+            x_chunk >= self.nb_chunks[0]
+            or y_chunk >= self.nb_chunks[1]
+            or self.chunks[(x_chunk, y_chunk)].occupied[rel_x][rel_y]
+        )
 
-    def add_object(self, object: Dict, prob: int, z: int | None = 0):
-        assert 0 <= prob <= 1
+    def add_object_pos(
+        self, obj_type: str, x: int, y: int, z: int, occupe: bool | None = False
+    ) -> bool:
+        """Essaye d'ajouter un élément obj à la position x, y. Renvoie si il a réussi."""
 
         x_map_size, y_map_size = self.chunk_size_tile
+        occupied = False
 
-        for _ in range(int((self.size[0] * self.size[1]) * prob)):
+        for dx, dy in self.asset[obj_type]["occupied_tiles"]:
 
-            x = np.random.randint(0, self.size[0])
-            y = np.random.randint(0, self.size[1])
+            if self.is_occupied(x, y, dx, dy):
+                occupied = True
+                break
 
-            occupied = False
+        if not occupied:
 
-            for dx, dy in object["occupied_tiles"]:
-
-                tx, ty = x + dx, y + dy
-                x_chunk, y_chunk = tx // x_map_size, ty // y_map_size
-                rel_x, rel_y = tx % x_map_size, ty % y_map_size
-
-                if x_chunk >= self.nb_chunks[0] or y_chunk >= self.nb_chunks[1]:
-                    occupied = True
-                    break
-
-                if self.chunks[(x_chunk, y_chunk)].occupied[rel_x][rel_y]:
-                    occupied = True
-                    break
-
-            if not occupied:
-
-                for dx, dy in object["occupied_tiles"]:
+            if occupe:
+                for dx, dy in self.asset[obj_type]["occupied_tiles"]:
 
                     tx, ty = x + dx, y + dy
                     x_chunk, y_chunk = tx // x_map_size, ty // y_map_size
@@ -332,7 +465,7 @@ class Map:
 
                     self.chunks[(x_chunk, y_chunk)].occupied[rel_x][rel_y] = True
 
-                for dx, dy in object["collision_tiles"]:
+                for dx, dy in self.asset[obj_type]["collision_tiles"]:
 
                     tx, ty = x + dx, y + dy
                     x_chunk, y_chunk = tx // x_map_size, ty // y_map_size
@@ -340,18 +473,163 @@ class Map:
 
                     self.chunks[(x_chunk, y_chunk)].collision[rel_x][rel_y] = True
 
-                x_chunk, y_chunk = x // x_map_size, y // y_map_size
-                rel_x, rel_y = x % x_map_size, y % y_map_size
+            x_chunk, y_chunk = x // x_map_size, y // y_map_size
+            rel_x, rel_y = x % x_map_size, y % y_map_size
 
-                self.chunks[(x_chunk, y_chunk)].object.append(
-                    {"type": object["type"], "x": rel_x, "y": rel_y, "z": z}
-                )
+            self.chunks[(x_chunk, y_chunk)].object.append(
+                {"type": obj_type, "x": rel_x, "y": rel_y, "z": z, "variant": -1}
+            )
 
-    def create_tile_map(self, *args: np.ndarray) -> np.ndarray:
-        tile = self.map > 0.5
-        for i, mask in enumerate(args):
-            tile = np.where(mask, i + 2, tile)
-        return tile
+            return True
+        return False
+
+    def add_objects(
+        self,
+        obj_type: str,
+        *,
+        occupe: bool | None = True,
+        nb: int | None = None,
+        prob: int | None = None,
+        z: int | None = 0,
+    ) -> List[Tuple[int, int]]:
+        """Ajoute des éléments "obj" sur la carte. Soit en créer un nombre nb ou utilise
+        prob pour déterminer le nombre à créer.\n
+        Met à jour occupied et collisions et ajoute l'élément dans objects de chaques chunks.\n
+        Ici z définit la priotité d'un élément, plus elle est haute, plus il sera affiché en dernier.
+        """
+        assert (nb is not None or prob is not None) and (nb is None or prob is None)
+        if prob is not None:
+            assert 0 <= prob <= 1
+            strict = False
+            nb = int((self.size[0] * self.size[1]) * prob)
+        else:
+            strict = True
+        count = 0
+
+        positions = []
+
+        xs = np.random.randint(0, self.size[0], size=nb * 3)
+        ys = np.random.randint(0, self.size[1], size=nb * 3)
+        i = 0
+
+        while count < nb:
+
+            if not strict:
+                count += 1
+
+            if self.add_object_pos(obj_type, xs[i], ys[i], z, occupe) and strict:
+                count += 1
+                positions.append((xs[i], ys[i]))
+
+            i += 1
+
+        return positions
+
+    def add_structure(
+        self,
+        obj_type: str,
+        *,
+        nb: int | None = None,
+        z: int | None = 0,
+        distance: float | None = 10,
+    ):
+
+        xs = np.random.randint(0, self.size[0], size=nb * 3)
+        ys = np.random.randint(0, self.size[1], size=nb * 3)
+        nb_pos = nb * 3
+        i = 0
+        j = 0
+        count = 0
+
+        while count < nb:
+
+            distances = [
+                calc_distance((xs[i], ys[i]), struct) > distance
+                for struct in self.structures
+            ]
+            if all(distances):
+                if self.add_object_pos(obj_type, xs[i], ys[i], z, True):
+                    count += 1
+                    self.structures.append((xs[i], ys[i]))
+
+            i += 1
+
+            if i >= nb_pos:
+                if j == 5:
+                    raise ValueError("Trop de structures demandé, ou trop proches.")
+                xs = np.random.randint(0, self.size[0], size=nb * 3)
+                ys = np.random.randint(0, self.size[1], size=nb * 3)
+                i = 0
+                j += 1
+
+    def generate_paths(
+        self,
+        randomness: float,
+        *,
+        nb: int | None = None,
+        prop: int | None = None,
+    ):
+        """Créer un chemin entre la position de départ et d'arrivé en ajoutant
+        du hasard pour générer des tuiles au hasard."""
+        assert (nb is not None or prop is not None) and (nb is None or prop is None)
+        nb_struct = len(self.structures)
+        if prop is not None:
+            assert 0 <= prop <= 1
+            nb = int((nb_struct * (nb_struct - 1)) / 2 * prop)
+
+        choices = {
+            i * nb_struct + j: (self.structures[i], self.structures[j])
+            for i in range(nb_struct)
+            for j in range(i + 1, nb_struct)
+        }
+        choosen = np.random.choice(
+            list(choices.keys()),
+            nb,
+            replace=False,
+        ).tolist()
+
+        for key in set(choosen):
+            start, end = choices[key]
+            path = a_star(self.road_map, start, end, randomness)
+
+            for x, y in path:
+
+                self.road_map[x, y] = REPLACE_VALUE
+
+    def add_road(self, z: int, nb_tiles: int | None = 3):
+
+        tiles = np.where(self.road_map == REPLACE_VALUE)
+        choices = [i for i in range(len(self.asset["pave"]))]
+
+        for x, y in zip(*tiles):
+
+            for _ in range(nb_tiles):
+
+                dx = np.random.randint(-1, 2)
+                dy = np.random.randint(-1, 2)
+
+                if not self.is_occupied(x, y, dx, dy):
+
+                    tx, ty = x + dx, y + dy
+                    x_chunk, y_chunk = (
+                        tx // self.chunk_size_tile[0],
+                        ty // self.chunk_size_tile[1],
+                    )
+                    rel_x, rel_y = (
+                        tx % self.chunk_size_tile[0],
+                        ty % self.chunk_size_tile[1],
+                    )
+
+                    self.chunks[(x_chunk, y_chunk)].occupied[rel_x][rel_y] = True
+                    self.chunks[(x_chunk, y_chunk)].object.append(
+                        {
+                            "type": "pave",
+                            "x": rel_x,
+                            "y": rel_y,
+                            "z": z,
+                            "variant": np.random.choice(choices),
+                        }
+                    )
 
     def load_chunks(self, absolute_position: Tuple[int, int]):
         """Prend la position du joueur sur la map, et charge les chunks atours"""
@@ -363,8 +641,8 @@ class Map:
         for x in range(chunk[0] - 1, chunk[0] + 2):
             for y in range(chunk[1] - 1, chunk[1] + 2):
                 if (
-                    0 <= x <= self.nb_chunks[0]
-                    and 0 <= y <= self.nb_chunks[1]
+                    0 <= x < self.nb_chunks[0]
+                    and 0 <= y < self.nb_chunks[1]
                     and not (x, y) in self.loaded_chunks
                 ):
                     self.loaded_chunks[(x, y)] = self.chunks[(x, y)].render()
@@ -379,161 +657,14 @@ class Map:
         for key in del_keys:
             del self.loaded_chunks[key]
 
-    def render_chunk(self, position: Tuple[int, int]) -> pygame.Surface:
-        """Prend une matrice de float [0, 1], ainsi qu'une position de chunk : couple d'entier,
-        et créer une surface de 32 par 32 tuiles correspondant au chunk à la position donnée
-        """
-        pos = np.array(position, dtype=np.int32)
-        assert np.less_equal(pos, self.size // 32).all()
-
-        ground_sur = pygame.Surface(
-            self.chunk_size_pix + (5 * self.tile_size), pygame.SRCALPHA
-        )
-        asset_sur = pygame.Surface(
-            self.chunk_size_pix + (5 * self.tile_size), pygame.SRCALPHA
-        )
-
-        start = pos * self.chunk_size_tile
-
-        for x in range(self.chunk_size_tile[0]):
-            for y in range(self.chunk_size_tile[1]):
-
-                rel = np.array([x, y], dtype=np.int32)
-                abs = start + rel
-
-                tile = self.occupied_tiles[abs[0]][abs[1]]
-                if self.tiles[tile]:
-                    asset_sur.blit(self.tiles[tile], rel * self.tile_size)
-                if self.map[abs[0]][abs[1]] > 0.5:
-                    ground_sur.blit(GROUND_TILE, rel * self.tile_size)
-
-        ground_sur.blit(asset_sur, (0, 0))
-        return ground_sur
-
-    def add_structure(
-        map: np.ndarray,
-        size: Tuple[int, int],
-        n: int,
-        space_between: float,
-        min_height: float | None = 0,
-    ) -> List[Tuple[int, int]]:
-        """Trouver des points sur la map où :
-        - size est la taille de la map
-        - map est la map sur laquel on veut trouver ces points
-        - n es le nombre de points à trouver
-        - space_between est l'espace minimum entre 2 points
-        - min_height est la hauteur maximale sur laquel placer un point
-
-        La fonction renvoie une liste de coordonnées
-        mais créera une erreure si il ne peut pas placer les points"""
-
-        cp = np.copy(map)  # Créer une copie de la map
-        maxi = np.unravel_index(
-            np.argmax(cp), size
-        )  # Trouve la position de la valeur maximale
-        points = [maxi]  # Ajoute cette coordonnée dans la liste
-
-        while len(points) < n:
-
-            if (
-                map[maxi[0]][maxi[1]] < min_height
-            ):  # Vérifie si le dernier point est au dessus du seuil
-                raise ValueError(
-                    "Some point are under min_height :"
-                    "decrease space_between, nb or min_height"
-                )
-
-            mask = np.zeros(size, dtype=bool)  # Créer une matrice de booléen
-            positions = np.ogrid[
-                : size[0], : size[1]
-            ]  # Prend toutes les position sur la map copié
-            dist2 = calc_distance(
-                positions, points[-1]
-            )  # Calcule toutes les distances au dernier point
-            mask |= (
-                dist2 <= space_between
-            )  # Créer une matrice de Vrai ou Faux si la distance au centre > seuil
-            cp[mask] = 0  # Enlève les valeur où distance centre > seuil
-
-            maxi = np.unravel_index(
-                np.argmax(cp), size
-            )  # Trouve la position de la valeur maximale
-
-            points.append(maxi)  # Ajoute la coordonnée dans la liste
-
-        return points
-
-    def colorize(points, size):
-
-        mat = np.zeros(size, dtype=int)
-
-        d = 10
-        yy, xx = np.ogrid[: size[0], : size[1]]
-
-        mask = np.zeros((size), dtype=bool)
-
-        for i, j in points:
-            dist2 = (yy - i) ** 2 + (xx - j) ** 2
-            mask |= dist2 <= d**2
-
-        mat[mask] = 1
-
-        return mat
-
-    def display(self, absolute_position: Tuple[int, int]):
-        """Affiche les chunks les plus proches"""
-        abs_position = np.array(absolute_position, dtype=np.int32)
-        assert np.less(abs_position, self.size * self.chunk_size_pix).all()
-
-        chunk = abs_position // self.chunk_size_pix
-
-        for x in range(chunk[0] + 1, chunk[0] - 2, -1):
-            for y in range(chunk[1] + 1, chunk[1] - 2, -1):
-                if (x, y) in self.loaded_chunks:
-                    self.screen.blit(
-                        self.loaded_chunks[(x, y)],
-                        (
-                            x * self.chunk_size_pix[0] - abs_position[0],
-                            y * self.chunk_size_pix[1] - abs_position[1],
-                        ),
-                    )
-
     def _display(self):
 
-        plt.subplot(231)
-
-        plt.title("Map")
-        plt.imshow(self.map, cmap="gray")
+        plt.subplot(221)
+        plt.imshow(self.map)
         plt.colorbar()
 
-        plt.subplot(234)
-
-        plt.title("Map Mask")
-        plt.imshow(self.map > 0.5, cmap="gray")
-        plt.colorbar()
-
-        plt.subplot(232)
-
-        plt.title("Grass Mask")
-        plt.imshow(self.grass_mask)
-        plt.colorbar()
-
-        plt.subplot(233)
-
-        plt.title("Ground Tiles")
-        plt.imshow(self.ground_tiles)
-        plt.colorbar()
-
-        plt.subplot(235)
-
-        plt.title("Buch Mask")
-        plt.imshow(self.bush_mask)
-        plt.colorbar()
-
-        plt.subplot(236)
-
-        plt.title("Plant Tiles")
-        plt.imshow(self.plant_tiles)
+        plt.subplot(222)
+        plt.imshow(self.road_map, origin="lower")
         plt.colorbar()
 
         plt.show()
@@ -543,7 +674,7 @@ if __name__ == "__main__":
 
     pygame.init()
 
-    screen = None
+    screen = pygame.display.set_mode((500, 500))
 
     class Loop:
 
@@ -553,7 +684,7 @@ if __name__ == "__main__":
             self.screen_size = pygame.Vector2(self.screen.get_size())
             self.abs_pos = pygame.Vector2([0, 0])
             self.clock = pygame.time.Clock()
-            self.map = Map((64, 64), (32, 32), (8, 8), (32, 32), self.screen, 0)
+            self.map = Map((8, 8), (32, 32), (8, 8), (32, 32), self.screen, 0)
 
         def event(self):
 
@@ -614,10 +745,14 @@ if __name__ == "__main__":
 
                 self.clock.tick(60)
 
-    loop = Loop(screen)
+    # loop = Loop(screen)
 
     # loop.map._display()
 
-    loop.run()
+    # loop.run()
 
     pygame.quit()
+
+    # map = Map((8, 8), (32, 32), (8, 8), (32, 32), screen, 0)
+
+    load_assets("tile_data.json")
