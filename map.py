@@ -339,7 +339,11 @@ class Map:
         self.octaves = octaves
         self.tile_size = np.array(tile_size, dtype=np.int32)
         self.chunk_size_pix = self.chunk_size_tile * self.tile_size
-        self.asset = load_assets("tile_data.json", asset_directory, self.tile_size)
+        self.asset = load_assets(
+            path.join(asset_directory, "tile_data.json"),
+            asset_directory,
+            self.tile_size,
+        )
         self.screen = screen
         if seed is None:  # Si aucune graine n'est donnée, prend en une au hasard
             self.seed = np.random.randint(0, 999999999)
