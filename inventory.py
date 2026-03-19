@@ -1,42 +1,471 @@
 import pygame
-from typing import Tuple, List, Dict
-import os
-
-# On trouve le dossier où se trouve ton script actuel (Projet-J3D)
-BASE_PATH = os.path.dirname(os.path.abspath(__file__))
-# On remonte d'un cran pour aller dans "MoleTale", là où est le dossier Ressources
-ROOT_PATH = os.path.dirname(BASE_PATH)
 
 
-def load_image(
-    relative_path: str, size: tuple | list | None = None
-) -> pygame.surface.Surface:
-    # Construction du chemin complet vers l'image demandée
-    full_path = os.path.join(ROOT_PATH, relative_path)
-
-    # Chemin vers ta texture de secours
-    fallback_path = os.path.join(ROOT_PATH, "Ressources", "inv_assets", "not_found.png")
-
-    if os.path.exists(full_path):
-        image = pygame.image.load(full_path).convert_alpha()
-    else:
-        print(f"Image introuvable: {full_path}. Chargement de not_found.png")
-        # Si même not_found.png n'est pas là, on crée un carré rose par défaut
-        if os.path.exists(fallback_path):
-            image = pygame.image.load(fallback_path).convert_alpha()
-        else:
-            image = pygame.Surface((32, 32))
-            image.fill((255, 0, 255))  # Rose flash
-
-    # Redimensionnement si besoin
-    if size is not None:
-        image = pygame.transform.scale(image, size)
-
-    return image
+"""
+item_dic c'est la base de données des Items du jeu
+Chaque item a :
+  - description  : texte affiché dans le tooltip
+  - item_type    : "Consommable", "Bric-à-brac", "Curiosités" ou "Légendes"
+  - max_stack    : quantité max par case d'inventaire
+  - icon_path    : chemin vers l'image depuis le dossier Ressources
+  - price        : prix de vente en Mole_Coins
+  - effect       : soin ou malus de PV si Consommable, None sinon
+"""
+item_dic: dict[str, dict] = {
+    # =========================================================================
+    # CONSOMMABLE — path : Ressources/inv_assets/edible/
+    # =========================================================================
+    "Champignon": {
+        "description": "Un petit champignon des bois comestible.",
+        "item_type": "Consommable",
+        "max_stack": 50,
+        "icon_path": "Ressources/inv_assets/edible/Mushroom.png",
+        "price": 12,
+        "effect": 2,
+    },
+    "Pomme": {
+        "description": "Une pomme rouge bien sucrée.",
+        "item_type": "Consommable",
+        "max_stack": 20,
+        "icon_path": "Ressources/inv_assets/edible/Apple.png",
+        "price": 15,
+        "effect": 3,
+    },
+    "Pomme verte": {
+        "description": "Légèrement acide mais très rafraîchissante.",
+        "item_type": "Consommable",
+        "max_stack": 20,
+        "icon_path": "Ressources/inv_assets/edible/Green Apple.png",
+        "price": 15,
+        "effect": 3,
+    },
+    "Fromage": {
+        "description": "Un morceau de fromage qui a du caractère.",
+        "item_type": "Consommable",
+        "max_stack": 20,
+        "icon_path": "Ressources/inv_assets/edible/Cheese.png",
+        "price": 18,
+        "effect": 4,
+    },
+    "Vin blanc": {
+        "description": "Un vin blanc sec et fruité.",
+        "item_type": "Consommable",
+        "max_stack": 5,
+        "icon_path": "Ressources/inv_assets/edible/Wine.png",
+        "price": 22,
+        "effect": 4,
+    },
+    "Pain": {
+        "description": "Un pain artisanal tout juste sorti du four.",
+        "item_type": "Consommable",
+        "max_stack": 15,
+        "icon_path": "Ressources/inv_assets/edible/Bread.png",
+        "price": 18,
+        "effect": 5,
+    },
+    "Vin rouge": {
+        "description": "Une bouteille de grand cru.",
+        "item_type": "Consommable",
+        "max_stack": 5,
+        "icon_path": "Ressources/inv_assets/edible/Wine 2.png",
+        "price": 25,
+        "effect": 5,
+    },
+    "Viande": {
+        "description": "Un morceau de viande crue de qualité.",
+        "item_type": "Consommable",
+        "max_stack": 10,
+        "icon_path": "Ressources/inv_assets/edible/Meat.png",
+        "price": 22,
+        "effect": 7,
+    },
+    "Jambon": {
+        "description": "Un jambon entier bien cuit.",
+        "item_type": "Consommable",
+        "max_stack": 5,
+        "icon_path": "Ressources/inv_assets/edible/Ham.png",
+        "price": 28,
+        "effect": 8,
+    },
+    "Petite Potion Rouge": {
+        "description": "Une petite fiole qui referme les plaies légères.",
+        "item_type": "Consommable",
+        "max_stack": 10,
+        "icon_path": "Ressources/inv_assets/edible/Red Potion 2.png",
+        "price": 35,
+        "effect": 10,
+    },
+    "Potion Rouge": {
+        "description": "La potion de soin classique des aventuriers.",
+        "item_type": "Consommable",
+        "max_stack": 10,
+        "icon_path": "Ressources/inv_assets/edible/Red Potion.png",
+        "price": 50,
+        "effect": 15,
+    },
+    "Grande Potion Rouge": {
+        "description": "Un flacon de soin majeur, très efficace.",
+        "item_type": "Consommable",
+        "max_stack": 5,
+        "icon_path": "Ressources/inv_assets/edible/Red Potion 3.png",
+        "price": 60,
+        "effect": 20,
+    },
+    "Viande de monstre": {
+        "description": "De la viande à l'odeur suspecte.",
+        "item_type": "Consommable",
+        "max_stack": 20,
+        "icon_path": "Ressources/inv_assets/edible/Monster Meat.png",
+        "price": 12,
+        "effect": -10,
+    },
+    # =========================================================================
+    # BRIC-À-BRAC — path : Ressources/inv_assets/junk/
+    # =========================================================================
+    "Os": {
+        "description": "Un vieil os blanchi par le soleil.",
+        "item_type": "Bric-à-brac",
+        "max_stack": 50,
+        "icon_path": "Ressources/inv_assets/junk/Bone.png",
+        "price": 5,
+        "effect": None,
+    },
+    "Livre": {
+        "description": "Un vieux livre aux pages jaunies.",
+        "item_type": "Bric-à-brac",
+        "max_stack": 5,
+        "icon_path": "Ressources/inv_assets/junk/Book.png",
+        "price": 20,
+        "effect": None,
+    },
+    "Bougie": {
+        "description": "Une simple bougie pour s'éclairer dans le noir.",
+        "item_type": "Bric-à-brac",
+        "max_stack": 20,
+        "icon_path": "Ressources/inv_assets/junk/Candle.png",
+        "price": 8,
+        "effect": None,
+    },
+    "Charbon": {
+        "description": "Un morceau de charbon noir, utile pour le feu.",
+        "item_type": "Bric-à-brac",
+        "max_stack": 99,
+        "icon_path": "Ressources/inv_assets/junk/Coal.png",
+        "price": 6,
+        "effect": None,
+    },
+    "Pièce de cuivre": {
+        "description": "La monnaie de base du royaume.",
+        "item_type": "Bric-à-brac",
+        "max_stack": 999,
+        "icon_path": "Ressources/inv_assets/junk/Copper Coin.png",
+        "price": 1,
+        "effect": None,
+    },
+    "Œuf": {
+        "description": "Un œuf mystérieux, peut-être comestible ?",
+        "item_type": "Bric-à-brac",
+        "max_stack": 20,
+        "icon_path": "Ressources/inv_assets/junk/Egg.png",
+        "price": 8,
+        "effect": None,
+    },
+    "Enveloppe": {
+        "description": "Une lettre scellée. Qui en est le destinataire ?",
+        "item_type": "Bric-à-brac",
+        "max_stack": 1,
+        "icon_path": "Ressources/inv_assets/junk/Envelop.png",
+        "price": 15,
+        "effect": None,
+    },
+    "Tissu": {
+        "description": "Un rouleau de tissu blanc, utile pour la couture.",
+        "item_type": "Bric-à-brac",
+        "max_stack": 99,
+        "icon_path": "Ressources/inv_assets/junk/Fabric.png",
+        "price": 8,
+        "effect": None,
+    },
+    "Plume": {
+        "description": "Une plume légère et résistante.",
+        "item_type": "Bric-à-brac",
+        "max_stack": 50,
+        "icon_path": "Ressources/inv_assets/junk/Feather.png",
+        "price": 7,
+        "effect": None,
+    },
+    "Engrenage": {
+        "description": "Une pièce mécanique complexe.",
+        "item_type": "Bric-à-brac",
+        "max_stack": 50,
+        "icon_path": "Ressources/inv_assets/junk/Gear.png",
+        "price": 15,
+        "effect": None,
+    },
+    "Pièce d'or": {
+        "description": "Une pièce brillante de grande valeur.",
+        "item_type": "Bric-à-brac",
+        "max_stack": 999,
+        "icon_path": "Ressources/inv_assets/junk/Golden Coin.png",
+        "price": 10,
+        "effect": None,
+    },
+    "Marteau": {
+        "description": "Un lourd marteau de forge.",
+        "item_type": "Bric-à-brac",
+        "max_stack": 1,
+        "icon_path": "Ressources/inv_assets/junk/Hammer.png",
+        "price": 25,
+        "effect": None,
+    },
+    "Lanterne": {
+        "description": "Une lanterne en métal qui éclaire bien dans le noir.",
+        "item_type": "Bric-à-brac",
+        "max_stack": 5,
+        "icon_path": "Ressources/inv_assets/junk/Lantern.png",
+        "price": 20,
+        "effect": None,
+    },
+    "Cuir": {
+        "description": "Une peau tannée souple et résistante.",
+        "item_type": "Bric-à-brac",
+        "max_stack": 99,
+        "icon_path": "Ressources/inv_assets/junk/Leather.png",
+        "price": 10,
+        "effect": None,
+    },
+    "Papier": {
+        "description": "Un parchemin vierge prêt à être écrit.",
+        "item_type": "Bric-à-brac",
+        "max_stack": 99,
+        "icon_path": "Ressources/inv_assets/junk/Paper.png",
+        "price": 5,
+        "effect": None,
+    },
+    "Pioche": {
+        "description": "L'outil indispensable de tout mineur.",
+        "item_type": "Bric-à-brac",
+        "max_stack": 1,
+        "icon_path": "Ressources/inv_assets/junk/Pickaxe.png",
+        "price": 22,
+        "effect": None,
+    },
+    "Corde": {
+        "description": "Une corde solide faite de fibres tressées.",
+        "item_type": "Bric-à-brac",
+        "max_stack": 99,
+        "icon_path": "Ressources/inv_assets/junk/Rope.png",
+        "price": 8,
+        "effect": None,
+    },
+    "Pelle": {
+        "description": "Utile pour creuser des trous ou déterrer des trésors.",
+        "item_type": "Bric-à-brac",
+        "max_stack": 1,
+        "icon_path": "Ressources/inv_assets/junk/Shovel.png",
+        "price": 18,
+        "effect": None,
+    },
+    "Pièce d'argent": {
+        "description": "Une pièce d'argent du royaume.",
+        "item_type": "Bric-à-brac",
+        "max_stack": 999,
+        "icon_path": "Ressources/inv_assets/junk/Silver Coin.png",
+        "price": 5,
+        "effect": None,
+    },
+    "Gel de Slime": {
+        "description": "Une substance gluante et verdâtre.",
+        "item_type": "Bric-à-brac",
+        "max_stack": 99,
+        "icon_path": "Ressources/inv_assets/junk/Slime Gel.png",
+        "price": 10,
+        "effect": None,
+    },
+    "Ficelle": {
+        "description": "Une bobine de fil résistant.",
+        "item_type": "Bric-à-brac",
+        "max_stack": 99,
+        "icon_path": "Ressources/inv_assets/junk/String.png",
+        "price": 4,
+        "effect": None,
+    },
+    "Bûche": {
+        "description": "Un morceau de bois brut fraîchement coupé.",
+        "item_type": "Bric-à-brac",
+        "max_stack": 99,
+        "icon_path": "Ressources/inv_assets/junk/Wood Log.png",
+        "price": 5,
+        "effect": None,
+    },
+    "Planche en bois": {
+        "description": "Du bois taillé prêt pour la construction.",
+        "item_type": "Bric-à-brac",
+        "max_stack": 99,
+        "icon_path": "Ressources/inv_assets/junk/Wooden Plank.png",
+        "price": 7,
+        "effect": None,
+    },
+    "Laine": {
+        "description": "Une boule de laine douce et chaude.",
+        "item_type": "Bric-à-brac",
+        "max_stack": 99,
+        "icon_path": "Ressources/inv_assets/junk/Wool.png",
+        "price": 8,
+        "effect": None,
+    },
+    # =========================================================================
+    # CURIOSITÉS — path : Ressources/inv_assets/curiosities/
+    # =========================================================================
+    "Livre Mystérieux": {
+        "description": "Un grimoire millénaire contenant des sorts oubliés.",
+        "item_type": "Curiosités",
+        "max_stack": 1,
+        "icon_path": "Ressources/inv_assets/curiosities/Book 3.png",
+        "price": 130,
+        "effect": None,
+    },
+    "Cristal": {
+        "description": "Un cristal translucide qui reflète la lumière.",
+        "item_type": "Curiosités",
+        "max_stack": 99,
+        "icon_path": "Ressources/inv_assets/curiosities/Crystal.png",
+        "price": 120,
+        "effect": None,
+    },
+    "Émeraude": {
+        "description": "Une émeraude brute extraite de la roche.",
+        "item_type": "Curiosités",
+        "max_stack": 99,
+        "icon_path": "Ressources/inv_assets/curiosities/Emerald.png",
+        "price": 100,
+        "effect": None,
+    },
+    "Carte Ancienne": {
+        "description": "Une carte aux contours usés qui mènerait à un trésor oublié.",
+        "item_type": "Curiosités",
+        "max_stack": 1,
+        "icon_path": "Ressources/inv_assets/curiosities/Map.png",
+        "price": 150,
+        "effect": None,
+    },
+    "Obsidienne": {
+        "description": "Une roche volcanique noire et tranchante.",
+        "item_type": "Curiosités",
+        "max_stack": 99,
+        "icon_path": "Ressources/inv_assets/curiosities/Obsidian.png",
+        "price": 80,
+        "effect": None,
+    },
+    "Perle": {
+        "description": "Une perle nacrée provenant des profondeurs.",
+        "item_type": "Curiosités",
+        "max_stack": 99,
+        "icon_path": "Ressources/inv_assets/curiosities/Pearl.png",
+        "price": 150,
+        "effect": None,
+    },
+    "Rubis": {
+        "description": "Un rubis brut à l'éclat rouge sombre.",
+        "item_type": "Curiosités",
+        "max_stack": 99,
+        "icon_path": "Ressources/inv_assets/curiosities/Ruby.png",
+        "price": 100,
+        "effect": None,
+    },
+    "Saphir": {
+        "description": "Un saphir brut d'un bleu profond.",
+        "item_type": "Curiosités",
+        "max_stack": 99,
+        "icon_path": "Ressources/inv_assets/curiosities/Sapphire.png",
+        "price": 95,
+        "effect": None,
+    },
+    "Parchemin": {
+        "description": "Un parchemin couvert de runes mystérieuses.",
+        "item_type": "Curiosités",
+        "max_stack": 5,
+        "icon_path": "Ressources/inv_assets/curiosities/Scroll.png",
+        "price": 120,
+        "effect": None,
+    },
+    "Crâne": {
+        "description": "Un crâne qui pourrait servir de trophée.",
+        "item_type": "Curiosités",
+        "max_stack": 10,
+        "icon_path": "Ressources/inv_assets/curiosities/Skull.png",
+        "price": 80,
+        "effect": None,
+    },
+    "Chapeau de Sorcier": {
+        "description": "Un chapeau pointu imprégné d'une légère aura magique.",
+        "item_type": "Curiosités",
+        "max_stack": 1,
+        "icon_path": "Ressources/inv_assets/curiosities/Wizard Hat.png",
+        "price": 180,
+        "effect": None,
+    },
+    "Bâton Magique": {
+        "description": "Un vieux bâton en bois qui semble canaliser une énergie mystérieuse.",
+        "item_type": "Curiosités",
+        "max_stack": 1,
+        "icon_path": "Ressources/inv_assets/curiosities/Wooden Staff.png",
+        "price": 160,
+        "effect": None,
+    },
+    # =========================================================================
+    # LÉGENDES — path : Ressources/inv_assets/legends/
+    # =========================================================================
+    "Diamant": {
+        "description": "La plus dure et la plus précieuse des gemmes.",
+        "item_type": "Légendes",
+        "max_stack": 99,
+        "icon_path": "Ressources/inv_assets/legends/Diamond.png",
+        "price": 500,
+        "effect": None,
+    },
+    "Œuf de Monstre": {
+        "description": "Un œuf orné de motifs étranges, il semble vibrer.",
+        "item_type": "Légendes",
+        "max_stack": 10,
+        "icon_path": "Ressources/inv_assets/legends/Monster Egg.png",
+        "price": 280,
+        "effect": None,
+    },
+    "Œil de Monstre": {
+        "description": "Une pupille verticale qui semble encore vous fixer.",
+        "item_type": "Légendes",
+        "max_stack": 30,
+        "icon_path": "Ressources/inv_assets/legends/Monster Eye.png",
+        "price": 320,
+        "effect": None,
+    },
+    "Bâton de Rubis": {
+        "description": "Canalise le pouvoir destructeur du feu. Un artefact rare.",
+        "item_type": "Légendes",
+        "max_stack": 1,
+        "icon_path": "Ressources/inv_assets/legends/Ruby Staff.png",
+        "price": 550,
+        "effect": None,
+    },
+    "Pierre Runique": {
+        "description": "Une pierre gravée de runes ancestrales qui émane une énergie mystérieuse.",
+        "item_type": "Légendes",
+        "max_stack": 5,
+        "icon_path": "Ressources/inv_assets/legends/Rune Stone.png",
+        "price": 400,
+        "effect": None,
+    },
+}
 
 
 class Item:
-    """Représente un item avec toutes ses propriétés."""
+    """
+    Gère les Items du jeu.
+
+    Usage :
+        Item.create("Diamant", 1)
+    """
 
     def __init__(
         self,
@@ -46,6 +475,8 @@ class Item:
         max_stack: int,
         quantity: int,
         icon: pygame.Surface,
+        price: int,
+        effect: int | None,
     ):
         self.name = name
         self.description = description
@@ -53,586 +484,707 @@ class Item:
         self.max_stack = max_stack
         self.quantity = quantity
         self.icon = icon
+        self.price = price
+        self.effect = effect
 
-    def can_stack_with(self, item) -> bool:
+    def can_stack_with(self, item: "Item") -> bool:
         return self.name == item.name and self.quantity < self.max_stack
 
+    def copy(self) -> "Item":
+        return Item(
+            self.name,
+            self.description,
+            self.item_type,
+            self.max_stack,
+            self.quantity,
+            self.icon,
+            self.price,
+            self.effect,
+        )
 
-# --- BASE DE DONNÉES DES ITEMS ---
-item_dic: dict[str, dict] = {
-    # === ÉQUIPEMENT (Armes, Armures, Outils, Sacs) ===
-    "Épée en fer": {
-        "description": "Une épée solide forgée dans du bon métal.",
-        "item_type": "Équipement",
-        "max_stack": 1,
-        "icon": "Ressources/inv_assets/weapon_tool/Iron Sword.png",
-    },
-    "Armure en fer": {
-        "description": "Une protection lourde et efficace contre les coups.",
-        "item_type": "Équipement",
-        "max_stack": 1,
-        "icon": "Ressources/inv_assets/armor/Iron Armor.png",
-    },
-    "Bouclier en fer": {
-        "description": "Un bouclier robuste arborant une croix gravée.",
-        "item_type": "Équipement",
-        "max_stack": 1,
-        "icon": "Ressources/inv_assets/armor/Iron Shield.png",
-    },
-    "Casque en fer": {
-        "description": "Protège la tête tout en laissant une bonne visibilité.",
-        "item_type": "Équipement",
-        "max_stack": 1,
-        "icon": "Ressources/inv_assets/armor/Iron Helmet.png",
-    },
-    "Bottes en fer": {
-        "description": "Lourdes mais indispensables pour une protection complète.",
-        "item_type": "Équipement",
-        "max_stack": 1,
-        "icon": "Ressources/inv_assets/armor/Iron Boot.png",
-    },
-    "Armure en cuir": {
-        "description": "Légère et souple, idéale pour les rôdeurs.",
-        "item_type": "Équipement",
-        "max_stack": 1,
-        "icon": "Ressources/inv_assets/armor/Leather Armor.png",
-    },
-    "Chapeau de sorcier": {
-        "description": "Un chapeau pointu imprégné d'une légère aura magique.",
-        "item_type": "Équipement",
-        "max_stack": 1,
-        "icon": "Ressources/inv_assets/armor/Wizard Hat.png",
-    },
-    "Sac": {
-        "description": "Un vieux sac en cuir pour transporter plus de butin.",
-        "item_type": "Équipement",
-        "max_stack": 1,
-        "icon": "Ressources/inv_assets/armor/Bag.png",
-    },
-    "Hache": {
-        "description": "Idéale pour couper du bois ou fendre des crânes.",
-        "item_type": "Équipement",
-        "max_stack": 1,
-        "icon": "Ressources/inv_assets/weapon_tool/Axe.png",
-    },
-    "Arc": {
-        "description": "Un arc en bois courbé, fiable à longue distance.",
-        "item_type": "Équipement",
-        "max_stack": 1,
-        "icon": "Ressources/inv_assets/weapon_tool/Bow.png",
-    },
-    "Bâton d'Émeraude": {
-        "description": "Un bâton magique canalisant l'énergie de la nature.",
-        "item_type": "Équipement",
-        "max_stack": 1,
-        "icon": "Ressources/inv_assets/weapon_tool/Emerald Staff.png",
-    },
-    "Épée Dorée": {
-        "description": "Aussi brillante que fragile, mais très tranchante.",
-        "item_type": "Équipement",
-        "max_stack": 1,
-        "icon": "Ressources/inv_assets/weapon_tool/Golden Sword.png",
-    },
-    "Marteau": {
-        "description": "Un lourd marteau de forge ou de combat.",
-        "item_type": "Équipement",
-        "max_stack": 1,
-        "icon": "Ressources/inv_assets/weapon_tool/Hammer.png",
-    },
-    "Couteau": {
-        "description": "Petit, discret et mortel.",
-        "item_type": "Équipement",
-        "max_stack": 1,
-        "icon": "Ressources/inv_assets/weapon_tool/Knife.png",
-    },
-    "Baguette Magique": {
-        "description": "Une petite baguette pour lancer des sorts mineurs.",
-        "item_type": "Équipement",
-        "max_stack": 1,
-        "icon": "Ressources/inv_assets/weapon_tool/Magic Wand.png",
-    },
-    "Pioche": {
-        "description": "L'outil indispensable de tout mineur.",
-        "item_type": "Équipement",
-        "max_stack": 1,
-        "icon": "Ressources/inv_assets/weapon_tool/Pickaxe.png",
-    },
-    "Bâton de Rubis": {
-        "description": "Canalise le pouvoir destructeur du feu.",
-        "item_type": "Équipement",
-        "max_stack": 1,
-        "icon": "Ressources/inv_assets/weapon_tool/Ruby Staff.png",
-    },
-    "Bâton de Saphir": {
-        "description": "Un bâton imprégné du pouvoir de la glace.",
-        "item_type": "Équipement",
-        "max_stack": 1,
-        "icon": "Ressources/inv_assets/weapon_tool/Sapphire Staff.png",
-    },
-    "Pelle": {
-        "description": "Utile pour creuser des trous ou déterrer des trésors.",
-        "item_type": "Équipement",
-        "max_stack": 1,
-        "icon": "Ressources/inv_assets/weapon_tool/Shovel.png",
-    },
-    "Épée en Argent": {
-        "description": "Particulièrement efficace contre les créatures de la nuit.",
-        "item_type": "Équipement",
-        "max_stack": 1,
-        "icon": "Ressources/inv_assets/weapon_tool/Silver Sword.png",
-    },
-    "Bâton de Topaze": {
-        "description": "Un bâton qui crépite d'énergie électrique.",
-        "item_type": "Équipement",
-        "max_stack": 1,
-        "icon": "Ressources/inv_assets/weapon_tool/Topaz Staff.png",
-    },
-    "Bouclier en Bois": {
-        "description": "Léger, mais ne durera pas éternellement.",
-        "item_type": "Équipement",
-        "max_stack": 1,
-        "icon": "Ressources/inv_assets/weapon_tool/Wooden Shield.png",
-    },
-    "Bâton en Bois": {
-        "description": "Une branche solide ramassée dans la forêt.",
-        "item_type": "Équipement",
-        "max_stack": 1,
-        "icon": "Ressources/inv_assets/weapon_tool/Wooden Staff.png",
-    },
-    "Épée en Bois": {
-        "description": "Une épée d'entraînement pour les débutants.",
-        "item_type": "Équipement",
-        "max_stack": 1,
-        "icon": "Ressources/inv_assets/weapon_tool/Wooden Sword.png",
-    },
-    # === CONSOMMABLE (Nourriture, Boissons, Potions) ===
-    "Pomme": {
-        "description": "Une pomme rouge bien sucrée.",
-        "item_type": "Consommable",
-        "max_stack": 20,
-        "icon": "Ressources/inv_assets/food/Apple.png",
-    },
-    "Bière": {
-        "description": "Une chope de bière fraîche avec beaucoup de mousse.",
-        "item_type": "Consommable",
-        "max_stack": 10,
-        "icon": "Ressources/inv_assets/food/Beer.png",
-    },
-    "Pain": {
-        "description": "Un pain artisanal tout juste sorti du four.",
-        "item_type": "Consommable",
-        "max_stack": 15,
-        "icon": "Ressources/inv_assets/food/Bread.png",
-    },
-    "Fromage": {
-        "description": "Un morceau de fromage qui a du caractère.",
-        "item_type": "Consommable",
-        "max_stack": 20,
-        "icon": "Ressources/inv_assets/food/Cheese.png",
-    },
-    "Steak de poisson": {
-        "description": "Un beau morceau de poisson grillé.",
-        "item_type": "Consommable",
-        "max_stack": 10,
-        "icon": "Ressources/inv_assets/food/Fish Steak.png",
-    },
-    "Pomme verte": {
-        "description": "Légèrement acide mais très rafraîchissante.",
-        "item_type": "Consommable",
-        "max_stack": 20,
-        "icon": "Ressources/inv_assets/food/Green Apple.png",
-    },
-    "Jambon": {
-        "description": "Un jambon entier bien cuit.",
-        "item_type": "Consommable",
-        "max_stack": 5,
-        "icon": "Ressources/inv_assets/food/Ham.png",
-    },
-    "Viande": {
-        "description": "Un morceau de viande crue de qualité.",
-        "item_type": "Consommable",
-        "max_stack": 10,
-        "icon": "Ressources/inv_assets/food/Meat.png",
-    },
-    "Champignon": {
-        "description": "Un petit champignon des bois comestible.",
-        "item_type": "Consommable",
-        "max_stack": 50,
-        "icon": "Ressources/inv_assets/food/Mushroom.png",
-    },
-    "Vin rouge": {
-        "description": "Une bouteille de grand cru.",
-        "item_type": "Consommable",
-        "max_stack": 5,
-        "icon": "Ressources/inv_assets/food/Wine 2.png",
-    },
-    "Vin blanc": {
-        "description": "Un vin blanc sec et fruité.",
-        "item_type": "Consommable",
-        "max_stack": 5,
-        "icon": "Ressources/inv_assets/food/Wine.png",
-    },
-    "Petite Potion Bleue": {
-        "description": "Une petite fiole d'énergie magique.",
-        "item_type": "Consommable",
-        "max_stack": 10,
-        "icon": "Ressources/inv_assets/potion/Blue Potion 2.png",
-    },
-    "Grande Potion Bleue": {
-        "description": "Une grande bouteille de mana concentré.",
-        "item_type": "Consommable",
-        "max_stack": 5,
-        "icon": "Ressources/inv_assets/potion/Blue Potion 3.png",
-    },
-    "Potion Bleue": {
-        "description": "Une potion standard pour restaurer la mana.",
-        "item_type": "Consommable",
-        "max_stack": 10,
-        "icon": "Ressources/inv_assets/potion/Blue Potion.png",
-    },
-    "Petite Potion Verte": {
-        "description": "Une petite décoction aux herbes médicinales.",
-        "item_type": "Consommable",
-        "max_stack": 10,
-        "icon": "Ressources/inv_assets/potion/Green Potion 2.png",
-    },
-    "Grande Potion Verte": {
-        "description": "Un puissant antidote ou tonique vert.",
-        "item_type": "Consommable",
-        "max_stack": 5,
-        "icon": "Ressources/inv_assets/potion/Green Potion 3.png",
-    },
-    "Potion Verte": {
-        "description": "Une potion verte équilibrée.",
-        "item_type": "Consommable",
-        "max_stack": 10,
-        "icon": "Ressources/inv_assets/potion/Green Potion.png",
-    },
-    "Petite Potion Rouge": {
-        "description": "Une petite fiole qui referme les plaies légères.",
-        "item_type": "Consommable",
-        "max_stack": 10,
-        "icon": "Ressources/inv_assets/potion/Red Potion 2.png",
-    },
-    "Grande Potion Rouge": {
-        "description": "Un flacon de soin majeur, très efficace.",
-        "item_type": "Consommable",
-        "max_stack": 5,
-        "icon": "Ressources/inv_assets/potion/Red Potion 3.png",
-    },
-    "Potion Rouge": {
-        "description": "La potion de soin classique des aventuriers.",
-        "item_type": "Consommable",
-        "max_stack": 10,
-        "icon": "Ressources/inv_assets/potion/Red Potion.png",
-    },
-    "Bouteille d'Eau": {
-        "description": "De l'eau pure, base de toutes les potions.",
-        "item_type": "Consommable",
-        "max_stack": 20,
-        "icon": "Ressources/inv_assets/potion/Water Bottle.png",
-    },
-    # === MATÉRIAU (Crafting et Ressources) ===
-    "Tissu": {
-        "description": "Un rouleau de tissu blanc, utile pour la couture.",
-        "item_type": "Matériau",
-        "max_stack": 99,
-        "icon": "Ressources/inv_assets/material/Fabric.png",
-    },
-    "Cuir": {
-        "description": "Une peau tannée souple et résistante.",
-        "item_type": "Matériau",
-        "max_stack": 99,
-        "icon": "Ressources/inv_assets/material/Leather.png",
-    },
-    "Papier": {
-        "description": "Un parchemin vierge prêt à être écrit.",
-        "item_type": "Matériau",
-        "max_stack": 99,
-        "icon": "Ressources/inv_assets/material/Paper.png",
-    },
-    "Corde": {
-        "description": "Une corde solide faite de fibres tressées.",
-        "item_type": "Matériau",
-        "max_stack": 99,
-        "icon": "Ressources/inv_assets/material/Rope.png",
-    },
-    "Ficelle": {
-        "description": "Une bobine de fil résistant.",
-        "item_type": "Matériau",
-        "max_stack": 99,
-        "icon": "Ressources/inv_assets/material/String.png",
-    },
-    "Bûche": {
-        "description": "Un morceau de bois brut fraîchement coupé.",
-        "item_type": "Matériau",
-        "max_stack": 99,
-        "icon": "Ressources/inv_assets/material/Wood Log.png",
-    },
-    "Planche en bois": {
-        "description": "Du bois taillé prêt pour la construction.",
-        "item_type": "Matériau",
-        "max_stack": 99,
-        "icon": "Ressources/inv_assets/material/Wooden Plank.png",
-    },
-    "Laine": {
-        "description": "Une boule de laine douce et chaude.",
-        "item_type": "Matériau",
-        "max_stack": 99,
-        "icon": "Ressources/inv_assets/material/Wool.png",
-    },
-    "Charbon": {
-        "description": "Un morceau de charbon noir, utile pour le feu.",
-        "item_type": "Matériau",
-        "max_stack": 99,
-        "icon": "Ressources/inv_assets/ore_gem/Coal.png",
-    },
-    "Lingot de cuivre": {
-        "description": "Un lingot de cuivre pur prêt à être forgé.",
-        "item_type": "Matériau",
-        "max_stack": 99,
-        "icon": "Ressources/inv_assets/ore_gem/Copper Ingot.png",
-    },
-    "Pépite de cuivre": {
-        "description": "Un petit éclat de cuivre brut.",
-        "item_type": "Matériau",
-        "max_stack": 99,
-        "icon": "Ressources/inv_assets/ore_gem/Copper Nugget.png",
-    },
-    "Pépite d'or": {
-        "description": "Un petit morceau d'or pur.",
-        "item_type": "Matériau",
-        "max_stack": 99,
-        "icon": "Ressources/inv_assets/ore_gem/Gold Nugget.png",
-    },
-    "Lingot d'or": {
-        "description": "Un lingot d'or massif et brillant.",
-        "item_type": "Matériau",
-        "max_stack": 99,
-        "icon": "Ressources/inv_assets/ore_gem/Golden Ingot.png",
-    },
-    "Obsidienne": {
-        "description": "Une roche volcanique noire et tranchante.",
-        "item_type": "Matériau",
-        "max_stack": 99,
-        "icon": "Ressources/inv_assets/ore_gem/Obsidian.png",
-    },
-    "Lingot d'argent": {
-        "description": "Un lingot d'argent pur au reflet lunaire.",
-        "item_type": "Matériau",
-        "max_stack": 99,
-        "icon": "Ressources/inv_assets/ore_gem/Silver Ingot.png",
-    },
-    "Pépite d'argent": {
-        "description": "Un fragment d'argent brut.",
-        "item_type": "Matériau",
-        "max_stack": 99,
-        "icon": "Ressources/inv_assets/ore_gem/Silver Nugget.png",
-    },
-    "Bouteille Vide": {
-        "description": "Une fiole en verre vide, prête à être remplie.",
-        "item_type": "Matériau",
-        "max_stack": 20,
-        "icon": "Ressources/inv_assets/potion/Empty Bottle.png",
-    },
-    "Engrenage": {
-        "description": "Une pièce mécanique complexe.",
-        "item_type": "Matériau",
-        "max_stack": 50,
-        "icon": "Ressources/inv_assets/misc/Gear.png",
-    },
-    "Flèche": {
-        "description": "Une flèche simple avec une pointe en silex.",
-        "item_type": "Matériau",
-        "max_stack": 50,
-        "icon": "Ressources/inv_assets/weapon_tool/Arrow.png",
-    },
-    # === GEMME (Pierres précieuses) ===
-    "Cristal": {
-        "description": "Un cristal translucide qui reflète la lumière.",
-        "item_type": "Gemme",
-        "max_stack": 99,
-        "icon": "Ressources/inv_assets/ore_gem/Crystal.png",
-    },
-    "Émeraude taillée": {
-        "description": "Une émeraude d'un vert éclatant, taillée avec soin.",
-        "item_type": "Gemme",
-        "max_stack": 99,
-        "icon": "Ressources/inv_assets/ore_gem/Cut Emerald.png",
-    },
-    "Rubis taillé": {
-        "description": "Un rubis rouge sang parfaitement poli.",
-        "item_type": "Gemme",
-        "max_stack": 99,
-        "icon": "Ressources/inv_assets/ore_gem/Cut Ruby.png",
-    },
-    "Saphir taillé": {
-        "description": "Un saphir d'un bleu profond et pur.",
-        "item_type": "Gemme",
-        "max_stack": 99,
-        "icon": "Ressources/inv_assets/ore_gem/Cut Sapphire.png",
-    },
-    "Topaze taillée": {
-        "description": "Une topaze aux reflets ambrés.",
-        "item_type": "Gemme",
-        "max_stack": 99,
-        "icon": "Ressources/inv_assets/ore_gem/Cut Topaz.png",
-    },
-    "Diamant": {
-        "description": "La plus dure et la plus précieuse des gemmes.",
-        "item_type": "Gemme",
-        "max_stack": 99,
-        "icon": "Ressources/inv_assets/ore_gem/Diamond.png",
-    },
-    "Émeraude": {
-        "description": "Une émeraude brute extraite de la roche.",
-        "item_type": "Gemme",
-        "max_stack": 99,
-        "icon": "Ressources/inv_assets/ore_gem/Emerald.png",
-    },
-    "Perle": {
-        "description": "Une perle nacrée provenant des profondeurs.",
-        "item_type": "Gemme",
-        "max_stack": 99,
-        "icon": "Ressources/inv_assets/ore_gem/Pearl.png",
-    },
-    # === BUTIN (Pièces de monstres) ===
-    "Os": {
-        "description": "Un vieil os blanchi par le soleil.",
-        "item_type": "Butin",
-        "max_stack": 50,
-        "icon": "Ressources/inv_assets/monster_part/Bone.png",
-    },
-    "Œuf": {
-        "description": "Un œuf mystérieux, peut-être comestible ?",
-        "item_type": "Butin",
-        "max_stack": 20,
-        "icon": "Ressources/inv_assets/monster_part/Egg.png",
-    },
-    "Plume": {
-        "description": "Une plume légère et résistante.",
-        "item_type": "Butin",
-        "max_stack": 50,
-        "icon": "Ressources/inv_assets/monster_part/Feather.png",
-    },
-    "Œuf de monstre": {
-        "description": "Un œuf orné de motifs étranges, il semble vibrer.",
-        "item_type": "Butin",
-        "max_stack": 10,
-        "icon": "Ressources/inv_assets/monster_part/Monster Egg.png",
-    },
-    "Œil de monstre": {
-        "description": "Une pupille verticale qui semble encore vous fixer.",
-        "item_type": "Butin",
-        "max_stack": 30,
-        "icon": "Ressources/inv_assets/monster_part/Monster Eye.png",
-    },
-    "Viande de monstre": {
-        "description": "De la viande à l'odeur suspecte.",
-        "item_type": "Butin",
-        "max_stack": 20,
-        "icon": "Ressources/inv_assets/monster_part/Monster Meat.png",
-    },
-    "Crâne": {
-        "description": "Un crâne qui pourrait servir de trophée.",
-        "item_type": "Butin",
-        "max_stack": 10,
-        "icon": "Ressources/inv_assets/monster_part/Skull.png",
-    },
-    "Gel de Slime": {
-        "description": "Une substance gluante et verdâtre.",
-        "item_type": "Butin",
-        "max_stack": 99,
-        "icon": "Ressources/inv_assets/monster_part/Slime Gel.png",
-    },
-    # === DIVERS (Monnaie, Quêtes, Conteneurs) ===
-    "Pièce de cuivre": {
-        "description": "La monnaie de base du royaume.",
-        "item_type": "Divers",
-        "max_stack": 999,
-        "icon": "Ressources/inv_assets/misc/Copper Coin.png",
-    },
-    "Pièce d'or": {
-        "description": "Une pièce brillante de grande valeur.",
-        "item_type": "Divers",
-        "max_stack": 999,
-        "icon": "Ressources/inv_assets/misc/Golden Coin.png",
-    },
-    "Livre ancien": {
-        "description": "Un livre relié en cuir aux pages jaunies.",
-        "item_type": "Divers",
-        "max_stack": 5,
-        "icon": "Ressources/inv_assets/misc/Book.png",
-    },
-    "Bougie": {
-        "description": "Une simple bougie pour s'éclairer dans le noir.",
-        "item_type": "Divers",
-        "max_stack": 20,
-        "icon": "Ressources/inv_assets/misc/Candle.png",
-    },
-    "Coffre": {
-        "description": "Un petit coffre en bois renforcé.",
-        "item_type": "Divers",
-        "max_stack": 1,
-        "icon": "Ressources/inv_assets/misc/Chest.png",
-    },
-    "Caisse": {
-        "description": "Une caisse de transport en bois.",
-        "item_type": "Divers",
-        "max_stack": 1,
-        "icon": "Ressources/inv_assets/misc/Crate.png",
-    },
-    "Enveloppe": {
-        "description": "Une lettre scellée. Qui en est le destinataire ?",
-        "item_type": "Divers",
-        "max_stack": 1,
-        "icon": "Ressources/inv_assets/misc/Envelop.png",
-    },
-    "Clé dorée": {
-        "description": "Une clé ornée qui semble ouvrir un mécanisme précieux.",
-        "item_type": "Divers",
-        "max_stack": 1,
-        "icon": "Ressources/inv_assets/misc/Golden Key.png",
-    },
-    "Clé en fer": {
-        "description": "Une clé simple mais robuste.",
-        "item_type": "Divers",
-        "max_stack": 5,
-        "icon": "Ressources/inv_assets/misc/Iron Key.png",
-    },
-    "Torche": {
-        "description": "Elle éclaire les endroits les plus sombres.",
-        "item_type": "Divers",
-        "max_stack": 20,
-        "icon": "Ressources/inv_assets/weapon_tool/Torch.png",
-    },
-    "Cœur": {
-        "description": "Un réceptacle de vie qui pulse doucement.",
-        "item_type": "Consommable",
-        "max_stack": 10,
-        "icon": "Ressources/inv_assets/misc/Heart.png",
-    },
-}
+    @staticmethod
+    def create(name, quantity) -> "Item":
+        """
+        - Si le nom est absent → ValueError
+        - Si l'image est introuvable → texture not_found
+        """
+        if name not in item_dic:
+            raise ValueError(f"Item inconnu : {name}. Vérifier item_dic.")
+
+        data = item_dic[name]
+
+        try:
+            icon_surface = pygame.image.load(data["icon_path"]).convert_alpha()
+        except (FileNotFoundError, pygame.error):
+            print(f"\nImage de '{name}' introuvable : '{data['icon_path']}'.\n")
+            icon_surface = pygame.image.load(
+                "Ressources/inv_assets/not_found.png"
+            ).convert_alpha()
+
+        icon_surface = pygame.transform.scale(icon_surface, (32, 32))
+
+        return Item(
+            name=name,
+            description=data["description"],
+            item_type=data["item_type"],
+            max_stack=data["max_stack"],
+            quantity=quantity,
+            icon=icon_surface,
+            price=data["price"],
+            effect=data["effect"],
+        )
 
 
-def create_item(name: str, quantity: int = 1) -> Item:
+class Inventaire:
     """
-    Crée un Item depuis la base de données.
-    - Si le nom n'est pas dans le dictionnaire -> ERREUR (Raise)
-    - Si l'image est introuvable -> Texture 'not_found'
+    Grille d'inventaire, logique pure.
+
+    Gère :
+        - La logique des items (ajouter, swap, ...)
+
+    Usage :
+        inv = Inventaire(rows=4, cols=8)
+        inv.add_item(Item.create("Diamant", 1))
     """
-    if name not in item_dic:
-        raise ValueError(f"Item inconnu : '{name}'. Vérifie item_dic dans ton code.")
 
-    data = item_dic[name]
-    qty = min(quantity, data["max_stack"])
-    icon_surface = load_image(data["icon"], (32, 32))
+    def __init__(self, rows, cols):
+        self.rows = rows
+        self.cols = cols
+        self.grid: list[list[Item | None]] = [
+            [None for i in range(cols)] for y in range(rows)
+        ]
 
-    return Item(
-        name=name,
-        description=data["description"],
-        item_type=data["item_type"],
-        max_stack=data["max_stack"],
-        quantity=qty,
-        icon=icon_surface,
+    def get(self, row, col) -> Item | None:
+        """Retourne un (Item ou None) de la position row, col"""
+        return self.grid[row][col]
+
+    def set(self, row, col, item: Item | None):
+        """Place un (Item ou None) à la position row, col"""
+        self.grid[row][col] = item
+
+    def add_item(self, item: Item):
+        """
+        Empile sur les stacks existants du même item
+        puis place le reste dans les cases vides.
+
+        Retourne 0 si tout a été ajouté,
+        ou la quantité restante si l'inventaire était plein.
+        """
+        remaining = item.quantity
+
+        # empiler sur les stacks existants
+        for i in range(self.rows):
+            for j in range(self.cols):
+                slot = self.grid[i][j]
+                if slot is not None and slot.can_stack_with(item):
+                    ajout = min(slot.max_stack - slot.quantity, remaining)
+                    slot.quantity += ajout
+                    remaining -= ajout
+                    if remaining == 0:
+                        return 0
+
+        # placer le reste dans des cases vides
+        for i in range(self.rows):
+            for j in range(self.cols):
+                if self.grid[i][j] is None:
+                    new_item = item.copy()
+                    new_item.quantity = min(remaining, item.max_stack)
+                    remaining -= new_item.quantity
+                    self.grid[i][j] = new_item
+                    if remaining == 0:
+                        return 0
+
+        return remaining
+
+    def remove_item(self, row, col, qty) -> Item | None:
+        """
+        Retire une quantité : "qty" d'items du slot à la position row, col.
+        Retourne une copie de l'item retiré, ou None si la case est vide.
+        Supprime le slot si la quantité tombe à 0.
+        """
+        item = self.grid[row][col]
+        if item is None:
+            return None
+        removed = item.copy()
+        removed.quantity = min(qty, item.quantity)
+        item.quantity -= removed.quantity
+        if item.quantity <= 0:
+            self.grid[row][col] = None
+        return removed
+
+    def swap(self, row_a, col_a, row_b, col_b):
+        """
+        Échange deux cases du même inventaire.
+        Si l'item est stackable avac l'autre alors on fusionne.
+        Sinon échange classique.
+        """
+        item_a = self.grid[row_a][col_a]
+        item_b = self.grid[row_b][col_b]
+
+        if item_a is not None and item_b is not None and item_b.can_stack_with(item_a):
+            ajout = min(item_b.max_stack - item_b.quantity, item_a.quantity)
+            item_b.quantity += ajout
+            item_a.quantity -= ajout
+            if item_a.quantity <= 0:
+                self.grid[row_a][col_a] = None
+        else:
+            self.grid[row_a][col_a], self.grid[row_b][col_b] = item_b, item_a
+
+    def transfer(self, row_a, col_a, other_inv: "Inventaire", row_b, col_b):
+        """
+        Échange deux cases d'inventaire differents.
+        Si l'item est stackable avac l'autre alors on fusionne.
+        Sinon échange classique.
+        """
+        item_a = self.grid[row_a][col_a]
+        item_b = other_inv.grid[row_b][col_b]
+
+        if item_a is not None and item_b is not None and item_b.can_stack_with(item_a):
+            ajout = min(item_b.max_stack - item_b.quantity, item_a.quantity)
+            item_b.quantity += ajout
+            item_a.quantity -= ajout
+            if item_a.quantity <= 0:
+                self.grid[row_a][col_a] = None
+        else:
+            self.grid[row_a][col_a], other_inv.grid[row_b][col_b] = item_b, item_a
+
+
+class InventaireUI:
+    """
+    Rendu Pygame d'une grille d'inventaire.
+
+    Gère :
+        - L'affichage du panneau (image + titre + icônes + highlight + tooltip)
+        - La détection de la case sous la souris
+
+    Usage :
+        ui = InventaireUI(
+            name         = "Sac du joueur",
+            inv          = mon_inventaire,
+            pos          = (50, 100),
+            image_path   = "Ressources/inv_assets/chest.png",
+            slot_size    = 52,
+            slot_margin  = 4,
+            padding      = 21,
+            title_height = 11,
+        )
+    """
+
+    def __init__(
+        self,
+        screen,
+        name,
+        inv: Inventaire,
+        pos: tuple,
+        image_path,
+        slot_size,
+        slot_margin,
+        padding,
+        title_height,
+    ):
+        self.screen: pygame.Surface = screen
+
+        self.name = name
+        self.inv = inv
+        self.pos = pos  # position où le panneau s'affiche
+        self.visible = False
+
+        self.slot_size = slot_size  # taille d'une case en px
+        self.slot_margin = slot_margin  # espace entre les cases en px
+        self.padding = padding  # bord du panneau en px
+        self.title_height = title_height  # espace au-dessus pour le titre en px
+
+        self.image = pygame.image.load(image_path).convert_alpha()
+
+        # Police d'écriture :
+
+        # Titre panneau
+        self.font_title = pygame.font.SysFont("segoeui", 11, bold=True)
+        # Compteur stack
+        self.font_stack = pygame.font.SysFont("segoeui", 12, bold=True)
+        # Nom item tooltip
+        self.font_tip_b = pygame.font.SysFont("segoeui", 13, bold=True)
+        # Description tooltip
+        self.font_tip = pygame.font.SysFont("segoeui", 13)
+        # Sous-textes tooltip
+        self.font_hint = pygame.font.SysFont("segoeui", 11)
+
+        # Les quatres types d'objet :
+        self.type_colors = {
+            "Consommable": (130, 220, 90),  # Vert
+            "Bric-à-brac": (160, 160, 185),  # Gris
+            "Curiosités": (10, 140, 255),  # Bleu
+            "Légendes": (255, 100, 40),  # Orange
+        }
+
+    def slot_rect(self, row, col) -> pygame.Rect:
+        """
+        Retourne le pygame.Rect d'une case de la position row, col.
+        """
+        return pygame.Rect(
+            self.pos[0] + self.padding + col * (self.slot_size + self.slot_margin),
+            self.pos[1]
+            + self.padding
+            + self.title_height
+            + row * (self.slot_size + self.slot_margin),
+            self.slot_size,
+            self.slot_size,
+        )
+
+    def slot_at(self, mouse_pos) -> tuple[int, int] | None:
+        """
+        Retourne la position row, col de la case sous la souris, ou None.
+        """
+        if not self.visible:
+            return None
+        for i in range(self.inv.rows):
+            for j in range(self.inv.cols):
+                if self.slot_rect(i, j).collidepoint(mouse_pos):
+                    return (i, j)
+        return None
+
+    def draw(self, mouse_pos, drag_mgr: "DragManager"):
+        """
+        Dessine le panneau complet dans l'ordre :
+        - Image de fond
+        - Titre du panneau
+        - Highlight de survol
+        - Icônes des items
+        """
+        if not self.visible:
+            return
+
+        # image de fond
+        self.screen.blit(self.image, self.pos)
+
+        # titre centré dans la zone titre
+        title_surf = self.font_title.render(self.name, True, (230, 210, 160))
+        self.screen.blit(
+            title_surf,
+            (
+                self.pos[0] + (self.image.get_width() - title_surf.get_width()) // 2,
+                self.pos[1]
+                + (self.padding + self.title_height - title_surf.get_height()) // 2,
+            ),
+        )
+
+        # position de la case survolée
+        hovered = self.slot_at(mouse_pos)
+
+        # highlight de la case survolée
+        if hovered is not None:
+            overlay = pygame.Surface((self.slot_size, self.slot_size), pygame.SRCALPHA)
+            overlay.fill((255, 255, 255, 60))
+            self.screen.blit(overlay, self.slot_rect(hovered[0], hovered[1]))
+
+        # icônes des items
+        for i in range(self.inv.rows):
+            for j in range(self.inv.cols):
+                item = self.inv.get(i, j)
+                rect = self.slot_rect(i, j)
+
+                # La case source du drag paraît vide :
+                # l'item "flotte" sous la souris, on ne le dessine pas ici
+                is_drag_source = (
+                    drag_mgr.drag_source_ui is self
+                    and drag_mgr.drag_source_row == i
+                    and drag_mgr.drag_source_col == j
+                )
+
+                if item is not None and not is_drag_source:
+                    icon_x = rect.x + (self.slot_size - item.icon.get_width()) // 2
+                    icon_y = rect.y + (self.slot_size - item.icon.get_height()) // 2
+                    self.screen.blit(item.icon, (icon_x, icon_y))
+
+                    # compteur de stack — uniquement si stackable et quantité > 1
+                    if item.max_stack > 1 and item.quantity > 1:
+                        qty_surf = self.font_stack.render(
+                            str(item.quantity), True, (255, 220, 0)
+                        )
+                        self.screen.blit(
+                            qty_surf,
+                            (
+                                rect.right
+                                - qty_surf.get_width()
+                                - 3,  # aligné à droite
+                                rect.bottom
+                                - qty_surf.get_height()
+                                - 2,  # aligné en bas
+                            ),
+                        )
+
+    def draw_tooltip(self, item: Item, mouse_pos):
+        """
+        Affiche une bulle d'info au survol d'un item :
+            - Nom (gras)
+            - Type (couleur selon rareté)
+            - Séparateur
+            - Description
+            - Soin/Malus : +-X PV   (Consommable uniquement)
+            - Valeur : X Mole_Coins
+            - Quantité / max        (si stackable)
+            - Hint clic droit       (Consommable uniquement)
+
+        Et se repositionne automatiquement pour ne pas sortir de l'écran !
+        """
+        type_color = self.type_colors.get(item.item_type, (160, 160, 185))
+
+        lines = [
+            (item.name, self.font_tip_b, (235, 235, 245)),
+            (item.item_type, self.font_hint, type_color),
+            ("", self.font_hint, (160, 160, 185)),  # séparateur
+            (item.description, self.font_tip, (210, 210, 220)),
+        ]
+
+        # effet de soin/malus pour consommable uniquement
+        if item.item_type == "Consommable" and item.effect is not None:
+            couleur = (130, 220, 130) if item.effect >= 0 else (220, 80, 80)
+            label = "Soin" if item.effect >= 0 else "Malus"
+            lines.append(
+                (
+                    f"{label} : {item.effect:+d} PV",
+                    self.font_hint,
+                    couleur,
+                )
+            )
+
+        # prix de vente pour tous les types
+        if item.price > 0:
+            lines.append(
+                (
+                    f"Valeur : {item.price} Mole_Coins",
+                    self.font_hint,
+                    (255, 220, 0),
+                )
+            )
+
+        # quantité si stackable
+        if item.max_stack > 1:
+            lines.append(
+                (
+                    f"Quantité : {item.quantity} / {item.max_stack}",
+                    self.font_hint,
+                    (160, 160, 185),
+                )
+            )
+
+        # "[Clic droit] Utiliser" pour consommable uniquement
+        if item.item_type == "Consommable":
+            lines.append(("[Clic droit] Utiliser", self.font_hint, (130, 215, 130)))
+
+        pad = 10  # marge bordure
+        gap = 3  # espace entre les infos
+
+        rendered = []
+        for text, font, color in lines:
+            if text == "":
+                rendered.append(None)
+            else:
+                rendered.append((font.render(text, True, color), color))
+
+        # dimensions du tooltip
+        text_surfaces = [r[0] for r in rendered if r is not None]
+        w = max((s.get_width() for s in text_surfaces), default=80) + pad * 2
+        h = (
+            sum(s.get_height() + gap for s in text_surfaces)
+            + sum(6 for r in rendered if r is None)
+            + pad * 2
+        )
+
+        # position : décalé depuis la souris, ajusté pour ne pas sortir de l'écran
+        tx, ty = mouse_pos[0] + 18, mouse_pos[1] + 10
+        sw, sh = self.screen.get_size()
+        if tx + w > sw:
+            tx = mouse_pos[0] - w - 8
+        if ty + h > sh:
+            ty = mouse_pos[1] - h - 8
+
+        # surface du tooltip
+        tip_surf = pygame.Surface((w, h), pygame.SRCALPHA)
+        pygame.draw.rect(tip_surf, (18, 18, 30, 218), (0, 0, w, h), border_radius=7)
+        pygame.draw.rect(
+            tip_surf, (30, 30, 50, 255), (0, 0, w, h), width=3, border_radius=7
+        )
+        pygame.draw.rect(
+            tip_surf,
+            (120, 120, 160, 255),
+            (2, 2, w - 4, h - 4),
+            width=1,
+            border_radius=6,
+        )
+
+        # enfin : rendu ligne par ligne
+        y = pad
+        for r in rendered:
+            if r is None:
+                pygame.draw.line(
+                    tip_surf, (80, 80, 110), (pad, y + 2), (w - pad, y + 2)
+                )
+                y += 6
+            else:
+                s, _ = r
+                tip_surf.blit(s, (pad, y))
+                y += s.get_height() + gap
+
+        self.screen.blit(tip_surf, (tx, ty))
+
+
+class DragManager:
+    """
+    Gère le drag & drop entre plusieurs InventaireUI.
+
+    Usage :
+        drag_mgr = DragManager([ui_joueur, ui_coffre])
+        drag_mgr.handle_event(event, mouse_pos, on_use=ma_fonction)
+        drag_mgr.draw(screen, mouse_pos)
+    """
+
+    def __init__(self, screen, ui_list: list[InventaireUI]):
+        self.screen: pygame.Surface = screen
+        self.ui_list = ui_list  # Tous les panneaux gérés
+
+        self.drag_item = None  # copie de l'Item drag
+        self.drag_source_ui = None  # inventaireUI source
+        self.drag_source_row = None  # ligne de la case source
+        self.drag_source_col = None  # colonne de la case source
+
+    def add_ui(self, ui: InventaireUI):
+        """Ajoute un panneau (Exemple : on ouvre un coffre)."""
+        self.ui_list.append(ui)
+
+    def remove_ui(self, ui: InventaireUI):
+        """Retire un panneau (Exemple : on ferme un coffre)."""
+        self.ui_list.remove(ui)
+
+    def handle_event(
+        self,
+        event: pygame.event.Event,
+        mouse_pos: tuple,
+        on_use=None,
+    ):
+        """
+        Traite les événements souris pour tous les panneaux.
+
+        on_use(item, slot, inventaire_ui) — callback clic droit,
+        appelé uniquement pour les Consommables.
+        """
+
+        # Clic gauche :
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for ui in self.ui_list:
+                if not ui.visible:
+                    continue
+                slot = ui.slot_at(mouse_pos)
+                if slot is not None:
+                    item = ui.inv.get(slot[0], slot[1])
+                    if item is not None:
+
+                        # Shift + clic gauche alors transfert instantané vers l'autre inventaire
+                        if pygame.key.get_mods() & pygame.KMOD_SHIFT:
+                            # cherche le premier inventaire visible différent de l'actuel
+                            for target_ui in self.ui_list:
+                                if target_ui is ui or not target_ui.visible:
+                                    continue
+                                # tente d'ajouter dans l'autre inventaire
+                                reste = target_ui.inv.add_item(item)
+                                if reste < item.quantity:
+                                    # au moins une partie a été transférée
+                                    transfere = item.quantity - reste
+                                    item.quantity -= transfere
+                                    if item.quantity <= 0:
+                                        ui.inv.set(slot[0], slot[1], None)
+                                break  # on essaie que le premier autre inventaire trouvé
+
+                        # Clic gauche normal → démarre le drag
+                        else:
+                            self.drag_item = item.copy()
+                            self.drag_source_ui = ui
+                            self.drag_source_row = slot[0]
+                            self.drag_source_col = slot[1]
+
+                    break
+
+        # Clic droit :
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+            for ui in self.ui_list:
+                if not ui.visible:
+                    continue
+                slot = ui.slot_at(mouse_pos)
+                if slot is not None:
+                    item = ui.inv.get(slot[0], slot[1])
+                    if item is not None:
+
+                        # Shift + clic droit alors on divise le stack par 2
+                        if pygame.key.get_mods() & pygame.KMOD_SHIFT:
+                            if item.max_stack > 1 and item.quantity > 1:
+                                moitie = item.quantity // 2
+
+                                # cherche une case vide uniquement dans le même inventaire
+                                placed = False
+                                for i in range(ui.inv.rows):
+                                    for j in range(ui.inv.cols):
+                                        if ui.inv.get(i, j) is None and (i, j) != slot:
+                                            new_item = item.copy()
+                                            new_item.quantity = moitie
+                                            ui.inv.set(i, j, new_item)
+                                            item.quantity -= moitie
+                                            placed = True
+                                            break
+                                    if placed:
+                                        break
+                                # si pas de case vide dans cet inventaire alors on fait rien
+
+                        # Clic droit simple alors utiliser pour "Consommable" uniquement
+                        elif on_use is not None and item.item_type == "Consommable":
+                            on_use(item, slot, ui)
+
+                    break
+
+        # Relâchement gauche (drop)
+        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            if self.drag_item is None:
+                return
+
+            for ui in self.ui_list:
+                if not ui.visible:
+                    continue
+                slot = ui.slot_at(mouse_pos)
+                if slot is not None:
+                    if self.drag_source_ui is ui:
+                        # même inventaire alors swap
+                        if slot != (self.drag_source_row, self.drag_source_col):
+                            ui.inv.swap(
+                                self.drag_source_row,
+                                self.drag_source_col,
+                                *slot,
+                            )
+                    else:
+                        # sinon cross-inventaire alors transfer
+                        self.drag_source_ui.inv.transfer(
+                            self.drag_source_row,
+                            self.drag_source_col,
+                            ui.inv,
+                            *slot,
+                        )
+                    break
+
+            # drop réussi ou relâché dans le vide on reset l'état du drag
+            self.drag_item = None
+            self.drag_source_ui = None
+            self.drag_source_row = None
+            self.drag_source_col = None
+
+    def draw(self, mouse_pos):
+        """
+        Dessine tous les panneaux visibles,
+        puis la tooltip et enfin
+        l'item flottant par-dessus tout.
+        """
+        for ui in self.ui_list:
+            ui.draw(mouse_pos, self)
+
+        # affiche la tooltip
+        if self.drag_item is None:
+            for ui in self.ui_list:
+                if not ui.visible:
+                    continue
+                hovered = ui.slot_at(mouse_pos)
+                if hovered is not None:
+                    item = ui.inv.get(hovered[0], hovered[1])
+                    if item is not None:
+                        ui.draw_tooltip(item, mouse_pos)
+                    break
+        else:
+            self.draw_dragged_item(mouse_pos)
+
+    def draw_dragged_item(self, mouse_pos):
+        """Dessine l'item (semi-transparent) sous la souris pendant un drag."""
+        ghost = self.drag_item.icon.copy()
+        ghost.set_alpha(180)
+
+        # Item drag : centré sous la souris
+        icon_x = mouse_pos[0] - ghost.get_width() // 2
+        icon_y = mouse_pos[1] - ghost.get_height() // 2
+        self.screen.blit(ghost, (icon_x, icon_y))
+
+
+if __name__ == "__main__":
+    pygame.init()
+    screen = pygame.display.set_mode((1000, 700))
+
+    inv_joueur = Inventaire(rows=4, cols=8)
+    inv_joueur.add_item(Item.create("Potion Rouge", 5))
+    inv_joueur.add_item(Item.create("Grande Potion Rouge", 2))
+    inv_joueur.add_item(Item.create("Pain", 4))
+    inv_joueur.add_item(Item.create("Champignon", 10))
+    inv_joueur.add_item(Item.create("Pièce de cuivre", 120))
+    inv_joueur.add_item(Item.create("Os", 80))
+    inv_joueur.add_item(Item.create("Engrenage", 3))
+    inv_joueur.add_item(Item.create("Cristal", 5))
+    inv_joueur.add_item(Item.create("Crâne", 1))
+    inv_joueur.add_item(Item.create("Diamant", 1))
+    inv_joueur.add_item(Item.create("Bâton de Rubis", 1))
+
+    inv_coffre = Inventaire(rows=4, cols=8)
+    inv_coffre.add_item(Item.create("Petite Potion Rouge", 8))
+    inv_coffre.add_item(Item.create("Fromage", 6))
+    inv_coffre.add_item(Item.create("Pièce d'or", 50))
+    inv_coffre.add_item(Item.create("Carte Ancienne", 1))
+    inv_coffre.add_item(Item.create("Viande de monstre", 1))
+
+    ui_joueur = InventaireUI(
+        screen,
+        name="Sac du joueur",
+        inv=inv_joueur,
+        pos=(30, 80),
+        image_path="Ressources/inv_assets/chest.png",
+        slot_size=52,
+        slot_margin=4,
+        padding=21,
+        title_height=11,
     )
+    ui_coffre = InventaireUI(
+        screen,
+        name="Coffre",
+        inv=inv_coffre,
+        pos=(30, 400),
+        image_path="Ressources/inv_assets/chest.png",
+        slot_size=52,
+        slot_margin=4,
+        padding=21,
+        title_height=11,
+    )
+    ui_joueur.visible = True
+    ui_coffre.visible = True
+
+    drag_mgr = DragManager(screen, [ui_joueur, ui_coffre])
+
+    def on_use(item: Item, slot: tuple, ui: InventaireUI):
+        """Consomme 1 unité de l'item utilisé."""
+        ui.inv.remove_item(*slot, 1)
+        print(f"Vous vous soigner de {item.effect} HP")
+        # self.player.hp += item.effect par exemple
+
+    running = True
+    while running:
+        mouse_pos = pygame.mouse.get_pos()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    running = False
+                if event.key == pygame.K_i:
+                    ui_joueur.visible = not ui_joueur.visible
+                if event.key == pygame.K_e:
+                    ui_coffre.visible = not ui_coffre.visible
+
+            drag_mgr.handle_event(event, mouse_pos, on_use=on_use)
+
+        # affichage
+        screen.fill((20, 20, 30))
+        drag_mgr.draw(mouse_pos)
+        pygame.display.flip()
+
+    pygame.quit()
