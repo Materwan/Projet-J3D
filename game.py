@@ -4,6 +4,7 @@ from moteur import Moteur
 from map import Map
 import time
 from camera_system import Camera
+from inventory import Item, Inventaire, InventaireUI, DragManager
 
 
 class Game:
@@ -29,6 +30,33 @@ class Game:
         self.map: Map
         self.address = "0.0.0.0"
         self.port = 8888
+
+        # INVENTAIRE ! : touche I pour ouvrir et fermer inventaire
+        largeur, hauteur = self.screen.get_size()
+        self.inv_joueur = Inventaire(rows=4, cols=8)
+        self.ui_joueur = InventaireUI(
+            self.screen,
+            name="Sac du joueur",
+            inv=self.inv_joueur,
+            pos=((largeur - 486) // 2, hauteur - 293),
+            image_path="Ressources/inv_assets/chest.png",
+            slot_size=52,
+            slot_margin=4,
+            padding=21,
+            title_height=11,
+            visible=False,
+        )
+        self.drag_mgr = DragManager(self.screen, [self.ui_joueur])
+
+        # Items de départ :
+        self.inv_joueur.add_item(Item.create("Potion Rouge", 3))
+
+    def _on_use(self, item: Item, slot, ui: InventaireUI):
+        """Appelé au clic droit sur un Consommable."""
+        if item.item_type == "Consommable" and item.effect is not None:
+            ui.inv.remove_item(slot[0], slot[1], 1)
+            print(f"You've suck dry your potion : {item.effect:+d} PV")
+            # self.player_controller.player.hp += item.effect par exemple
 
     def initialize(self):
         """Initialise le moteur, le controlleur à utiliser, les keybinds et la camera"""
@@ -68,18 +96,29 @@ class Game:
 
     def event(self, events: list[pygame.event.Event]) -> bool:
         """Gére les entré de l'utilisateur."""
+        mouse_pos = pygame.mouse.get_pos()
+
         for event in events:
             if event.type == pygame.QUIT:
                 self.manager.running = False
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    pygame.mixer.music.play(-1)
-                    self.manager.states["MENU_PAUSE"].surface_copie = self.screen.copy()
-                    self.manager.change_state("MENU_PAUSE")
+                    if self.ui_joueur.visible:  # ferme l'inventaire
+                        self.ui_joueur.visible = False
+                    else:
+                        pygame.mixer.music.play(-1)
+                        self.manager.states["MENU_PAUSE"].surface_copie = (
+                            self.screen.copy()
+                        )
+                        self.manager.change_state("MENU_PAUSE")
                 elif event.key == pygame.K_SPACE:
                     self.player_controller.attaque = True
                 elif event.key == pygame.K_F2:
                     self.player_controller.toggle_hitbox()
+                elif event.key == pygame.K_i:
+                    self.ui_joueur.visible = not self.ui_joueur.visible
+
+            self.drag_mgr.handle_event(event, mouse_pos, on_use=self._on_use)
 
         self.player_controller.event(pygame.key.get_pressed())
 
@@ -96,3 +135,5 @@ class Game:
         self.screen.fill((100, 100, 100))
         self.camera.display_map(self.map)
         self.player_controller.display()
+        # affiche l'inventaire
+        self.drag_mgr.draw(pygame.mouse.get_pos())

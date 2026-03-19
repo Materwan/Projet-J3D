@@ -681,13 +681,14 @@ class InventaireUI:
         slot_margin,
         padding,
         title_height,
+        visible,
     ):
         self.screen: pygame.Surface = screen
 
         self.name = name
         self.inv = inv
         self.pos = pos  # position où le panneau s'affiche
-        self.visible = False
+        self.visible = visible
 
         self.slot_size = slot_size  # taille d'une case en px
         self.slot_margin = slot_margin  # espace entre les cases en px
@@ -1142,6 +1143,7 @@ if __name__ == "__main__":
         slot_margin=4,
         padding=21,
         title_height=11,
+        visible=True,
     )
     ui_coffre = InventaireUI(
         screen,
@@ -1153,9 +1155,8 @@ if __name__ == "__main__":
         slot_margin=4,
         padding=21,
         title_height=11,
+        visible=True,
     )
-    ui_joueur.visible = True
-    ui_coffre.visible = True
 
     drag_mgr = DragManager(screen, [ui_joueur, ui_coffre])
 
