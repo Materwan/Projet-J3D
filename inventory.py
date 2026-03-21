@@ -1,5 +1,5 @@
 import pygame
-
+import random
 
 """
 item_dic c'est la base de données des Items du jeu
@@ -10,6 +10,11 @@ Chaque item a :
   - icon_path    : chemin vers l'image depuis le dossier Ressources
   - price        : prix de vente en Mole_Coins
   - effect       : soin ou malus de PV si Consommable, None sinon
+
+Price :
+    item_dic stocke le prix de VENTE.
+    Le prix d'ACHAT chez un marchand = prix_vente * price_multiplier
+    (entre 1.2 et 1.6, tiré aléatoirement pour chaque PNJ marchand).
 """
 item_dic: dict[str, dict] = {
     # =========================================================================
@@ -461,7 +466,7 @@ item_dic: dict[str, dict] = {
 
 class Item:
     """
-    Gère les Items du jeu.
+    Données et état d'un Item du jeu.
 
     Usage :
         Item.create("Diamant", 1)
@@ -505,11 +510,11 @@ class Item:
     @staticmethod
     def create(name, quantity) -> "Item":
         """
-        - Si le nom est absent → ValueError
-        - Si l'image est introuvable → texture not_found
+        - Si le nom est inconnu alors ValueError
+        - Si l'image est introuvable alors texture not_found
         """
         if name not in item_dic:
-            raise ValueError(f"Item inconnu : {name}. Vérifier item_dic.")
+            raise ValueError(f"Item inconnu : '{name}'. Vérifier item_dic.")
 
         data = item_dic[name]
 
@@ -682,6 +687,7 @@ class InventaireUI:
         padding,
         title_height,
         visible,
+        is_merchant,
     ):
         self.screen: pygame.Surface = screen
 
@@ -689,6 +695,11 @@ class InventaireUI:
         self.inv = inv
         self.pos = pos  # position où le panneau s'affiche
         self.visible = visible
+        self.is_merchant = is_merchant
+        if is_merchant:
+            self.price_multiplier = round(random.uniform(1.2, 1.6), 2)
+        else:
+            self.price_multiplier = 1.0
 
         self.slot_size = slot_size  # taille d'une case en px
         self.slot_margin = slot_margin  # espace entre les cases en px
@@ -744,7 +755,7 @@ class InventaireUI:
                     return (i, j)
         return None
 
-    def draw(self, mouse_pos, drag_mgr: "DragManager"):
+    def draw(self, mouse_pos, drag_mgr: "InventaireManager"):
         """
         Dessine le panneau complet dans l'ordre :
         - Image de fond
@@ -849,11 +860,20 @@ class InventaireUI:
                 )
             )
 
-        # prix de vente pour tous les types
-        if item.price > 0:
+        # prix de vente (ou achat si inventaire de marchand) pour tous les types d'Item
+        if self.is_merchant:
+            displayed_price = round(item.price * self.price_multiplier)
             lines.append(
                 (
-                    f"Valeur : {item.price} Mole_Coins",
+                    f"Prix d'achat : {displayed_price} Mole_Coins",
+                    self.font_hint,
+                    (255, 220, 0),
+                )
+            )
+        else:
+            lines.append(
+                (
+                    f"Valeur de vente : {item.price} Mole_Coins",
                     self.font_hint,
                     (255, 220, 0),
                 )
@@ -930,9 +950,9 @@ class InventaireUI:
         self.screen.blit(tip_surf, (tx, ty))
 
 
-class DragManager:
+class InventaireManager:
     """
-    Gère le drag & drop entre plusieurs InventaireUI.
+    Gère plusieurs InventaireUI ainsi que le drag & drop.
 
     Usage :
         drag_mgr = DragManager([ui_joueur, ui_coffre])
@@ -996,7 +1016,7 @@ class DragManager:
                                         ui.inv.set(slot[0], slot[1], None)
                                 break  # on essaie que le premier autre inventaire trouvé
 
-                        # Clic gauche normal → démarre le drag
+                        # Clic gauche normal alors démarre le drag
                         else:
                             self.drag_item = item.copy()
                             self.drag_source_ui = ui
@@ -1144,6 +1164,7 @@ if __name__ == "__main__":
         padding=21,
         title_height=11,
         visible=True,
+        is_merchant=False,
     )
     ui_coffre = InventaireUI(
         screen,
@@ -1156,9 +1177,10 @@ if __name__ == "__main__":
         padding=21,
         title_height=11,
         visible=True,
+        is_merchant=True,
     )
 
-    drag_mgr = DragManager(screen, [ui_joueur, ui_coffre])
+    drag_mgr = InventaireManager(screen, [ui_joueur, ui_coffre])
 
     def on_use(item: Item, slot: tuple, ui: InventaireUI):
         """Consomme 1 unité de l'item utilisé."""

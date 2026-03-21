@@ -4,7 +4,7 @@ from moteur import Moteur
 from map import Map
 import time
 from camera_system import Camera
-from inventory import Item, Inventaire, InventaireUI, DragManager
+from inventory import Item, Inventaire, InventaireUI, InventaireManager
 
 
 class Game:
@@ -31,7 +31,7 @@ class Game:
         self.address = "0.0.0.0"
         self.port = 8888
 
-        # INVENTAIRE ! : touche I pour ouvrir et fermer inventaire
+        # INVENTAIRE : touche I pour ouvrir et fermer l'inventaire
         largeur, hauteur = self.screen.get_size()
         self.inv_joueur = Inventaire(rows=4, cols=8)
         self.ui_joueur = InventaireUI(
@@ -45,8 +45,9 @@ class Game:
             padding=21,
             title_height=11,
             visible=False,
+            is_merchant=False,
         )
-        self.drag_mgr = DragManager(self.screen, [self.ui_joueur])
+        self.drag_mgr = InventaireManager(self.screen, [self.ui_joueur])
 
         # Items de départ :
         self.inv_joueur.add_item(Item.create("Potion Rouge", 3))
