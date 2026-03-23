@@ -4,7 +4,6 @@ from menu import Text
 from random import shuffle
 
 CARD_TYPES = {0 : "Player", 1 : "Ally", 2 : "Spell", 3 : "Equip"}
-EFFECT = {}
 
 class Card:
     def __init__(self, type: int, name: str):
