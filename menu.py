@@ -118,16 +118,6 @@ class Principal_Menu(Menu):
         self.eltpages = [self.start, self.settings, self.quit]
 
     def event(self, events):
-        # Proposition
-        """
-        self.quit.hover, self.start.hover, self.settings.hover = (
-            False,
-            False,
-            False,
-        )
-        puis pour chaque truc juste :
-        self.quit.hover = True
-        """
         coord = p.mouse.get_pos()
         for event in events:
             if event.type == p.QUIT:
@@ -614,7 +604,7 @@ class Join_Multi_Menu(Menu):
             button = a.Button(
                 EMPTY_BUTTON,
                 self.screen,
-                (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 200 + count * 100),
+                (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 200 + count * 150),
                 (301, 95),
             )
             button_t = [
@@ -687,6 +677,12 @@ class Pause_Menu(Menu):
     def __init__(self, screen, manager):
         super().__init__(screen, manager)
         self.surface_copie = None
+        self.blackscreen = p.Surface(self.WINDOWS, p.SRCALPHA)
+        p.draw.rect(
+            self.blackscreen,
+            (10, 10, 22, 100),
+            (0, 0, self.WINDOWS[0], self.WINDOWS[1]),
+        )
         self.manager.running = True
         self.start = a.Button(
             PLAY_BUTTON,
@@ -756,6 +752,7 @@ class Pause_Menu(Menu):
 
     def display(self):
         self.manager.states["GAME"].display()
+        self.screen.blit(self.blackscreen, (0, 0))
         self.pagedisplay()
         self.start.clicked = False
         self.settings.clicked = False
