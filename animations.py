@@ -157,7 +157,7 @@ class AnimationController:
         """Change state and direction if neccesary, otherwise, update frame index"""
 
         if self.attacking:
-            self.frame_index += 1
+            self.frame_index += 2
             # Fin de l'animation d'attaque
             if self.frame_index >= self.attack_length * 10:
                 self.attacking = False
