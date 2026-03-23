@@ -1,0 +1,11 @@
+Cards :
+
+	Types : -Player 1 (Unique, has HP (Health Point), MP (Magic Point), AP (Attack Point) : if HP drop to 0 (or below), player die and the run end; MP is used for spells; AP is damage the player deal each attack. Equip can be equipped to gain advantages)
+		-Player 2 (if multi enabled, has same attribute as P1)
+		-Ally (Gained after beating a boss, act as "secondary player" : can attack and have powerful activable effect (that can be used once per game (?)) or passive, Equip can't be attached to them)
+		-Spell (common type of card found, cost MP and is discard after use)
+		-Equip (common type of card found, one can be equipped/gifted to Player 2 per, give passive effects over time)
+
+	Turn : -Player and opponent draw a card
+		-Each play at the same time, they any play spells in their spells zone in the order they want to play them (opponent card are faced down) as long as they have enough MP, their spells will be played in the order they have decided as well as equipping/gifting an Equip card once per turn
+		-When the player (and Player 2) finished, they passes to the combat step : Each spells are played by their order (each spells in slot 1: then slot 2; then 3...) then allies from both sides attack, before the player and opponent attack, they can choose if they want to target the player/opponent, or an ally
