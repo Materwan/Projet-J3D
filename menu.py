@@ -56,6 +56,20 @@ class Menu:
         }
         self.key = {"up": False, "down": False, "left": False, "right": False}
         self.manager.running = False
+        self.retour = a.Button(
+            EMPTY_BUTTON,
+            self.screen,
+            (170, 67),
+        )
+        self.retour_t = [Text("Impact", 30, "<--", (0, 0, 0), self.screen)]
+        self.retour_t.append(
+            (
+                (self.retour.rec.width - self.retour_t[0].lenth[0]) // 2
+                + self.retour.rec.left,
+                (self.retour.rec.height - self.retour_t[0].lenth[1]) // 2
+                + self.retour.rec.top,
+            )
+        )
 
     def recalculcoord(self, text, button):
         """recalcul the coordonnee"""
@@ -129,27 +143,17 @@ class Principal_Menu(Menu):
                     self.settings.clicked = True
                     self.manager.change_state("MENU_SETTING")
             else:
-                # Aprés les fonction ca existe !!
+                self.quit.hover, self.start.hover, self.settings.hover = (
+                    False,
+                    False,
+                    False,
+                )
                 if self.quit.rec.collidepoint(coord):
-                    self.quit.hover, self.start.hover, self.settings.hover = (
-                        True,
-                        False,
-                        False,
-                    )
+                    self.quit.hover = True
                 elif self.start.rec.collidepoint(coord):
-                    self.start.hover, self.quit.hover = True, False  # WTF ??
+                    self.start.hover = True
                 elif self.settings.rec.collidepoint(coord):
-                    self.quit.hover, self.start.hover, self.settings.hover = (
-                        False,
-                        False,
-                        True,
-                    )
-                else:
-                    self.quit.hover, self.start.hover, self.settings.hover = (
-                        False,
-                        False,
-                        False,
-                    )
+                    self.settings.hover = True
 
     def update(self):
         pass
@@ -157,7 +161,7 @@ class Principal_Menu(Menu):
     def display(self):
         self.screen.blit(self.bg_img, self.bg_img_coord)
         self.textdisplay()
-        self.pagedisplay()  # Pourquoi alors que tu as self ???
+        self.pagedisplay()
         self.start.clicked = False
         self.settings.clicked = False
         self.quit.clicked = False
@@ -170,11 +174,6 @@ class Setting_Menu(Menu):
         self.manager.running = True
         self.surface_copie = None
         self.menu_appel = menu_appel
-        self.retour = a.Button(
-            EMPTY_BUTTON,
-            self.screen,
-            (170, 67),
-        )
         self.changeup = a.Button(
             EMPTY_BUTTON,
             self.screen,
@@ -261,15 +260,6 @@ class Setting_Menu(Menu):
                 + self.changeright.rec.left,
                 (self.changeright.rec.height - self.right_t[0].lenth[1]) // 2
                 + self.changeright.rec.top,
-            )
-        )
-        self.retour_t = [Text("Impact", 30, "<--", (0, 0, 0), self.screen)]
-        self.retour_t.append(
-            (
-                (self.retour.rec.width - self.retour_t[0].lenth[0]) // 2
-                + self.retour.rec.left,
-                (self.retour.rec.height - self.retour_t[0].lenth[1]) // 2
-                + self.retour.rec.top,
             )
         )
         self.elttexts = [
@@ -414,11 +404,6 @@ class Play_Menu(Menu):
     def __init__(self, screen, manager):
         super().__init__(screen, manager)
         self.manager.running = True
-        self.retour = a.Button(
-            EMPTY_BUTTON,
-            self.screen,
-            (170, 67),
-        )
         self.solo = a.Button(
             EMPTY_BUTTON,
             self.screen,
@@ -485,15 +470,6 @@ class Play_Menu(Menu):
                 (self.joinmultiplayer.rec.height - self.joinmultiplayer_t[0].lenth[1])
                 // 2
                 + self.joinmultiplayer.rec.top,
-            )
-        )
-        self.retour_t = [Text("Impact", 30, "<--", (0, 0, 0), self.screen)]
-        self.retour_t.append(
-            (
-                (self.retour.rec.width - self.retour_t[0].lenth[0]) // 2
-                + self.retour.rec.left,
-                (self.retour.rec.height - self.retour_t[0].lenth[1]) // 2
-                + self.retour.rec.top,
             )
         )
         self.elttexts = [
@@ -574,11 +550,6 @@ class Join_Multi_Menu(Menu):
         super().__init__(screen, manager)
         self.list_button = []
         self.manager.running = True
-        self.retour = a.Button(
-            EMPTY_BUTTON,
-            self.screen,
-            (170, 67),
-        )
         """
         Un dictionnaire ou les clé sont les addresses ip et les valeurs sont un dictionnaire contennant le nom de la partie et l'addresses :
         <une ip>: {
@@ -595,16 +566,6 @@ class Join_Multi_Menu(Menu):
         """
         self.serveurs = {}
         self.serveurs: Dict[Dict]
-        self.retour_t = [Text("Impact", 30, "<--", (0, 0, 0), self.screen)]
-        self.retour_t.append(
-            (
-                (self.retour.rec.width - self.retour_t[0].lenth[0]) // 2
-                + self.retour.rec.left,
-                (self.retour.rec.height - self.retour_t[0].lenth[1]) // 2
-                + self.retour.rec.top,
-            )
-        )
-
         self.upd_prot = threading.Thread(target=self.recieve_udp)
         self.udp_event = threading.Event()
         self.upd_prot.start()
