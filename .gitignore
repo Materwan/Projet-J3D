@@ -2,4 +2,5 @@ runAnimation/
 runAnimation.zip
 Ressources/
 __pycache__
+.venv/
 ~*
