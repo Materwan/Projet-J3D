@@ -672,6 +672,7 @@ class Join_Multi_Menu(Menu):
                 )
             )
             self.list_button.append((button, button_t))
+            count += 1
 
     def event(self, events):
         coord = p.mouse.get_pos()
