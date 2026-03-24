@@ -20,6 +20,7 @@ class Game:
             "down": pygame.K_DOWN,
             "left": pygame.K_LEFT,
             "right": pygame.K_RIGHT,
+            "attack": pygame.K_SPACE,
         }
 
         # on initialise la camera à 0 pour pas que ça plante
@@ -112,7 +113,7 @@ class Game:
                             self.screen.copy()
                         )
                         self.manager.change_state("MENU_PAUSE")
-                elif event.key == pygame.K_SPACE:
+                elif event.key == self.keybinds["attack"]:
                     self.player_controller.attaque = True
                 elif event.key == pygame.K_F2:
                     self.player_controller.toggle_hitbox()

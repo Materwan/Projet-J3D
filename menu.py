@@ -53,6 +53,7 @@ class Menu:
             "down": p.K_DOWN,
             "left": p.K_LEFT,
             "right": p.K_RIGHT,
+            "attack": p.K_SPACE,
         }
         self.key = {"up": False, "down": False, "left": False, "right": False}
         self.manager.running = False
@@ -167,22 +168,27 @@ class Setting_Menu(Menu):
         self.changeup = a.Button(
             EMPTY_BUTTON,
             self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 210),
+            (self.WINDOWS[0] // 2 - 200, self.WINDOWS[1] // 2 - 70),
         )
         self.changedown = a.Button(
             EMPTY_BUTTON,
             self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 70),
+            (self.WINDOWS[0] // 2 - 200, self.WINDOWS[1] // 2 + 70),
         )
         self.changeleft = a.Button(
             EMPTY_BUTTON,
             self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 70),
+            (self.WINDOWS[0] // 2 + 200, self.WINDOWS[1] // 2 - 70),
         )
         self.changeright = a.Button(
             EMPTY_BUTTON,
             self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 210),
+            (self.WINDOWS[0] // 2 + 200, self.WINDOWS[1] // 2 + 70),
+        )
+        self.changeattack = a.Button(
+            EMPTY_BUTTON,
+            self.screen,
+            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 200),
         )
         self.up_t = [
             Text(
@@ -252,11 +258,29 @@ class Setting_Menu(Menu):
                 + self.changeright.rec.top,
             )
         )
+        self.attack_t = [
+            Text(
+                "Impact",
+                30,
+                "ATTACK: " + p.key.name(self.keybinds["attack"]),
+                (0, 0, 0),
+                self.screen,
+            )
+        ]
+        self.attack_t.append(
+            (
+                (self.changeattack.rec.width - self.attack_t[0].lenth[0]) // 2
+                + self.changeattack.rec.left,
+                (self.changeattack.rec.height - self.attack_t[0].lenth[1]) // 2
+                + self.changeattack.rec.top,
+            )
+        )
         self.elttexts = [
             self.up_t,
             self.down_t,
             self.left_t,
             self.right_t,
+            self.attack_t,
             self.retour_t,
         ]
         self.eltpages = [
@@ -265,6 +289,7 @@ class Setting_Menu(Menu):
             self.changedown,
             self.changeleft,
             self.changeright,
+            self.changeattack,
         ]
 
     def changekey(self, event):
@@ -334,6 +359,13 @@ class Setting_Menu(Menu):
                     "RIGHT: " + p.key.name(self.keybinds["right"]),
                     False,
                 )
+                self.interchange(
+                    self.attack_t,
+                    self.changeattack,
+                    "attack",
+                    "ATTACK: " + p.key.name(self.keybinds["attack"]),
+                    False,
+                )
             if self.checkchangekey():
                 """if a keybind is changing dont look for collidepoint"""
                 (
@@ -342,7 +374,8 @@ class Setting_Menu(Menu):
                     self.changedown.hover,
                     self.changeleft.hover,
                     self.changeright.hover,
-                ) = (False, False, False, False, False)
+                    self.changeattack.hover,
+                ) = (False, False, False, False, False, False)
                 checkevent = (
                     event.type == p.MOUSEBUTTONDOWN and event.button == p.BUTTON_LEFT
                 )
@@ -374,6 +407,12 @@ class Setting_Menu(Menu):
                     if checkevent:
                         self.interchange(
                             self.right_t, self.changeright, "right", "...", True
+                        )
+                elif self.changeattack.rec.collidepoint(coord):
+                    self.changeattack.hover = True
+                    if checkevent:
+                        self.interchange(
+                            self.attack_t, self.changeattack, "attack", "...", True
                         )
 
     def update(self):
@@ -538,6 +577,7 @@ class Join_Multi_Menu(Menu):
 
     def __init__(self, screen, manager):
         super().__init__(screen, manager)
+        self.count = 0
         self.list_button = []
         self.manager.running = True
         """
@@ -591,7 +631,6 @@ class Join_Multi_Menu(Menu):
                     time.sleep(0.5)
             except socket.timeout:
                 continue
-
         if sock:
             sock.close()
             print("UDP recieve protocol stopped")
@@ -724,6 +763,10 @@ class Pause_Menu(Menu):
                         self.surface_copie
                     )
                     self.manager.change_state("MENU_SETTING_PAUSE")
+
+            elif event.type == p.KEYDOWN and event.key == p.K_ESCAPE:
+                self.start.clicked = True
+                self.manager.change_state("GAME")
             else:
                 if self.quit.rec.collidepoint(coord):
                     self.quit.hover, self.start.hover, self.settings.hover = (
