@@ -636,12 +636,18 @@ class Join_Multi_Menu(Menu):
                     if addr[0] not in self.serveurs:
                         self.serveurs[addr[0]] = data
                 else:
+                    if sock_set:
+                        sock_set = False
+                        sock.close()
+                        print("UDP recieve protocol stopped")
                     time.sleep(0.5)
             except socket.timeout:
                 continue
         if sock:
-            sock.close()
-            print("UDP recieve protocol stopped")
+            if sock_set:
+                sock_set = False
+                sock.close()
+                print("UDP recieve protocol stopped")
 
     def create_list_button(self, serveurs):
         # Ca non
@@ -758,6 +764,7 @@ class Pause_Menu(Menu):
             if event.type == p.MOUSEBUTTONDOWN and event.button == p.BUTTON_LEFT:
                 if self.quit.rec.collidepoint(coord):
                     self.quit.clicked = True
+                    self.manager.states["GAME"].player_controller.close = True
                     self.manager.change_state("MENU_P")
                 elif self.start.rec.collidepoint(coord):
                     self.start.clicked = True

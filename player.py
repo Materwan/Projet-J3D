@@ -1,6 +1,7 @@
 import pygame
 from moteur import Moteur
 from map import Map
+from camera_system import Camera
 from animations import AnimationController, create_player_animation
 from typing import Tuple, Dict
 import time
@@ -63,6 +64,7 @@ class PlayerControllerBase:
         """Initialise les éléments nécessaires à un joueur"""
         self.screen = screen
         self.camera = None
+        self.camera: Camera
         self.moteur = moteur
         self.map = map
         if moteur is not None and map is not None:
@@ -334,7 +336,7 @@ class HostController(PlayerControllerBase):
 
         # Arrêt le serveur : n'accepte plus les connections
         self.serveur.close()
-        print("Serveur fermé")
+        print("N'accepte plus les connexions")
 
         # Défini les variables à envoyer
         to_send_data = get_to_send_data()
@@ -344,9 +346,10 @@ class HostController(PlayerControllerBase):
             "octaves": self.map.octaves,
             "seed": self.map.seed,
         }
-        print(to_send_data)
         writer.write(dict_to_bytes(to_send_data))
         await writer.drain()
+
+        recieved_bytes = await reader.readline()
 
         try:
             while True:
@@ -517,6 +520,7 @@ class GuestController(PlayerControllerBase):
         self.host_target_pos = None
 
     def set_camera(self, camera):
+        self.camera: Camera
         self.camera = camera
         self.host.camera = camera
 
@@ -527,29 +531,34 @@ class GuestController(PlayerControllerBase):
     async def connect(self):
         """Se connecte au serveur"""
 
-        self.reader, self.writer = await asyncio.open_connection(
-            self.address, self.port
-        )
+        try:
+            self.reader, self.writer = await asyncio.open_connection(
+                self.address, self.port
+            )
 
-        # Récupère la position initiale des joueurs
-        recieved_bytes = await self.reader.readline()
-        recieved_data = bytes_to_dict(recieved_bytes)
+            # Récupère la position initiale des joueurs
+            recieved_bytes = await self.reader.readline()
+            recieved_data = bytes_to_dict(recieved_bytes)
 
-        # Met à jour les variable correspondantes
-        self.position.update(recieved_data["guest"]["position"])
-        self.host.position.update(recieved_data["host"]["position"])
-        self.host.moving_intent = recieved_data["host"]["moving_intent"]
-        self.host.direction = recieved_data["host"]["direction"]
+            # Met à jour les variable correspondantes
+            self.position.update(recieved_data["guest"]["position"])
+            self.host.position.update(recieved_data["host"]["position"])
+            self.host.moving_intent = recieved_data["host"]["moving_intent"]
+            self.host.direction = recieved_data["host"]["direction"]
 
-        self.map = Map(
-            recieved_data["map"]["nb_chunks"],
-            recieved_data["map"]["chunk_size"],
-            recieved_data["map"]["octaves"],
-            (32, 32),
-            r"Ressources\Pixel Art Top Down - Basic v1.2.3",
-            self.screen,
-            recieved_data["map"]["seed"],
-        )
+            self.map = Map(
+                recieved_data["map"]["nb_chunks"],
+                recieved_data["map"]["chunk_size"],
+                recieved_data["map"]["octaves"],
+                (32, 32),
+                r"Ressources\Pixel Art Top Down - Basic v1.2.3",
+                self.screen,
+                recieved_data["map"]["seed"],
+            )
+
+            self.writer.write(dict_to_bytes({"close": False}))
+        except ConnectionRefusedError:
+            self.close = True
 
         self.loaded = True
 
@@ -557,7 +566,8 @@ class GuestController(PlayerControllerBase):
         """Fonction de lancement du réseau"""
 
         await self.connect()
-        await self.handle_host()
+        if not self.close:
+            await self.handle_host()
 
     def run(self):
         """Lance le serveur en se connectant à l'hôte puis

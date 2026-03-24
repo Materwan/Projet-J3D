@@ -70,8 +70,18 @@ class Game:
             )
             while not self.player_controller.loaded:
                 time.sleep(0.2)
-            self.map = self.player_controller.map  # recupere la map de client
-            self.moteur.map = self.map  # donner à moteur pour Client-side prediction
+            if self.player_controller.close:
+                self.manager.state = self.manager.states["MENU_MULTI"]
+            else:
+                self.map = self.player_controller.map  # recupere la map de client
+                self.moteur.map = (
+                    self.map
+                )  # donner à moteur pour Client-side prediction
+
+                self.player_controller.keybinds = self.keybinds
+                self.camera.map_width = self.map.size[0] * self.map.tile_size[0]
+                self.camera.map_height = self.map.size[1] * self.map.tile_size[1]
+                self.player_controller.set_camera(self.camera)
         else:
             self.map = Map(
                 (8, 8),
@@ -91,10 +101,10 @@ class Game:
                     self.screen, self.moteur, self.map, (4000, 4096)
                 )
 
-        self.player_controller.keybinds = self.keybinds
-        self.camera.map_width = self.map.size[0] * self.map.tile_size[0]
-        self.camera.map_height = self.map.size[1] * self.map.tile_size[1]
-        self.player_controller.set_camera(self.camera)
+            self.player_controller.keybinds = self.keybinds
+            self.camera.map_width = self.map.size[0] * self.map.tile_size[0]
+            self.camera.map_height = self.map.size[1] * self.map.tile_size[1]
+            self.player_controller.set_camera(self.camera)
 
     def event(self, events: list[pygame.event.Event]) -> bool:
         """Gére les entré de l'utilisateur."""
@@ -130,7 +140,7 @@ class Game:
         self.camera.update(self.player_controller.hitbox)
 
         if self.player_controller.close:
-            self.manager.running = False
+            self.manager.state = self.manager.states["MENU_P"]
 
     def display(self):
         """Affiche tout les éléments."""
