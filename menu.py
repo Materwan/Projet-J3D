@@ -57,6 +57,12 @@ class Menu:
         }
         self.key = {"up": False, "down": False, "left": False, "right": False}
         self.manager.running = False
+        self.blackscreen = p.Surface(self.WINDOWS, p.SRCALPHA)
+        p.draw.rect(
+            self.blackscreen,
+            (10, 10, 22, 100),
+            (0, 0, self.WINDOWS[0], self.WINDOWS[1]),
+        )
         self.retour = a.Button(
             EMPTY_BUTTON,
             self.screen,
@@ -416,14 +422,16 @@ class Setting_Menu(Menu):
                         )
 
     def update(self):
-        pass
+        if self.manager.states["GAME"].playing_mode != "solo":
+            self.manager.states["GAME"].update()
 
     def display(self):
         if self.menu_appel == "MENU_P":
             # Euhhhhh Non
             self.screen.blit(self.bg_img, self.bg_img_coord)
         else:
-            self.screen.blit(self.surface_copie, (0, 0))
+            self.screen.blit(self.blackscreen, (0, 0))
+            # self.screen.blit(self.surface_copie, (0, 0))
         self.pagedisplay()
         self.textdisplay()
 
