@@ -273,7 +273,9 @@ class HostController(PlayerControllerBase):
         sock.settimeout(0.5)
 
         message = bytes(
-            json.dumps({"Game name": "My game", "Port": 8888}) + "\n", encoding="utf-8"
+            json.dumps({"Game name": "My game", "Port": 8888, "last": time.time()})
+            + "\n",
+            encoding="utf-8",
         )  # définit le message à envoyer
 
         while self.udp_run:  # tourne tant que le serveur n'es pas fermé
@@ -337,10 +339,12 @@ class HostController(PlayerControllerBase):
         # Défini les variables à envoyer
         to_send_data = get_to_send_data()
         to_send_data["map"] = {
-            "size": self.map.size.tolist(),
+            "nb_chunks": self.map.nb_chunks.tolist(),
+            "chunk_size": self.map.chunk_size_tile.tolist(),
             "octaves": self.map.octaves,
             "seed": self.map.seed,
         }
+        print(to_send_data)
         writer.write(dict_to_bytes(to_send_data))
         await writer.drain()
 
@@ -538,12 +542,13 @@ class GuestController(PlayerControllerBase):
         self.host.direction = recieved_data["host"]["direction"]
 
         self.map = Map(
-            recieved_data["map"]["size"],
+            recieved_data["map"]["nb_chunks"],
+            recieved_data["map"]["chunk_size"],
             recieved_data["map"]["octaves"],
             (32, 32),
-            (32, 32),
-            recieved_data["map"]["seed"],
+            r"Ressources\Pixel Art Top Down - Basic v1.2.3",
             self.screen,
+            recieved_data["map"]["seed"],
         )
 
         self.loaded = True
@@ -667,6 +672,7 @@ class GuestController(PlayerControllerBase):
             self.host.animation.trigger_attack()
             self.host.attaque = False
 
+        print(self.position)
         # gestion animation
         self.animation.update(self.moving_intent, self.direction)
         self.host.animation.update(self.host.moving_intent, self.host.direction)
