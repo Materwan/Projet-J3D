@@ -12,6 +12,10 @@ class Card:
     
     def __str__(self):
         return f"({CARD_TYPES[self.type]}) {self.name}"
+    
+    def display(self):
+        self.artwork = pygame.transform.scale(self.artwork, self.scale)
+        self.screen.blit(self.artwork, self.position)
       
 
 class Hand:
@@ -37,10 +41,13 @@ class Hand:
 
 
 class Deck:
-    def __init__(self, cards: list[Card]):
+    def __init__(self, screen: pygame.surface.Surface, position: Tuple[int,int], cards: list[Card],  artwork = "Ressources/Cartes/PlaceHolderDeck.png"):
+        self.screen = screen
+        self.position = (position)
         self.cards = cards
         self.size = len(self.cards)
-        self. artwork
+        self.artwork = pygame.image.load(artwork)
+        self.scale = (35*5, 47*5)
           
     def add2Deck(self, cards: Card):
         self.cards.append(cards)
@@ -61,13 +68,18 @@ class Deck:
         return printer
     
     def display(self):
-        self.artwork = 
+        self.artwork = pygame.transform.scale(self.artwork, self.scale)
+        self.screen.blit(self.artwork, self.position)
 
 
 class DiscardPile:
-    def __init__(self):
+    def __init__(self, screen: pygame.surface.Surface, position: Tuple[int,int],  artwork = "Ressources/Cartes/PlaceHolderDiscard.png"):
+        self.screen = screen
+        self.position = (position)
         self.cards = []
         self.size = 0
+        self.artwork = pygame.image.load(artwork)
+        self.scale = (35*5, 47*5)
 
     def add2Discard(self, card: Card):
         self.cards.append(card)
@@ -76,7 +88,7 @@ class DiscardPile:
     def rmFromDiscard(self, index: int):
         if 0 < index < self.size:
             self.size =-1
-            return self.card.pop[index]
+            return self.card.pop(index)
     
     def __str__(self):
         printer = "[ "
@@ -84,6 +96,10 @@ class DiscardPile:
             printer += f"{str(self.cards[i])}, "
         printer += "]"
         return printer
+    
+    def display(self):
+        self.artwork = pygame.transform.scale(self.artwork, self.scale)
+        self.screen.blit(self.artwork, self.position)
 
 
 
@@ -116,11 +132,6 @@ class PlayerCard:
         else:
             self.hoverTime = -1
             self.biggerpicture = False
-
-
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
     
     def display(self):
         self.artwork = pygame.transform.scale(self.artwork, self.scale)
@@ -141,17 +152,31 @@ class PlayerCard:
 
 
 class Game:
+    def __init__(self, pCard: PlayerCard, deck: Deck, discard: DiscardPile):
+        self.screen = screen
+        self.screenSize = self.screen.get_size()
+        self.pCard = pCard
+        self.deck = deck
+        self.discard = discard
+        self.running = True
+
     def display(self):
         self.screen.fill('#603B2A')
-        
-        
+        self.deck.display()
+        self.discard.display()
+        self.pCard.display()
         pygame.display.flip()
+    
+    def event(self):
+        self.pCard.event()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
     
     def run(self):
         while self.running:
-            self.event()
             self.display()
-   
+            self.event()
 
 
 if __name__ == "__main__":
@@ -160,13 +185,14 @@ if __name__ == "__main__":
     screen = pygame.display.set_mode((1920, 1080))
     running = True
     screenSize = screen.get_size()
-    x_pos = (screenSize[0] - (35*5))/ 2
-    y_pos = (screenSize[1] - (47*5))/ 2
-    test = PlayerCard(screen, (x_pos, y_pos))
-    deck = Deck([Card(2, "Fireball"), Card(3, "Scythe"), Card(2, "Heal"), Card(2, "tornado"), Card(3, "A WII FUCKING GUN"), Card(3, "brick"), Card(3, "Mana Crown")])
+
+    player = PlayerCard(screen, ((screenSize[0] - (35*5))/2, (screenSize[1] - (47*5))/2))
+
+    deck = Deck(screen, ((screenSize[0] - (35*5))*6/7, (screenSize[1] - (47*5))*6/7), [Card(2, "Fireball"), Card(3, "Scythe"), Card(2, "Heal"), Card(2, "tornado"), Card(3, "A WII FUCKING GUN"), Card(3, "brick"), Card(3, "Mana Crown")])
+    
+    discard = DiscardPile(screen, ((screenSize[0] - (35*5))*26/35,(screenSize[1] - (47*5))*6/7))   
+    
     hand = Hand()
-    deck.shuffle()
-    hand.add2Hand(deck.rmFromTopDeck())
-    print(hand)
-    print(deck)
+
+    test = Game(player, deck, discard)
     test.run()
