@@ -672,7 +672,6 @@ class GuestController(PlayerControllerBase):
             self.host.animation.trigger_attack()
             self.host.attaque = False
 
-        print(self.position)
         # gestion animation
         self.animation.update(self.moving_intent, self.direction)
         self.host.animation.update(self.host.moving_intent, self.host.direction)
