@@ -1,6 +1,7 @@
 import pygame
 from random import uniform, randint
-from constants import SCREEN_WIDTH, SCREEN_HEIGHT
+from main import TAILLE_ECRAN
+
 
 CACHED_IMAGES = {}
 
@@ -66,7 +67,7 @@ def spawn_local_particle(group, pos, sprite_path, speed_range=(80, 150), rot=200
 
 # Particule qui peut apparaître n'importe où à l'écran(sans zone à définir) et avec des paramètres aléatoires
 def spawn_global_particle(group, sprite_path, speed_range=(50, 100), rot=200, angles=(0, 360), chaos=0.1, shrink_range=(40, 90), size=30):
-    pos = (randint(0, SCREEN_WIDTH), randint(0, SCREEN_HEIGHT))
+    pos = (randint(0, TAILLE_ECRAN[0]), randint(0, TAILLE_ECRAN[1]))
     img = get_image(sprite_path)
     
     vitesse = uniform(speed_range[0], speed_range[1])

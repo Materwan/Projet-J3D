@@ -9,8 +9,12 @@ class Camera:
         self.height = height
         self.map_width = map_width
         self.map_height = map_height
+        
+        # variables pour le tremblement de caméra 
         self.shake_timer = 0
         self.shake_intensity = 0
+        self.offset_x = 0
+        self.offset_y = 0
 
     def start_shake(self, intensity, duration):
         # Démarre / initialise un effet de tremblement de la caméra
@@ -31,11 +35,11 @@ class Camera:
 
             map_obj.screen.blit(map_obj.loaded_chunks[(x, y)], (screen_x, screen_y))
 
-    def apply(self, entity):
+    def apply(self, entity_rect):
         """
         Argument : Rect
         """
-        return entity.move(self.camera.topleft)
+        return entity_rect.move(self.camera.x + self.offset_x, self.camera.y + self.offset_y)
 
     def update(self, target):
         target: pygame.Rect
@@ -51,9 +55,13 @@ class Camera:
         # Tremblement de caméra
         # On applique le décalage directement sur self.camera.x/y
         if self.shake_timer > 0:
-            self.camera.x += random.randint(-self.shake_intensity, self.shake_intensity)
-            self.camera.y += random.randint(-self.shake_intensity, self.shake_intensity)
+            self.offset_x += random.randint(-self.shake_intensity, self.shake_intensity)
+            self.offset_y += random.randint(-self.shake_intensity, self.shake_intensity)
             self.shake_timer -= 1
+            self.shake_intensity *= 0.9 
+        else : 
+            self.offset_x = 0
+            self.offset_y = 0
 
         # 4. Limites du monde (Clamping)
         # On s'assure que même avec le tremblement, on ne sort pas de la map. BTW erwan faudra renseigner les dimensions de la map dans le constructeur de la caméra pour que ca marche
