@@ -6,6 +6,7 @@ import heapq
 import math
 import time
 from map import Map
+from camera_system import Camera
 
 
 def create_node(
@@ -107,35 +108,56 @@ def a_star(
 class Ennemi:
 
     def __init__(
-        self, screen: pygame.Surface, position: List[int], speed: int, map: Map
+        self,
+        screen: pygame.Surface,
+        position: List[int],
+        speed: int,
+        chase_range: float,
+        map: Map,
     ):
         self.screen = screen
-        self.position = pygame.Vector2(position)
+        self.position = np.array(position)
+        self.rect = pygame.Rect(position[0], position[1], 32, 32)
         self.speed = speed
-        self.last_objectif = None
-        self.last_vect = None
+        self.chase_range = chase_range
         self.map = map
+        self.path = []
+        self.direction = np.array((0, 0))
+        self.last_calc = 0
 
-    def update(self, player_pos: pygame.Vector2):
+    def update(self, players_pos: Tuple[pygame.Vector2]):
 
-        start = (
-            int(self.position.x // self.map.tile_size[0]),
-            int(self.position.y // self.map.tile_size[1]),
+        players_positions = [
+            np.array((vec.x, vec.y), dtype=np.int32) // self.map.tile_size
+            for vec in players_pos
+        ]
+        tile_position = (
+            np.array((self.position[0], self.position[1])) // self.map.tile_size
         )
-        end = (
-            int(player_pos.x // self.map.tile_size[0]),
-            int(player_pos.y // self.map.tile_size[1]),
-        )
-        path = a_star(self.map, start, end)
+        distances = [heuristic(tile_position, x) for x in players_positions]
+        closest = min(distances)
+        if closest < self.chase_range:
+            if time.time() - self.last_calc > closest * 0.02:
+                player = players_positions[distances.index(closest)]
+                player = (player[0], player[1])
+                position = (tile_position[0], tile_position[1])
+                self.path = a_star(self.map, position, player)
+                if len(self.path) > 1:
+                    self.direction = tile_position - np.array(self.path[1])
+                self.last_calc = time.time()
+            self.position -= self.direction * self.speed
+            self.rect.move_ip(-self.direction * self.speed)
 
-        return path
+        return self.path
 
-    def display(self):
+    def display(self, camera: Camera):
+
+        screen_pos = pygame.Vector2(camera.apply(self.rect).center)
 
         pygame.draw.rect(
             self.screen,
             (255, 0, 0),
-            pygame.Rect(self.position[0], self.position[1], 50, 50),
+            pygame.Rect(screen_pos.x, screen_pos.y, 32, 32),
         )
 
 
@@ -145,7 +167,7 @@ if __name__ == "__main__":
 
     screen = pygame.display.set_mode((8192 // 8, 8192 // 8))
     map = Map(
-        (8, 8),
+        (4, 4),
         (32, 32),
         (8, 8),
         (32, 32),
@@ -153,8 +175,6 @@ if __name__ == "__main__":
         screen,
         0,
     )
-
-    np.savetxt("save.txt", map.chunks[(4, 4)].collision)
 
     t = {
         (x, y): pygame.transform.scale_by(map.chunks[(x, y)].render(), (1 / 8))
@@ -169,7 +189,7 @@ if __name__ == "__main__":
             self.screen = screen
             self.pos = [0, 0]
             self.clock = pygame.time.Clock()
-            self.ennemi = Ennemi(screen, (4096, 4096), 1, map)
+            self.ennemi = Ennemi(screen, (2048, 2048), 5, 50, map)
             self.t = time.time()
             self.path = []
 
@@ -185,8 +205,9 @@ if __name__ == "__main__":
         def update(self):
 
             self.t = time.time()
-            self.path = self.ennemi.update(pygame.Vector2(self.mouse_pos) * 8)
-            print(time.time() - self.t)
+            self.path = self.ennemi.update((pygame.Vector2(self.mouse_pos) * 8,))
+            # print(time.time() - self.t)
+            # print(self.path)
 
         def display(self):
 
@@ -204,6 +225,7 @@ if __name__ == "__main__":
                     (self.path[i - 1][0] * 4 + 2, self.path[i - 1][1] * 4 + 2),
                     (self.path[i][0] * 4 + 2, self.path[i][1] * 4 + 2),
                 )
+            self.ennemi.display()
             pygame.display.flip()
 
         def run(self):

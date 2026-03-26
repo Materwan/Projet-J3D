@@ -5,6 +5,7 @@ from map import Map
 import time
 from camera_system import Camera
 from inventory import Item, Inventaire, InventaireUI, InventaireManager
+from ennemis import Ennemi
 
 
 class Game:
@@ -105,6 +106,8 @@ class Game:
             self.camera.map_width = self.map.size[0] * self.map.tile_size[0]
             self.camera.map_height = self.map.size[1] * self.map.tile_size[1]
             self.player_controller.set_camera(self.camera)
+        
+        self.ennemi = Ennemi(self.screen, (3500, 3500), 2, 32, self.map)
 
     def event(self, events: list[pygame.event.Event]) -> bool:
         """Gére les entré de l'utilisateur."""
@@ -141,11 +144,14 @@ class Game:
 
         if self.player_controller.close:
             self.manager.state = self.manager.states["MENU_P"]
+        
+        self.ennemi.update((self.player_controller.position,))
 
     def display(self):
         """Affiche tout les éléments."""
         self.screen.fill((100, 100, 100))
         self.camera.display_map(self.map)
         self.player_controller.display()
+        self.ennemi.display(self.camera)
         # affiche l'inventaire
         self.drag_mgr.draw(pygame.mouse.get_pos())

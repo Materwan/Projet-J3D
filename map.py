@@ -1,5 +1,6 @@
 from typing import Tuple, List, Dict
 from collections.abc import Callable
+from itertools import combinations
 import numpy as np
 from perlin_numpy import generate_perlin_noise_2d
 import matplotlib.pyplot as plt
@@ -8,6 +9,7 @@ import pygame
 import heapq
 from os import path
 import json
+import time
 
 
 REPLACE_VALUE = 0.3
@@ -287,13 +289,15 @@ class Chunk:
             (self.chunk_size + 5) * self.tile_size, pygame.SRCALPHA
         )
 
-        for x in range(self.chunk_size[0]):
-            for y in range(self.chunk_size[1]):
-                if self.ground[x][y]:
-                    ground_sur.blit(
-                        self.asset["ground"]["image"],
-                        (x * self.tile_size[0], y * self.tile_size[1]),
-                    )
+        blit_sequence = [
+            (
+                self.asset["ground"]["image"],
+                (x * self.tile_size[0], y * self.tile_size[1]),
+            )
+            for x, y in zip(*np.where(self.ground))
+        ]
+
+        ground_sur.blits(blit_sequence)
 
         objects = sorted(self.object, key=lambda x: x["z"])
 
@@ -358,7 +362,7 @@ class Map:
 
         self.add_object_pos("place", 128, 128, 3)
         self.structures.append((128, 128))
-        self.add_structure("place", nb=8, z=3, distance=50)
+        self.add_structure("place", nb=3, z=3, distance=10)
         self.generate_paths(0.3, prop=1)
         self.add_road(0, 2)
         self.add_objects("grass", prob=0.1, z=-1, occupe=True)
@@ -547,14 +551,13 @@ class Map:
 
         while count < nb:
 
-            distances = [
-                calc_distance((xs[i], ys[i]), struct) > distance
-                for struct in self.structures
-            ]
-            if all(distances):
-                if self.add_object_pos(obj_type, xs[i], ys[i], z, True):
-                    count += 1
-                    self.structures.append((xs[i], ys[i]))
+            if self.structures:
+                struct = np.array(self.structures)
+                diff = struct - np.array([xs[i], ys[i]])
+                if np.all(np.hypot(diff[:, 0], diff[:, 1]) > distance):
+                    if self.add_object_pos(obj_type, xs[i], ys[i], z, True):
+                        count += 1
+                        self.structures.append((xs[i], ys[i]))
 
             i += 1
 
@@ -581,19 +584,16 @@ class Map:
             assert 0 <= prop <= 1
             nb = int((nb_struct * (nb_struct - 1)) / 2 * prop)
 
-        choices = {
-            i * nb_struct + j: (self.structures[i], self.structures[j])
-            for i in range(nb_struct)
-            for j in range(i + 1, nb_struct)
-        }
+        all_pairs = list(combinations(range(nb_struct), 2))
         choosen = np.random.choice(
-            list(choices.keys()),
+            len(all_pairs),
             nb,
             replace=False,
-        ).tolist()
+        )
 
-        for key in set(choosen):
-            start, end = choices[key]
+        for i in choosen:
+            start = self.structures[all_pairs[i][0]]
+            end = self.structures[all_pairs[i][1]]
             path = a_star(self.road_map, start, end, randomness)
 
             for x, y in path:
@@ -605,12 +605,16 @@ class Map:
         tiles = np.where(self.road_map == REPLACE_VALUE)
         choices = [i for i in range(len(self.asset["pave"]))]
 
-        for x, y in zip(*tiles):
+        n = len(tiles[0])
+        all_dx = np.random.randint(-1, 2, size=(n, nb_tiles))
+        all_dy = np.random.randint(-1, 2, size=(n, nb_tiles))
 
-            for _ in range(nb_tiles):
+        for i, (x, y) in enumerate(zip(*tiles)):
 
-                dx = np.random.randint(-1, 2)
-                dy = np.random.randint(-1, 2)
+            for j in range(nb_tiles):
+
+                dx = all_dx[i][j]
+                dy = all_dy[i][j]
 
                 if not self.is_occupied(x, y, dx, dy):
 
@@ -651,15 +655,15 @@ class Map:
                 ):
                     self.loaded_chunks[(x, y)] = self.chunks[(x, y)].render()
 
-        del_keys = []
-        for x, y in self.loaded_chunks.keys():
-            if not (
-                chunk[0] - 1 <= x <= chunk[0] + 1 and chunk[1] - 1 <= y <= chunk[1] + 1
-            ):
-                del_keys.append((x, y))
-
-        for key in del_keys:
-            del self.loaded_chunks[key]
+        valid = {
+            (x, y)
+            for x in range(chunk[0] - 1, chunk[0] + 2)
+            for y in range(chunk[1] - 1, chunk[1] + 2)
+            if 0 <= x < self.nb_chunks[0] and 0 <= y < self.nb_chunks[1]
+        }
+        for key in list(self.loaded_chunks):
+            if key not in valid:
+                del self.loaded_chunks[key]
 
     def _display(self):
 
@@ -688,7 +692,15 @@ if __name__ == "__main__":
             self.screen_size = pygame.Vector2(self.screen.get_size())
             self.abs_pos = pygame.Vector2([0, 0])
             self.clock = pygame.time.Clock()
-            self.map = Map((8, 8), (32, 32), (8, 8), (32, 32), self.screen, 0)
+            self.map = Map(
+                (8, 8),
+                (32, 32),
+                (8, 8),
+                (32, 32),
+                r"Ressources\Pixel Art Top Down - Basic v1.2.3",
+                self.screen,
+                0,
+            )
 
         def event(self):
 
@@ -749,11 +761,11 @@ if __name__ == "__main__":
 
                 self.clock.tick(60)
 
-    # loop = Loop(screen)
+    loop = Loop(screen)
 
-    # loop.map._display()
+    loop.map._display()
 
-    # loop.run()
+    loop.run()
 
     pygame.quit()
 
