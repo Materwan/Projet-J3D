@@ -1,6 +1,7 @@
 import pygame
 from typing import Tuple, List, Dict
 import os
+import psutil
 
 
 def load_image(
@@ -14,6 +15,92 @@ def load_image(
     return image
 
 
+def display_directory(directory: str, indent: int | None = 0):
+
+    for dir in os.listdir(directory):
+        print("| "*indent, dir, sep="")
+        if os.path.isdir(os.path.join(directory, dir)):
+            display_directory(os.path.join(directory, dir), indent+1)
+
+
+def load_animations(directory: str, size: Tuple[int, int] | None):
+
+    res_dict = {}
+    res_list = []
+
+    for dir in os.listdir(directory):
+        new_directory = os.path.join(directory, dir)
+        if os.path.isdir(new_directory):
+            res_dict[dir] = load_animations(new_directory, size)
+        else:
+            res_list.append(load_image(directory, dir, size))
+    
+    if len(res_dict) > 0 and len(res_list) > 0:
+        raise Exception("Dossier pas au bon format, va voir le drive")
+    elif len(res_dict) > 0:
+        return res_dict
+    elif len(res_list) > 0:
+        return res_list
+    else:
+        raise Exception("Dossier vide")
+
+
+def combine_back_front(back_list, front_list, background_opacity: int | None = 128):
+    """Combine deux listes de Surfaces (back et front) en une liste de Surfaces."""
+    if len(back_list) != len(front_list):
+        raise ValueError("back et front n'ont pas le même nombre d'images")
+
+    combined = []
+    for back_surf, front_surf in zip(back_list, front_list):
+        if back_surf.get_size() != front_surf.get_size():
+            raise ValueError("back et front n'ont pas la même taille")
+
+        # On crée une copie de back pour ne pas le modifier in-place
+        base = back_surf.copy()
+        base.fill((255, 255, 255, background_opacity), None, pygame.BLEND_RGBA_MULT)
+        base.blit(front_surf, (0, 0))
+        combined.append(base)
+
+    return combined
+
+
+def apply_back_front_exception(anim_dict, background_opacity: int | None = 128):
+    """
+    Parcourt récursivement le dict d'animations.
+    Si un niveau contient les clés 'back' et 'front', 
+    on remplace ce dict par la liste des images combinées.
+    """
+    # Si c'est une liste, rien à faire
+    if isinstance(anim_dict, list):
+        return anim_dict
+
+    # Sinon c'est un dict
+    if not isinstance(anim_dict, dict):
+        raise TypeError("Structure inattendue dans le dictionnaire d'animations")
+
+    # Si on a exactement 'back' et 'front'
+    keys = set(anim_dict.keys())
+    if keys == {"back", "front"}:
+        back_val = apply_back_front_exception(anim_dict["back"], background_opacity)
+        front_val = apply_back_front_exception(anim_dict["front"], background_opacity)
+        print(back_val, front_val)
+
+        if not isinstance(back_val, list) or not isinstance(front_val, list):
+            raise TypeError("'back' et 'front' doivent contenir des listes d'images")
+
+        return combine_back_front(back_val, front_val, background_opacity)
+
+    # Sinon, on descend récursivement dans les sous-dicts
+    new_dict = {}
+    for key, value in anim_dict.items():
+        if isinstance(value, (dict, list)):
+            new_dict[key] = apply_back_front_exception(value)
+        else:
+            new_dict[key] = value
+
+    return new_dict
+
+'''
 def load_run_animation(run_directory: str, size: Tuple | List | None = None) -> Dict:
 
     animations = {
@@ -95,7 +182,7 @@ def create_player_animation(
 ) -> Dict[str, pygame.surface.Surface]:
     """Retourne un dictionnaire d'animations pour le joueur :
     {
-        "run":    { "right": [...], "left": [...], "up": [...], "down": [...] },
+        "run":    { "right": [...], "left": [...] },
         "idle":   { "right": [...], "left": [...] },
         "attack": { "right": [...], "left": [...] }
     }
@@ -123,17 +210,19 @@ def create_player_animation(
     animations["attack"] = load_attack_animation(attack_directory, size)
 
     return animations
-
+'''
 
 class AnimationController:
 
     def __init__(
         self,
-        animations: Dict[str, Dict[str, List[pygame.surface.Surface]]],
+        animation_directory: str,
+        size: Tuple[int, int] | None,
         screen: pygame.surface.Surface,
     ):
         # Load animations
-        self.animations = animations
+        self.animations = load_animations(animation_directory, size)
+        self.animations = apply_back_front_exception(self.animations)
         self.screen = screen
         self.current_state = "idle"
         self.current_dir = "right"
@@ -143,55 +232,37 @@ class AnimationController:
         ].get_size()
         self.length = len(self.animations[self.current_state][self.current_dir])
 
-        self.attacking = False
-        self.attack_length = 0
-
     def trigger_attack(self):
         """Déclenche l'animation d'attaque (une seule fois, non interruptible)."""
-        if not self.attacking:
-            self.attacking = True
+        if not self.current_state == "attack":
+            self.current_state = "attack"
             self.frame_index = 0
-            self.attack_length = len(self.animations["attack"][self.current_dir])
+            self.length = len(self.animations[self.current_state][self.current_dir])
 
-    def update(self, running: str, direction: str):
+    def update(self, state: str, direction: str):
         """Change state and direction if neccesary, otherwise, update frame index"""
 
-        if self.attacking:
-            self.frame_index += 2
-            # Fin de l'animation d'attaque
-            if self.frame_index >= self.attack_length * 10:
-                self.attacking = False
-                self.frame_index = 0
-                self.length = len(self.animations[self.current_state][self.current_dir])
-        else:
-            new_state = "run" if running else "idle"
-            if new_state != self.current_state or direction != self.current_dir:
+        if not self.current_state == "attack" or self.frame_index + 1 >= self.length * 10:
+
+            if state != self.current_state or direction != self.current_dir:
                 # Change state and direction
-                self.current_state = new_state
+                self.current_state = state
                 self.current_dir = direction
                 # Reset frame index and number of images
                 self.frame_index = 0
                 self.length = len(self.animations[self.current_state][self.current_dir])
-            else:
-                # Update frame index
-                self.frame_index = (self.frame_index + 1) % (self.length * 10)
+
+        # Update frame index
+        self.frame_index = (self.frame_index + 1) % (self.length * 10)
 
     def display(self, position: Tuple | List | pygame.Vector2):
         """Display animation"""
-        if self.attacking:
-            self.screen.blit(
-                self.animations["attack"][self.current_dir][
-                    self.frame_index // 10 % self.attack_length
-                ],
-                position,
-            )
-        else:
-            self.screen.blit(
-                self.animations[self.current_state][self.current_dir][
-                    self.frame_index // 10 % self.length
-                ],
-                position,
-            )
+        self.screen.blit(
+            self.animations[self.current_state][self.current_dir][
+                self.frame_index // 10 % self.length
+            ],
+            position,
+        )
 
 
 class Button:
@@ -266,89 +337,11 @@ class Button:
 
 
 if __name__ == "__main__":
-    pygame.init()
 
-    screen = pygame.display.set_mode((600, 600))
+    screen = pygame.display.set_mode((10, 10))
+    
+    display_directory(r"Ressources\Animations\Ennemis\ennemy_1")
 
-    class Game:
+    animations = load_animations(r"Ressources\Animations\Ennemis\ennemy_1")
 
-        def __init__(self, screen: pygame.surface.Surface):
-            self.running = True
-            animations = create_player_animation(
-                "Projet-J3D\Animations\Idle_Animations",
-                "Projet-J3D\Animations\Run_Animations",
-                (100, 100),
-            )
-            self.animation_controller = AnimationController(animations, screen)
-            self.clock = pygame.time.Clock()
-            self.button = Button(
-                r"Projet-J3D\Animations\UI\PLAY.png", screen, (300, 300), (200, 200)
-            )
-            self.screen = screen
-            self.hover = False
-            self.clicked = False
-            self.pos = [0, 0]
-            self.direction = "right"
-            self.dico = {
-                (1, 0): "right",
-                (-1, 0): "left",
-                (0, 1): "down",
-                (0, -1): "up",
-            }
-            self.velocity = [0, 0]
-
-        def event(self):
-            hover = False
-            clicked = False
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    self.running = False
-
-                mouse_pos = pygame.mouse.get_pos()
-                if 200 < mouse_pos[0] < 400 and 200 < mouse_pos[1] < 400:
-                    hover = True
-                    if event.type == pygame.MOUSEBUTTONDOWN:
-                        if event.button == pygame.BUTTON_LEFT:
-                            clicked = True
-                self.button.change_state(hover, clicked)
-
-            keys = pygame.key.get_pressed()
-            # gestion de la vélocité en regardant les touches pressées
-            self.velocity[0] = int(keys[pygame.K_RIGHT]) - int(
-                keys[pygame.K_LEFT]
-            )  # vaut soit 0, 1 ou -1 pour la vélocité en x
-            self.velocity[1] = int(keys[pygame.K_DOWN]) - int(
-                keys[pygame.K_UP]
-            )  # vaut soit 0, 1 ou -1 pour la vélocité en y
-
-        def update(self):
-            if (self.velocity[0], self.velocity[1]) in self.dico:
-                self.direction = self.dico[(self.velocity[0], self.velocity[1])]
-            if self.velocity == [0, 0]:
-                self.direction = "right" if self.direction == "up" else self.direction
-                self.direction = "left" if self.direction == "down" else self.direction
-                self.animation_controller.update("idle", self.direction)
-            else:
-                self.animation_controller.update("run", self.direction)
-            self.pos[0] += self.velocity[0] * 2
-            self.pos[1] += self.velocity[1] * 2
-
-        def display(self):
-            self.screen.fill((255, 255, 255))
-            self.animation_controller.display(self.pos)
-            self.button.display()
-            pygame.display.flip()
-
-        def run(self):
-
-            while self.running == True:
-
-                self.event()
-                self.update()
-                self.display()
-
-                self.clock.tick(60)
-
-    Game(screen).run()
-
-    pygame.quit()
+    print(apply_back_front_exception(animations))

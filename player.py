@@ -2,7 +2,7 @@ import pygame
 from moteur import Moteur
 from map import Map
 from camera_system import Camera
-from animations import AnimationController, create_player_animation
+from animations import AnimationController
 from typing import Tuple, Dict
 import time
 import asyncio
@@ -73,13 +73,7 @@ class PlayerControllerBase:
         self.show_hitbox = False  # pour F2
 
         # Initialise les animations
-        animation_images = create_player_animation(
-            r"Ressources\Animations\Idle_Animations",
-            r"Ressources\Animations\runAnimation",
-            r"Ressources\Animations\attack",
-            (100, 100),
-        )
-        self.animation = AnimationController(animation_images, self.screen)
+        self.animation = AnimationController(r"Ressources\Animations\Player", (100, 100), self.screen)
         self.im_size = pygame.Vector2(self.animation.im_size)
 
         # Initialise les données nécessaires pour un joueur
@@ -193,14 +187,15 @@ class SoloPlayerController(PlayerControllerBase):
 
             super().update()
 
+        state = "run" if self.moving_intent else "idle"
         if self.attaque:
-            self.animation.trigger_attack()
+            state = "attack"
             self.attaque_rect = self.moteur.create_rect_attaque(
                 self.position, self.direction
             )
             self.attaque = False  # consommé, on attend le prochain appui
 
-        self.animation.update(self.moving_intent, self.direction)
+        self.animation.update(state, self.direction)
 
     def display(self):
 

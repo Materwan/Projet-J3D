@@ -107,7 +107,7 @@ class Game:
             self.camera.map_height = self.map.size[1] * self.map.tile_size[1]
             self.player_controller.set_camera(self.camera)
         
-        self.ennemi = Ennemi(self.screen, (3500, 3500), 2, 32, self.map)
+        self.ennemi = Ennemi(self.screen, (3500, 3500), 1, 32, self.map)
 
     def event(self, events: list[pygame.event.Event]) -> bool:
         """Gére les entré de l'utilisateur."""
