@@ -6,16 +6,21 @@ import time
 from camera_system import Camera
 from inventory import Item, Inventaire, InventaireUI, InventaireManager
 from ennemis import Ennemi
+from particle_system_2 import spawn_global_particle, spawn_local_particle
+from random import randint 
 
 
 class Game:
     """Classe de gestion du jeu : joueur et carte."""
 
     def __init__(self, screen: pygame.Surface, manager):
+        self.clock = pygame.time.Clock()
         self.screen = screen
         self.manager = manager
         self.playing_mode = None
         self.player_controller = None
+    
+        
         self.keybinds = {
             "up": pygame.K_UP,
             "down": pygame.K_DOWN,
@@ -27,6 +32,11 @@ class Game:
         # on initialise la camera à 0 pour pas que ça plante
         width, height = self.screen.get_size()
         self.camera = Camera(width, height, 0, 0)
+        
+
+        self.particles = pygame.sprite.Group()
+        
+       
 
         self.map = None
         self.map: Map
@@ -50,9 +60,11 @@ class Game:
             is_merchant=False,
         )
         self.drag_mgr = InventaireManager(self.screen, [self.ui_joueur])
+        
 
         # Items de départ :
         self.inv_joueur.add_item(Item.create("Potion Rouge", 3))
+         
 
     def _on_use(self, item: Item, slot, ui: InventaireUI):
         """Appelé au clic droit sur un Consommable."""
@@ -127,7 +139,10 @@ class Game:
                         )
                         self.manager.change_state("MENU_PAUSE")
                 elif event.key == self.keybinds["attack"]:
+                    if self.camera :
+                        self.camera.start_shake(intensity=2, duration=10)
                     self.player_controller.attaque = True
+                    
                 elif event.key == pygame.K_F2:
                     self.player_controller.toggle_hitbox()
                 elif event.key == pygame.K_i:
@@ -138,7 +153,12 @@ class Game:
         self.player_controller.event(pygame.key.get_pressed())
 
     def update(self):
+        
         """Met à jour le jeu."""
+
+        dt = self.clock.tick(60) / 1000.0
+
+
         self.player_controller.update()
         self.camera.update(self.player_controller.hitbox)
 
@@ -146,6 +166,28 @@ class Game:
             self.manager.state = self.manager.states["MENU_P"]
         
         self.ennemi.update((self.player_controller.position,))
+        
+        # effet de particules sur tout l'ecrant (stylé nan ? )
+        
+        if len(self.particles) < 50: # Limite pour les performances
+           
+            # On récupère les coordonnées du monde actuellement à l'écran
+            # On prend une marge de 100 pixels pour que les particules 
+            # n'apparaissent pas "magiquement" sur le bord
+            margin = 100
+            
+            # Le top-left de la caméra est en négatif (ex: -4000), 
+            # on l'inverse pour avoir la position monde
+            visible_world_x = -self.camera.camera.x
+            visible_world_y = -self.camera.camera.y
+            
+            # On définit la zone de spawn
+            spawn_x = randint(int(visible_world_x - margin), 
+                            int(visible_world_x + self.screen.get_width() + margin))
+            spawn_y = randint(int(visible_world_y - margin), 
+                            int(visible_world_y + self.screen.get_height() + margin))
+            spawn_local_particle(self.particles, sprite_path= "Ressources/particles/dust.png", pos = (spawn_x, spawn_y),  size=10, speed_range=(25, 45), chaos= 0.2, shrink_range=(2, 15), rot = 10)
+        self.particles.update(dt)
 
     def display(self):
         """Affiche tout les éléments."""
@@ -153,5 +195,9 @@ class Game:
         self.camera.display_map(self.map)
         self.player_controller.display()
         self.ennemi.display(self.camera)
+        
         # affiche l'inventaire
         self.drag_mgr.draw(pygame.mouse.get_pos())
+        # affiche les particules
+        for sprite in self.particles:
+           self.screen.blit(sprite.image, self.camera.apply(sprite.rect))
