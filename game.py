@@ -16,6 +16,7 @@ class Game:
         self.manager = manager
         self.playing_mode = None
         self.player_controller = None
+        
         self.keybinds = {
             "up": pygame.K_UP,
             "down": pygame.K_DOWN,
@@ -27,6 +28,7 @@ class Game:
         # on initialise la camera à 0 pour pas que ça plante
         width, height = self.screen.get_size()
         self.camera = Camera(width, height, 0, 0)
+       
 
         self.map = None
         self.map: Map
@@ -50,9 +52,11 @@ class Game:
             is_merchant=False,
         )
         self.drag_mgr = InventaireManager(self.screen, [self.ui_joueur])
+        
 
         # Items de départ :
         self.inv_joueur.add_item(Item.create("Potion Rouge", 3))
+         
 
     def _on_use(self, item: Item, slot, ui: InventaireUI):
         """Appelé au clic droit sur un Consommable."""
@@ -127,7 +131,10 @@ class Game:
                         )
                         self.manager.change_state("MENU_PAUSE")
                 elif event.key == self.keybinds["attack"]:
+                    if self.camera :
+                        self.camera.start_shake(intensity=2, duration=10)
                     self.player_controller.attaque = True
+                    
                 elif event.key == pygame.K_F2:
                     self.player_controller.toggle_hitbox()
                 elif event.key == pygame.K_i:

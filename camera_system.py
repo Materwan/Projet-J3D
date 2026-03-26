@@ -30,8 +30,8 @@ class Camera:
             chunk_world_y = y * map_obj.chunk_size_pix[1]
 
             # Ces deux lignes doivent être DANS la boucle (indentation manquante)
-            screen_x = chunk_world_x + self.camera.x
-            screen_y = chunk_world_y + self.camera.y
+            screen_x = chunk_world_x + self.camera.x + self.offset_x
+            screen_y = chunk_world_y + self.camera.y + self.offset_y 
 
             map_obj.screen.blit(map_obj.loaded_chunks[(x, y)], (screen_x, screen_y))
 
@@ -55,8 +55,10 @@ class Camera:
         # Tremblement de caméra
         # On applique le décalage directement sur self.camera.x/y
         if self.shake_timer > 0:
-            self.offset_x += random.randint(-self.shake_intensity, self.shake_intensity)
-            self.offset_y += random.randint(-self.shake_intensity, self.shake_intensity)
+            intensity = int(self.shake_intensity)
+            
+            self.offset_x += random.randint(-intensity, intensity)
+            self.offset_y += random.randint(-intensity, intensity)
             self.shake_timer -= 1
             self.shake_intensity *= 0.9 
         else : 
