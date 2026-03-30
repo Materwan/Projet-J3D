@@ -1,6 +1,5 @@
 import pygame
 import numpy as np
-from tqdm import tqdm
 from typing import List, Tuple, Dict
 import heapq
 import math
@@ -34,20 +33,6 @@ def get_neighbors(grid: Map, pos: Tuple[int, int]) -> List[Tuple[int, int]]:
     moves = [
         (x + dx, y + dy) for dx in [-1, 0, 1] for dy in [-1, 0, 1] if dx != 0 or dy != 0
     ]
-    """for nx, ny in moves:
-        print(0, nx, cols, 0 <= nx < cols)
-        print(0, ny, rows, 0 <= ny < rows)
-        print(
-            int(
-                grid.chunks[
-                    (nx // grid.chunk_size_tile[0], ny // grid.chunk_size_tile[1])
-                ].collision[nx % grid.chunk_size_tile[0]][ny % grid.chunk_size_tile[1]]
-            ),
-            grid.chunks[
-                (nx // grid.chunk_size_tile[0], ny // grid.chunk_size_tile[1])
-            ].collision[nx % grid.chunk_size_tile[0]][ny % grid.chunk_size_tile[1]]
-            == 0,
-        )"""
     return [
         (nx, ny)
         for nx, ny in moves
@@ -117,7 +102,9 @@ class Ennemi:
         map: Map,
     ):
         self.screen = screen
-        self.animation = AnimationController(r"Ressources\Animations\Ennemis\ennemy_1", None, self.screen)
+        self.animation = AnimationController(
+            r"Ressources\Animations\Ennemis\ennemy_1", None, self.screen
+        )
         self.position = np.array(position)
         self.rect = pygame.Rect(position[0], position[1], 32, 32)
         self.speed = speed
@@ -150,11 +137,14 @@ class Ennemi:
                 self.last_calc = time.time()
             self.position += self.velocity * self.speed
             self.rect.move_ip(self.velocity * self.speed)
-            if heuristic(players_pos[distances.index(closest)], self.position) < self.attack_range:
+            if (
+                heuristic(players_pos[distances.index(closest)], self.position)
+                < self.attack_range
+            ):
                 self.attack = True
             else:
                 self.attack = False
-        
+
         state = "run" if (self.velocity[0] != 0 or self.velocity[1] != 0) else "idle"
         if self.velocity[0] < 0:
             self.direction = "left"
@@ -171,7 +161,10 @@ class Ennemi:
         screen_pos = pygame.Vector2(camera.apply(self.rect).center)
 
         self.animation.display(
-            screen_pos - pygame.Vector2(self.animation.im_size[0] // 2, self.animation.im_size[1] - 22)
+            screen_pos
+            - pygame.Vector2(
+                self.animation.im_size[0] // 2, self.animation.im_size[1] - 22
+            )
         )
 
 
