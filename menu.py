@@ -1,6 +1,6 @@
 import pygame as p
 import animations as a
-from typing import List, Dict
+from typing import List, Dict, Tuple
 import threading
 import socket
 import json
@@ -25,26 +25,24 @@ p.mixer.music.load("Ressources/Musics/placeholder.mp3")
 p.mixer.music.play(-1)
 
 
-def create_button_with_text(image, screen, pos, text_str="", scale=1):
-    button = a.Button(image, screen, pos, scale=scale)
-    text = Text("Impact", 30, text_str, (0, 0, 0), screen)
-    coord = (
-        (button.rec.width - text.lenth[0]) // 2 + button.rec.left,
-        (button.rec.height - text.lenth[1]) // 2 + button.rec.top,
-    )
-    return button, [text, coord]
-
-
 class Text:
 
-    def __init__(self, name, size, text, t_color, screen=None, antialias=False):
+    def __init__(
+        self,
+        name: str,
+        size: int,
+        text: str,
+        t_color: Tuple[int, int, int],
+        screen: p.Surface = None,
+        antialias: bool = False,
+    ):
         self.screen = screen
         self.caractere = text
         self.font = p.font.SysFont(name, size)
         self.text = self.font.render(text, antialias, t_color)
         self.lenth = self.text.get_size()
 
-    def draw_text(self, coordonninate):
+    def draw_text(self, coordonninate: Tuple[int, int]) -> None:
         """draw a text"""
         self.screen.blit(self.text, coordonninate)
 
@@ -82,19 +80,21 @@ class Menu:
         )
         # =======================Button End=======================
 
-    def recalculcoord(self, text, button):
+    def recalculcoord(
+        self, text: List | Text | Tuple[int, int], button: a.Button
+    ) -> Tuple[int, int]:
         """recalcul the coordonnee"""
         return (
             (button.rec.width - text[0].lenth[0]) // 2 + button.rec.left,
             (button.rec.height - text[0].lenth[1]) // 2 + button.rec.top,
         )
 
-    def pagedisplay(self):
+    def pagedisplay(self) -> None:
         """draw the page"""
         for elt in self.eltpages:
             elt.display()
 
-    def textdisplay(self):
+    def textdisplay(self) -> None:
         """draw the text"""
         for elt in self.elttexts:
             elt[0].draw_text(elt[1])
@@ -107,7 +107,7 @@ class Principal_Menu(Menu):
         self.manager.running = True
 
         # =======================Button Start=======================
-        self.start = a.Button(
+        self.start, _ = create_button_with_text(
             PLAY_BUTTON,
             self.screen,
             (self.half[0], self.half[1] - 100),
@@ -126,7 +126,7 @@ class Principal_Menu(Menu):
         self.elttexts = []
         self.eltpages = [self.titre, self.start, self.settings, self.quit]
 
-    def event(self, events):
+    def event(self, events: list[p.event.Event]) -> None:
         coord = p.mouse.get_pos()
         for event in events:
             if event.type == p.QUIT:
@@ -154,10 +154,10 @@ class Principal_Menu(Menu):
                 elif self.settings.rec.collidepoint(coord):
                     self.settings.hover = True
 
-    def update(self):
+    def update(self) -> None:
         pass
 
-    def display(self):
+    def display(self) -> None:
         self.screen.blit(self.bg_img, self.bg_img_coord)
         self.textdisplay()
         self.pagedisplay()
@@ -168,7 +168,7 @@ class Principal_Menu(Menu):
 
 class Setting_Menu(Menu):
 
-    def __init__(self, screen, manager, menu_appel="MENU_P"):
+    def __init__(self, screen: p.Surface, manager, menu_appel: str = "MENU_P"):
         super().__init__(screen, manager)
         self.manager.running = True
         self.surface_copie = None
@@ -224,7 +224,7 @@ class Setting_Menu(Menu):
             self.changeattack,
         ]
 
-    def changekey(self, event):
+    def changekey(self, event: p.event.Event) -> None:
         """take the last keybind to replace the old one"""
         for elt in self.key.keys():
             if self.key[elt]:
@@ -235,21 +235,28 @@ class Setting_Menu(Menu):
                     self.keybinds[elt] = event.button
                 self.key[elt] = False
 
-    def checkchangekey(self):
+    def checkchangekey(self) -> bool:
         """look if there is no other keybind that is being change"""
         for elt in self.key.keys():
             if self.key[elt]:
                 return False
         return True
 
-    def interchange(self, changetext, button, direction, caractere, bool):
+    def interchange(
+        self,
+        changetext: List | Text | Tuple[int, int],
+        button: a.Button,
+        direction: str,
+        caractere: str,
+        bool: bool,
+    ) -> None:
         """change the texte of the button that you want to change the keybind"""
         changetext[0].text = changetext[0].font.render(caractere, False, (0, 0, 0))
         changetext[0].lenth = changetext[0].text.get_size()
         changetext[1] = super().recalculcoord(changetext, button)
         self.key[direction] = bool
 
-    def event(self, events):
+    def event(self, events: list[p.event.Event]) -> None:
         coord = p.mouse.get_pos()
         for event in events:
             if event.type == p.QUIT:
@@ -311,7 +318,6 @@ class Setting_Menu(Menu):
                 checkevent = (
                     event.type == p.MOUSEBUTTONDOWN and event.button == p.BUTTON_LEFT
                 )
-                # Les fonctions ca existe !!!!
                 if self.retour.rec.collidepoint(coord):
                     self.retour.hover = True
                     if checkevent:
@@ -347,29 +353,26 @@ class Setting_Menu(Menu):
                             self.attack_t, self.changeattack, "attack", "...", True
                         )
 
-    def update(self):
-        pass
+    def update(self) -> None:
         if (
             self.menu_appel != "MENU_P"
             and self.manager.states["GAME"].playing_mode != "solo"
         ):
             self.manager.states["GAME"].update()
 
-    def display(self):
+    def display(self) -> None:
         if self.menu_appel == "MENU_P":
-            # Euhhhhh Non
             self.screen.blit(self.bg_img, self.bg_img_coord)
         else:
             self.manager.states["GAME"].display()
             self.screen.blit(self.blackscreen, (0, 0))
-            # self.screen.blit(self.surface_copie, (0, 0))
         self.pagedisplay()
         self.textdisplay()
 
 
 class Play_Menu(Menu):
 
-    def __init__(self, screen, manager):
+    def __init__(self, screen: p.Surface, manager):
         super().__init__(screen, manager)
         self.manager.running = True
 
@@ -402,8 +405,7 @@ class Play_Menu(Menu):
         ]
         self.eltpages = [self.retour, self.solo, self.multiplayer, self.joinmultiplayer]
 
-    def event(self, events):
-        # Stp aére ton code
+    def event(self, events: list[p.event.Event]) -> None:
         coord = p.mouse.get_pos()
         for event in events:
             if event.type == p.QUIT:
@@ -451,10 +453,10 @@ class Play_Menu(Menu):
                 elif self.retour.rec.collidepoint(coord):
                     self.retour.hover = True
 
-    def update(self):
+    def update(self) -> None:
         pass
 
-    def display(self):
+    def display(self) -> None:
         self.screen.blit(self.bg_img, self.bg_img_coord)
         self.pagedisplay()
         self.textdisplay()
@@ -468,25 +470,11 @@ class Play_Menu(Menu):
 
 class Join_Multi_Menu(Menu):
 
-    def __init__(self, screen, manager):
+    def __init__(self, screen: p.Surface, manager):
         super().__init__(screen, manager)
         self.serveurs_save = 0
         self.list_button = []
         self.manager.running = True
-        """
-        Un dictionnaire ou les clé sont les addresses ip et les valeurs sont un dictionnaire contennant le nom de la partie et l'addresses :
-        <une ip>: {
-            "Game name": <le nom de la partie>,
-            "Port": <port pour se connecter>
-        }
-        <une autre ip>: {
-            "Game name": <le nom de la partie>,
-            "Port": <port pour se connecter>
-        }
-        .
-        .
-        .
-        """
         self.serveurs = {}
         self.serveurs: Dict[Dict]
         self.upd_prot = threading.Thread(target=self.recieve_udp)
@@ -495,11 +483,11 @@ class Join_Multi_Menu(Menu):
         self.elttexts = [self.retour_t]
         self.eltpages = [self.retour]
 
-    def initialize_udp(self):
+    def initialize_udp(self) -> None:
 
         self.upd_func = asyncio.run(self.recieve_udp())
 
-    def recieve_udp(self):
+    def recieve_udp(self) -> None:
 
         sock_set = False
         sock = None
@@ -534,7 +522,7 @@ class Join_Multi_Menu(Menu):
                 sock.close()
                 print("UDP recieve protocol stopped")
 
-    def create_list_button(self):
+    def create_list_button(self) -> None:
         self.list_button = []
         count = 0
         for serveur in self.serveurs.keys():
@@ -547,7 +535,7 @@ class Join_Multi_Menu(Menu):
             self.list_button.append((button, button_t))
             count += 1
 
-    def event(self, events):
+    def event(self, events: list[p.event.Event]) -> None:
         coord = p.mouse.get_pos()
         for event in events:
             if event.type == p.QUIT:
@@ -579,10 +567,10 @@ class Join_Multi_Menu(Menu):
                 if self.retour.rec.collidepoint(coord):
                     self.retour.hover = True
 
-    def update(self):
+    def update(self) -> None:
         pass
 
-    def display(self):
+    def display(self) -> None:
         self.screen.blit(self.bg_img, self.bg_img_coord)
         if len(self.serveurs) != self.serveurs_save:
             self.serveurs_save = len(self.serveurs)
@@ -599,7 +587,7 @@ class Join_Multi_Menu(Menu):
 
 class Pause_Menu(Menu):
 
-    def __init__(self, screen, manager):
+    def __init__(self, screen: p.Surface, manager):
         super().__init__(screen, manager)
         self.surface_copie = None
         self.blackscreen = p.Surface(self.WINDOWS, p.SRCALPHA)
@@ -625,7 +613,7 @@ class Pause_Menu(Menu):
         self.eltpages = [self.resume, self.settings, self.quit]
         self.elttexts = [self.resume_t]
 
-    def event(self, events):
+    def event(self, events: list[p.event.Event]) -> None:
         coord = p.mouse.get_pos()
         for event in events:
             if event.type == p.QUIT:
@@ -673,11 +661,11 @@ class Pause_Menu(Menu):
                         False,
                     )
 
-    def update(self):
+    def update(self) -> None:
         if self.manager.states["GAME"].playing_mode != "solo":
             self.manager.states["GAME"].update()
 
-    def display(self):
+    def display(self) -> None:
         self.manager.states["GAME"].display()
         self.screen.blit(self.blackscreen, (0, 0))
         self.pagedisplay()
@@ -685,3 +673,15 @@ class Pause_Menu(Menu):
         self.resume.clicked = False
         self.settings.clicked = False
         self.quit.clicked = False
+
+
+def create_button_with_text(
+    image: str, screen: p.Surface, pos: Tuple | List, text_str: str = "", scale: int = 1
+) -> Tuple[a.Button, List | Text | Tuple[int, int]]:
+    button = a.Button(image, screen, pos, scale=scale)
+    text = Text("Impact", 30, text_str, (0, 0, 0), screen)
+    coord = (
+        (button.rec.width - text.lenth[0]) // 2 + button.rec.left,
+        (button.rec.height - text.lenth[1]) // 2 + button.rec.top,
+    )
+    return button, [text, coord]
