@@ -1,7 +1,6 @@
 import pygame
 from typing import Tuple, List, Dict
 import os
-import psutil
 
 
 def load_image(
@@ -18,9 +17,9 @@ def load_image(
 def display_directory(directory: str, indent: int | None = 0):
 
     for dir in os.listdir(directory):
-        print("| "*indent, dir, sep="")
+        print("| " * indent, dir, sep="")
         if os.path.isdir(os.path.join(directory, dir)):
-            display_directory(os.path.join(directory, dir), indent+1)
+            display_directory(os.path.join(directory, dir), indent + 1)
 
 
 def load_animations(directory: str, size: Tuple[int, int] | None):
@@ -34,7 +33,7 @@ def load_animations(directory: str, size: Tuple[int, int] | None):
             res_dict[dir] = load_animations(new_directory, size)
         else:
             res_list.append(load_image(directory, dir, size))
-    
+
     if len(res_dict) > 0 and len(res_list) > 0:
         raise Exception("Dossier pas au bon format, va voir le drive")
     elif len(res_dict) > 0:
@@ -67,7 +66,7 @@ def combine_back_front(back_list, front_list, background_opacity: int | None = 1
 def apply_back_front_exception(anim_dict, background_opacity: int | None = 128):
     """
     Parcourt récursivement le dict d'animations.
-    Si un niveau contient les clés 'back' et 'front', 
+    Si un niveau contient les clés 'back' et 'front',
     on remplace ce dict par la liste des images combinées.
     """
     # Si c'est une liste, rien à faire
@@ -100,117 +99,6 @@ def apply_back_front_exception(anim_dict, background_opacity: int | None = 128):
 
     return new_dict
 
-'''
-def load_run_animation(run_directory: str, size: Tuple | List | None = None) -> Dict:
-
-    animations = {
-        "right": [],
-        "left": [],
-        "up": [],
-        "down": [],
-    }
-
-    right_path = os.path.join(run_directory, "right")
-    for name in os.listdir(right_path):
-
-        right_image = load_image(right_path, name, size)
-        animations["right"].append(right_image)
-        animations["up"].append(right_image)
-
-    left_path = os.path.join(run_directory, "left")
-    for name in os.listdir(left_path):
-
-        left_image = load_image(left_path, name, size)
-        animations["left"].append(left_image)
-        animations["down"].append(left_image)
-
-    return animations
-
-
-def load_idle_animation(idle_directory: str, size: Tuple | List | None = None) -> Dict:
-
-    animations = {
-        "right": [],
-        "left": [],
-    }
-
-    right_path = os.path.join(idle_directory, "right")
-    for name in os.listdir(right_path):
-
-        right_image = load_image(right_path, name, size)
-        animations["right"].append(right_image)
-
-    left_path = os.path.join(idle_directory, "left")
-    for name in os.listdir(left_path):
-
-        left_image = load_image(left_path, name, size)
-        animations["left"].append(left_image)
-
-    return animations
-
-
-def load_attack_animation(
-    attack_directory: str,
-    size: Tuple | List | None = None,
-    background_opacity: int | None = 128,
-) -> Dict:
-
-    animations = {
-        "right": [],
-        "left": [],
-    }
-
-    player_path = os.path.join(attack_directory, "player")
-    back_path = os.path.join(attack_directory, "back")
-    for name_play, name_back in zip(os.listdir(player_path), os.listdir(back_path)):
-
-        image = load_image(player_path, name_play, size)
-        back = load_image(back_path, name_back, size)
-        back.fill((255, 255, 255, background_opacity), None, pygame.BLEND_RGBA_MULT)
-        image.blit(back, (0, 0))
-        animations["left"].append(image)
-        animations["right"].append(pygame.transform.flip(image, 1, 0))
-
-    return animations
-
-
-def create_player_animation(
-    idle_directory: str,
-    run_directory: str,
-    attack_directory: str,
-    size: Tuple | List | None = None,
-) -> Dict[str, pygame.surface.Surface]:
-    """Retourne un dictionnaire d'animations pour le joueur :
-    {
-        "run":    { "right": [...], "left": [...] },
-        "idle":   { "right": [...], "left": [...] },
-        "attack": { "right": [...], "left": [...] }
-    }
-    Chaque liste contient des Surface pygame. Taille originale si size=None.
-    """
-    animations = {
-        "run": {
-            "right": [],
-            "left": [],
-            "up": [],
-            "down": [],
-        },
-        "idle": {
-            "right": [],
-            "left": [],
-        },
-        "attack": {
-            "right": [],
-            "left": [],
-        },
-    }
-
-    animations["run"] = load_run_animation(run_directory, size)
-    animations["idle"] = load_idle_animation(idle_directory, size)
-    animations["attack"] = load_attack_animation(attack_directory, size)
-
-    return animations
-'''
 
 class AnimationController:
 
@@ -242,7 +130,10 @@ class AnimationController:
     def update(self, state: str, direction: str):
         """Change state and direction if neccesary, otherwise, update frame index"""
 
-        if not self.current_state == "attack" or self.frame_index + 1 >= self.length * 10:
+        if (
+            not self.current_state == "attack"
+            or self.frame_index + 1 >= self.length * 10
+        ):
 
             if state != self.current_state or direction != self.current_dir:
                 # Change state and direction
@@ -272,6 +163,7 @@ class Button:
         path: str,
         screen: pygame.surface.Surface,
         position: Tuple | List,
+        *,
         size: Tuple | List | None = None,
         scale: int | None = 1,
     ):
@@ -339,7 +231,7 @@ class Button:
 if __name__ == "__main__":
 
     screen = pygame.display.set_mode((10, 10))
-    
+
     display_directory(r"Ressources\Animations\Ennemis\ennemy_1")
 
     animations = load_animations(r"Ressources\Animations\Ennemis\ennemy_1")
