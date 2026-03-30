@@ -470,7 +470,7 @@ class Join_Multi_Menu(Menu):
 
     def __init__(self, screen, manager):
         super().__init__(screen, manager)
-        self.serveurs_save = None
+        self.serveurs_save = 0
         self.list_button = []
         self.manager.running = True
         """
@@ -534,11 +534,10 @@ class Join_Multi_Menu(Menu):
                 sock.close()
                 print("UDP recieve protocol stopped")
 
-    def create_list_button(self, serveurs):
-        # Ca non
+    def create_list_button(self):
         self.list_button = []
         count = 0
-        for serveur in serveurs.keys():
+        for serveur in self.serveurs.keys():
             button, button_t = create_button_with_text(
                 EMPTY_BUTTON,
                 self.screen,
@@ -585,11 +584,11 @@ class Join_Multi_Menu(Menu):
 
     def display(self):
         self.screen.blit(self.bg_img, self.bg_img_coord)
-        if self.serveurs != self.serveurs_save:
-            self.serveurs_save = self.serveurs
+        if len(self.serveurs) != self.serveurs_save:
+            self.serveurs_save = len(self.serveurs)
             self.eltpages = [self.retour]
             self.elttexts = [self.retour_t]
-            self.create_list_button(self.serveurs)
+            self.create_list_button()
             for elt in self.list_button:
                 self.eltpages.append(elt[0])
                 self.elttexts.append(elt[1])
