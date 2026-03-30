@@ -13,6 +13,7 @@ PLAY_BUTTON = MENU_ASSET_DIRECTORY + "PLAY.png"
 SETTING_BUTTON = MENU_ASSET_DIRECTORY + "SETTINGS.png"
 EXIT_BUTTON = MENU_ASSET_DIRECTORY + "EXIT.png"
 EMPTY_BUTTON = MENU_ASSET_DIRECTORY + "EMPTY.png"
+TITLE = MENU_ASSET_DIRECTORY + "logo.png"
 
 UDP_IP = "0.0.0.0"
 UDP_PORT = 9999
@@ -109,20 +110,21 @@ class Principal_Menu(Menu):
         self.start = a.Button(
             PLAY_BUTTON,
             self.screen,
-            (self.half[0], self.half[1] - 150),
+            (self.half[0], self.half[1] - 100),
         )
         self.settings, _ = create_button_with_text(
-            SETTING_BUTTON, self.screen, self.half, "", 0.8
+            SETTING_BUTTON, self.screen, (self.half[0], self.half[1] + 50), "", 0.8
         )
         self.quit, _ = create_button_with_text(
-            EXIT_BUTTON, self.screen, (self.half[0], self.half[1] + 150)
+            EXIT_BUTTON, self.screen, (self.half[0], self.half[1] + 200)
+        )
+        self.titre, _ = create_button_with_text(
+            TITLE, self.screen, (self.half[0], self.half[1] - 250), "", 0.6
         )
         # =======================Button End=======================
 
-        self.titre = [Text("Impact", 150, "Mole Tale", (255, 255, 255), self.screen)]
-        self.titre.append(((self.WINDOWS[0] - self.titre[0].lenth[0]) // 2, 0))
-        self.elttexts = [self.titre]
-        self.eltpages = [self.start, self.settings, self.quit]
+        self.elttexts = []
+        self.eltpages = [self.titre, self.start, self.settings, self.quit]
 
     def event(self, events):
         coord = p.mouse.get_pos()
@@ -468,6 +470,7 @@ class Join_Multi_Menu(Menu):
 
     def __init__(self, screen, manager):
         super().__init__(screen, manager)
+        self.serveurs_save = None
         self.list_button = []
         self.manager.running = True
         """
@@ -582,9 +585,12 @@ class Join_Multi_Menu(Menu):
 
     def display(self):
         self.screen.blit(self.bg_img, self.bg_img_coord)
-        self.create_list_button(self.serveurs)
-        for elt in self.list_button:
-            if elt[0] not in self.eltpages:
+        if self.serveurs != self.serveurs_save:
+            self.serveurs_save = self.serveurs
+            self.eltpages = [self.retour]
+            self.elttexts = [self.retour_t]
+            self.create_list_button(self.serveurs)
+            for elt in self.list_button:
                 self.eltpages.append(elt[0])
                 self.elttexts.append(elt[1])
         self.pagedisplay()
@@ -606,10 +612,8 @@ class Pause_Menu(Menu):
         self.manager.running = True
 
         # =======================Button Start=======================
-        self.start = a.Button(
-            PLAY_BUTTON,
-            self.screen,
-            (self.half[0], self.half[1] - 150),
+        self.resume, self.resume_t = create_button_with_text(
+            EMPTY_BUTTON, self.screen, (self.half[0], self.half[1] - 150), "RESUME"
         )
         self.settings, _ = create_button_with_text(
             SETTING_BUTTON, self.screen, self.half, "", 0.8
@@ -619,7 +623,8 @@ class Pause_Menu(Menu):
         )
         # =======================Button End=======================
 
-        self.eltpages = [self.start, self.settings, self.quit]
+        self.eltpages = [self.resume, self.settings, self.quit]
+        self.elttexts = [self.resume_t]
 
     def event(self, events):
         coord = p.mouse.get_pos()
@@ -631,8 +636,8 @@ class Pause_Menu(Menu):
                     self.quit.clicked = True
                     self.manager.states["GAME"].player_controller.close = True
                     self.manager.change_state("MENU_P")
-                elif self.start.rec.collidepoint(coord):
-                    self.start.clicked = True
+                elif self.resume.rec.collidepoint(coord):
+                    self.resume.clicked = True
                     self.manager.change_state("GAME")
                 elif self.settings.rec.collidepoint(coord):
                     self.settings.clicked = True
@@ -645,25 +650,25 @@ class Pause_Menu(Menu):
                     self.manager.change_state("MENU_SETTING_PAUSE")
 
             elif event.type == p.KEYDOWN and event.key == p.K_ESCAPE:
-                self.start.clicked = True
+                self.resume.clicked = True
                 self.manager.change_state("GAME")
             else:
                 if self.quit.rec.collidepoint(coord):
-                    self.quit.hover, self.start.hover, self.settings.hover = (
+                    self.quit.hover, self.resume.hover, self.settings.hover = (
                         True,
                         False,
                         False,
                     )
-                elif self.start.rec.collidepoint(coord):
-                    self.start.hover, self.quit.hover = True, False
+                elif self.resume.rec.collidepoint(coord):
+                    self.resume.hover, self.quit.hover = True, False
                 elif self.settings.rec.collidepoint(coord):
-                    self.quit.hover, self.start.hover, self.settings.hover = (
+                    self.quit.hover, self.resume.hover, self.settings.hover = (
                         False,
                         False,
                         True,
                     )
                 else:
-                    self.quit.hover, self.start.hover, self.settings.hover = (
+                    self.quit.hover, self.resume.hover, self.settings.hover = (
                         False,
                         False,
                         False,
@@ -677,6 +682,7 @@ class Pause_Menu(Menu):
         self.manager.states["GAME"].display()
         self.screen.blit(self.blackscreen, (0, 0))
         self.pagedisplay()
-        self.start.clicked = False
+        self.textdisplay()
+        self.resume.clicked = False
         self.settings.clicked = False
         self.quit.clicked = False
