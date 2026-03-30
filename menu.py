@@ -24,6 +24,16 @@ p.mixer.music.load("Ressources/Musics/placeholder.mp3")
 p.mixer.music.play(-1)
 
 
+def create_button_with_text(image, screen, pos, text_str="", scale=1):
+    button = a.Button(image, screen, pos, scale=scale)
+    text = Text("Impact", 30, text_str, (0, 0, 0), screen)
+    coord = (
+        (button.rec.width - text.lenth[0]) // 2 + button.rec.left,
+        (button.rec.height - text.lenth[1]) // 2 + button.rec.top,
+    )
+    return button, [text, coord]
+
+
 class Text:
 
     def __init__(self, name, size, text, t_color, screen=None, antialias=False):
@@ -44,6 +54,7 @@ class Menu:
         self.elttexts = []
         self.eltpages = []
         self.WINDOWS = screen.get_size()
+        self.half = (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2)
         self.screen = screen
         self.bg_img = p.image.load(BACKGROUND).convert()
         self.bg_img_coord = self.bg_img.get_rect()
@@ -63,20 +74,12 @@ class Menu:
             (10, 10, 22, 100),
             (0, 0, self.WINDOWS[0], self.WINDOWS[1]),
         )
-        self.retour = a.Button(
-            EMPTY_BUTTON,
-            self.screen,
-            (170, 67),
+
+        # =======================Button Start=======================
+        self.retour, self.retour_t = create_button_with_text(
+            EMPTY_BUTTON, self.screen, (170, 67), "<--"
         )
-        self.retour_t = [Text("Impact", 30, "<--", (0, 0, 0), self.screen)]
-        self.retour_t.append(
-            (
-                (self.retour.rec.width - self.retour_t[0].lenth[0]) // 2
-                + self.retour.rec.left,
-                (self.retour.rec.height - self.retour_t[0].lenth[1]) // 2
-                + self.retour.rec.top,
-            )
-        )
+        # =======================Button End=======================
 
     def recalculcoord(self, text, button):
         """recalcul the coordonnee"""
@@ -101,24 +104,21 @@ class Principal_Menu(Menu):
     def __init__(self, screen: p.Surface, manager):
         super().__init__(screen, manager)
         self.manager.running = True
-        half = (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2)
+
+        # =======================Button Start=======================
         self.start = a.Button(
             PLAY_BUTTON,
             self.screen,
-            (half[0], half[1] - 150),
+            (self.half[0], self.half[1] - 150),
         )
-        self.settings = a.Button(
-            SETTING_BUTTON,
-            self.screen,
-            half,
-            (497 * 0.80, 184 * 0.80),
+        self.settings, _ = create_button_with_text(
+            SETTING_BUTTON, self.screen, self.half, "", 0.8
         )
-        self.quit = a.Button(
-            EXIT_BUTTON,
-            self.screen,
-            (half[0], half[1] + 150),
-            (322 * 0.97, 82 * 0.97),
+        self.quit, _ = create_button_with_text(
+            EXIT_BUTTON, self.screen, (self.half[0], self.half[1] + 150)
         )
+        # =======================Button End=======================
+
         self.titre = [Text("Impact", 150, "Mole Tale", (255, 255, 255), self.screen)]
         self.titre.append(((self.WINDOWS[0] - self.titre[0].lenth[0]) // 2, 0))
         self.elttexts = [self.titre]
@@ -171,116 +171,40 @@ class Setting_Menu(Menu):
         self.manager.running = True
         self.surface_copie = None
         self.menu_appel = menu_appel
-        self.changeup = a.Button(
+
+        # =======================Button Start=======================
+        self.changeup, self.up_t = create_button_with_text(
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2 - 200, self.WINDOWS[1] // 2 - 70),
+            "UP: " + p.key.name(self.keybinds["up"]),
         )
-        self.changedown = a.Button(
+        self.changedown, self.down_t = create_button_with_text(
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2 - 200, self.WINDOWS[1] // 2 + 70),
+            "DOWN: " + p.key.name(self.keybinds["down"]),
         )
-        self.changeleft = a.Button(
+        self.changeleft, self.left_t = create_button_with_text(
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2 + 200, self.WINDOWS[1] // 2 - 70),
+            "LEFT: " + p.key.name(self.keybinds["left"]),
         )
-        self.changeright = a.Button(
+        self.changeright, self.right_t = create_button_with_text(
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2 + 200, self.WINDOWS[1] // 2 + 70),
+            "RIGHT: " + p.key.name(self.keybinds["right"]),
         )
-        self.changeattack = a.Button(
+        self.changeattack, self.attack_t = create_button_with_text(
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 200),
+            "ATTACK: " + p.key.name(self.keybinds["attack"]),
         )
-        self.up_t = [
-            Text(
-                "Impact",
-                30,
-                "UP: " + p.key.name(self.keybinds["up"]),
-                (0, 0, 0),
-                self.screen,
-            )
-        ]
-        self.up_t.append(
-            (
-                (self.changeup.rec.width - self.up_t[0].lenth[0]) // 2
-                + self.changeup.rec.left,
-                (self.changeup.rec.height - self.up_t[0].lenth[1]) // 2
-                + self.changeup.rec.top,
-            )
-        )
-        self.down_t = [
-            Text(
-                "Impact",
-                30,
-                "DOWN: " + p.key.name(self.keybinds["down"]),
-                (0, 0, 0),
-                self.screen,
-            )
-        ]
-        self.down_t.append(
-            (
-                (self.changedown.rec.width - self.down_t[0].lenth[0]) // 2
-                + self.changedown.rec.left,
-                (self.changedown.rec.height - self.down_t[0].lenth[1]) // 2
-                + self.changedown.rec.top,
-            )
-        )
-        self.left_t = [
-            Text(
-                "Impact",
-                30,
-                "LEFT: " + p.key.name(self.keybinds["left"]),
-                (0, 0, 0),
-                self.screen,
-            )
-        ]
-        self.left_t.append(
-            (
-                (self.changeleft.rec.width - self.left_t[0].lenth[0]) // 2
-                + self.changeleft.rec.left,
-                (self.changeleft.rec.height - self.left_t[0].lenth[1]) // 2
-                + self.changeleft.rec.top,
-            )
-        )
-        self.right_t = [
-            Text(
-                "Impact",
-                30,
-                "RIGHT: " + p.key.name(self.keybinds["right"]),
-                (0, 0, 0),
-                self.screen,
-            )
-        ]
-        self.right_t.append(
-            (
-                (self.changeright.rec.width - self.right_t[0].lenth[0]) // 2
-                + self.changeright.rec.left,
-                (self.changeright.rec.height - self.right_t[0].lenth[1]) // 2
-                + self.changeright.rec.top,
-            )
-        )
-        self.attack_t = [
-            Text(
-                "Impact",
-                30,
-                "ATTACK: " + p.key.name(self.keybinds["attack"]),
-                (0, 0, 0),
-                self.screen,
-            )
-        ]
-        self.attack_t.append(
-            (
-                (self.changeattack.rec.width - self.attack_t[0].lenth[0]) // 2
-                + self.changeattack.rec.left,
-                (self.changeattack.rec.height - self.attack_t[0].lenth[1]) // 2
-                + self.changeattack.rec.top,
-            )
-        )
+        # =======================Button End=======================
+
         self.elttexts = [
             self.up_t,
             self.down_t,
@@ -422,7 +346,11 @@ class Setting_Menu(Menu):
                         )
 
     def update(self):
-        if self.manager.states["GAME"].playing_mode != "solo":
+        pass
+        if (
+            self.menu_appel != "MENU_P"
+            and self.manager.states["GAME"].playing_mode != "solo"
+        ):
             self.manager.states["GAME"].update()
 
     def display(self):
@@ -430,6 +358,7 @@ class Setting_Menu(Menu):
             # Euhhhhh Non
             self.screen.blit(self.bg_img, self.bg_img_coord)
         else:
+            self.manager.states["GAME"].display()
             self.screen.blit(self.blackscreen, (0, 0))
             # self.screen.blit(self.surface_copie, (0, 0))
         self.pagedisplay()
@@ -441,74 +370,28 @@ class Play_Menu(Menu):
     def __init__(self, screen, manager):
         super().__init__(screen, manager)
         self.manager.running = True
-        self.solo = a.Button(
+
+        # =======================Button Start=======================
+        self.solo, self.solo_t = create_button_with_text(
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 150),
+            "SOLO",
         )
-        self.multiplayer = a.Button(
+        self.multiplayer, self.multiplayer_t = create_button_with_text(
             EMPTY_BUTTON,
             self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2),
+            self.half,
+            "MULTIPLAYER",
         )
-        self.joinmultiplayer = a.Button(
+        self.joinmultiplayer, self.joinmultiplayer_t = create_button_with_text(
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 150),
+            "JOIN MULTIPLAYER",
         )
-        self.solo_t = [
-            Text(
-                "Impact",
-                30,
-                "SOLO",
-                (0, 0, 0),
-                self.screen,
-            )
-        ]
-        self.solo_t.append(
-            (
-                (self.solo.rec.width - self.solo_t[0].lenth[0]) // 2
-                + self.solo.rec.left,
-                (self.solo.rec.height - self.solo_t[0].lenth[1]) // 2
-                + self.solo.rec.top,
-            )
-        )
-        self.multiplayer_t = [
-            Text(
-                "Impact",
-                30,
-                "MULTIPLAYER",
-                (0, 0, 0),
-                self.screen,
-            )
-        ]
-        self.multiplayer_t.append(
-            (
-                (self.multiplayer.rec.width - self.multiplayer_t[0].lenth[0]) // 2
-                + self.multiplayer.rec.left,
-                (self.multiplayer.rec.height - self.multiplayer_t[0].lenth[1]) // 2
-                + self.multiplayer.rec.top,
-            )
-        )
-        self.joinmultiplayer_t = [
-            Text(
-                "Impact",
-                30,
-                "JOIN MULTIPLAYER",
-                (0, 0, 0),
-                self.screen,
-            )
-        ]
-        self.joinmultiplayer_t.append(
-            (
-                (self.joinmultiplayer.rec.width - self.joinmultiplayer_t[0].lenth[0])
-                // 2
-                + self.joinmultiplayer.rec.left,
-                (self.joinmultiplayer.rec.height - self.joinmultiplayer_t[0].lenth[1])
-                // 2
-                + self.joinmultiplayer.rec.top,
-            )
-        )
+        # =======================Button End=======================
+
         self.elttexts = [
             self.solo_t,
             self.multiplayer_t,
@@ -585,7 +468,6 @@ class Join_Multi_Menu(Menu):
 
     def __init__(self, screen, manager):
         super().__init__(screen, manager)
-        self.count = 0
         self.list_button = []
         self.manager.running = True
         """
@@ -654,26 +536,11 @@ class Join_Multi_Menu(Menu):
         self.list_button = []
         count = 0
         for serveur in serveurs.keys():
-            button = a.Button(
+            button, button_t = create_button_with_text(
                 EMPTY_BUTTON,
                 self.screen,
                 (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 200 + count * 150),
-                (301, 95),
-            )
-            button_t = [
-                Text(
-                    "Impact",
-                    30,
-                    serveur,
-                    (0, 0, 0),
-                    self.screen,
-                )
-            ]
-            button_t.append(
-                (
-                    (button.rec.width - button_t[0].lenth[0]) // 2 + button.rec.left,
-                    (button.rec.height - button_t[0].lenth[1]) // 2 + button.rec.top,
-                )
+                serveur,
             )
             self.list_button.append((button, button_t))
             count += 1
@@ -737,23 +604,21 @@ class Pause_Menu(Menu):
             (0, 0, self.WINDOWS[0], self.WINDOWS[1]),
         )
         self.manager.running = True
+
+        # =======================Button Start=======================
         self.start = a.Button(
             PLAY_BUTTON,
             self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 150),
+            (self.half[0], self.half[1] - 150),
         )
-        self.settings = a.Button(
-            SETTING_BUTTON,
-            self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2),
-            (497 * 0.80, 184 * 0.80),
+        self.settings, _ = create_button_with_text(
+            SETTING_BUTTON, self.screen, self.half, "", 0.8
         )
-        self.quit = a.Button(
-            EXIT_BUTTON,
-            self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 150),
-            (322 * 0.97, 82 * 0.97),
+        self.quit, _ = create_button_with_text(
+            EXIT_BUTTON, self.screen, (self.half[0], self.half[1] + 150)
         )
+        # =======================Button End=======================
+
         self.eltpages = [self.start, self.settings, self.quit]
 
     def event(self, events):
