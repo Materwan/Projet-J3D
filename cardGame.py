@@ -25,7 +25,9 @@ class Card:
         self.screen.blit(self.artwork, self.position)
       
 class Hand:
-    def __init__(self):
+    def __init__(self, screen: pygame.surface.Surface, position: Tuple[int,int]):
+        self.screen = screen
+        self.position = position
         self.cards = []
         self.size = 0
 
@@ -46,18 +48,19 @@ class Hand:
         return printer
     
     def display(self):
-        for cards in self.cards:
-            cards.display()
+        if self.size != 0:
+            for cards in self.cards:
+                cards.display()
 
 class Deck:
     def __init__(self, screen: pygame.surface.Surface, position: Tuple[int,int], cards: list[Card],  artworkCard = "Ressources/Cartes/PlaceHolderDeck.png", artworkEmpty = "Ressources/Cartes/PlaceHolderDeckEmpty.png"):
         self.screen = screen
-        self.position = (position)
+        self.position = position
         self.cards = cards
         self.size = len(self.cards)
         self.artworkCard = pygame.image.load(artworkCard)
         self.artworkEmpty = pygame.image.load(artworkEmpty)
-        self.scale = (35*5, 47*5)
+        self.scale = (35*3.25, 47*3.25)
           
     def add2Deck(self, cards: Card):
         self.cards.append(cards)
@@ -92,7 +95,7 @@ class DiscardPile:
         self.cards = []
         self.size = 0
         self.artworkEmpty = pygame.image.load(artwork)
-        self.scale = (35*5, 47*5)
+        self.scale = (35*3.25, 47*3.25)
 
     def add2Discard(self, card: Card):
         if card:
@@ -130,7 +133,8 @@ class PlayerCard:
         self.maxAp = ap
         self.position = (position)
         self.artwork = pygame.image.load(artwork)
-        self.scale = (35*5, 47*5)
+        self.bigArtWork = pygame.image.load(artwork)
+        self.scale = (35*3.25, 47*3.25)
         self.running = True
         self.hover = False
         self.hoverTime = -1
@@ -150,28 +154,36 @@ class PlayerCard:
     def display(self):
         self.artwork = pygame.transform.scale(self.artwork, self.scale)
         self.screen.blit(self.artwork, self.position)
-        self.hpDisplay = Text("Impact", 19, str(self.hp), "#FFFFFF", self.artwork)
-        self.mpDisplay = Text("Impact", 19, str(self.mp), "#FFFFFF", self.artwork)
-        self.apDisplay = Text("Impact", 19, str(self.ap), "#FFFFFF", self.artwork)
-        self.hpDisplay.draw_text((30, 190))
-        self.mpDisplay.draw_text((83, 190))
-        self.apDisplay.draw_text((130, 190))
+        self.hpDisplay = Text("Impact", 12, str(self.hp), "#FFFFFF", self.artwork)
+        self.mpDisplay = Text("Impact", 12, str(self.mp), "#FFFFFF", self.artwork)
+        self.apDisplay = Text("Impact", 12, str(self.ap), "#FFFFFF", self.artwork)
+        self.hpDisplay.draw_text((18, 125))
+        self.mpDisplay.draw_text((54, 125))
+        self.apDisplay.draw_text((86, 125))
         
         if self.biggerpicture == True:
-            self.bigArtWork = pygame.transform.scale(self.artwork, (self.scale[0]*2.5, self.scale[1]*2.5))
+            self.bigArtWork = pygame.transform.scale(self.bigArtWork, (self.scale[0]*3.5, self.scale[1]*3.5))
             self.screen.blit(self.bigArtWork, (self.screenSize[0]/1.55, self.screenSize[0]/8))
+            self.hpDisplay = Text("Impact", 55, str(self.hp), "#FFFFFF", self.bigArtWork)
+            self.mpDisplay = Text("Impact", 55, str(self.mp), "#FFFFFF", self.bigArtWork)
+            self.apDisplay = Text("Impact", 55, str(self.ap), "#FFFFFF", self.bigArtWork)
+            self.hpDisplay.draw_text((30, 395)) #Wrong dimentions
+            self.mpDisplay.draw_text((83, 395)) #Wrong dimentions
+            self.apDisplay.draw_text((130, 395)) #Wrong dimentions
 
 class Game:
     def __init__(self, pCard: PlayerCard, deck: Deck, discard: DiscardPile):
         self.screen = screen
         self.screenSize = self.screen.get_size()
+        self.artwork = pygame.image.load("Ressources/Cartes/PlaceHolderBG.png")
         self.pCard = pCard
         self.deck = deck
         self.discard = discard
         self.running = True
 
     def display(self):
-        self.screen.fill('#603B2A')
+        self.artwork = pygame.transform.scale(self.artwork, self.screenSize)
+        self.screen.blit(self.artwork, (0, 0))
         self.deck.display()
         self.discard.display()
         self.pCard.display()
@@ -201,13 +213,13 @@ if __name__ == "__main__":
     running = True
     screenSize = screen.get_size()
 
-    player = PlayerCard(screen, ((screenSize[0] - (35*5))/2, (screenSize[1] - (47*5))/2))
+    player = PlayerCard(screen, ((screenSize[0] - (35*3.25))/2, (screenSize[1] - (47*3.25))/1.35))
 
-    deck = Deck(screen, ((screenSize[0] - (35*5))*6/7, (screenSize[1] - (47*5))*6/7), [Card("Dmg2"), Card("HpUp3")])
+    deck = Deck(screen, ((screenSize[0] - (35*3.25))*6/7, (screenSize[1] - (47*3.25))*4.9/7), [Card("Dmg2"), Card("HpUp3")])
     
-    discard = DiscardPile(screen, ((screenSize[0] - (35*5))*26/35,(screenSize[1] - (47*5))*6/7))   
+    discard = DiscardPile(screen, ((screenSize[0] - (35*3.25))*6/7,(screenSize[1] - (47*3.25))*6.25/7))   
     
-    hand = Hand()
+    hand = Hand(screen, ((screenSize[0] - (35*3.25))*9/35,(screenSize[1] - (47*3.25))*1/7))
 
     test = Game(player, deck, discard)
     test.run()
