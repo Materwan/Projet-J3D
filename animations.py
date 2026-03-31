@@ -1,47 +1,50 @@
-import pygame
-from typing import Tuple, List, Dict
+"""Module pour les animations et boutons."""
+
+from typing import Tuple, List
 import os
+import pygame
 
 
 def load_image(
     directory: str, name: str, size: Tuple | List | None = None
-) -> pygame.surface.Surface:
+) -> pygame.Surface:
     """Load image with good size (normal if None)"""
     path = os.path.join(directory, name)
     image = pygame.image.load(path).convert_alpha()
-    if size != None:
+    if size is not None:
         image = pygame.transform.scale(image, size)
     return image
 
 
 def display_directory(directory: str, indent: int | None = 0):
+    """Affiche la structure d'un dossier avec fichiers et sous-dossiers."""
 
-    for dir in os.listdir(directory):
-        print("| " * indent, dir, sep="")
-        if os.path.isdir(os.path.join(directory, dir)):
-            display_directory(os.path.join(directory, dir), indent + 1)
+    for dirs in os.listdir(directory):
+        print("| " * indent, dirs, sep="")
+        if os.path.isdir(os.path.join(directory, dirs)):
+            display_directory(os.path.join(directory, dirs), indent + 1)
 
 
-def load_animations(directory: str, size: Tuple[int, int] | None):
+def load_animations(directory: str, size: Tuple[int, int] | None = None):
+    """Initialise toutes les frames d'une animation."""
 
     res_dict = {}
     res_list = []
 
-    for dir in os.listdir(directory):
-        new_directory = os.path.join(directory, dir)
+    for dirs in os.listdir(directory):
+        new_directory = os.path.join(directory, dirs)
         if os.path.isdir(new_directory):
-            res_dict[dir] = load_animations(new_directory, size)
+            res_dict[dirs] = load_animations(new_directory, size)
         else:
-            res_list.append(load_image(directory, dir, size))
+            res_list.append(load_image(directory, dirs, size))
 
     if len(res_dict) > 0 and len(res_list) > 0:
-        raise Exception("Dossier pas au bon format, va voir le drive")
-    elif len(res_dict) > 0:
+        raise ValueError("Dossier pas au bon format, va voir le drive")
+    if len(res_dict) > 0:
         return res_dict
-    elif len(res_list) > 0:
+    if len(res_list) > 0:
         return res_list
-    else:
-        raise Exception("Dossier vide")
+    raise ValueError("Dossier vide")
 
 
 def combine_back_front(back_list, front_list, background_opacity: int | None = 128):
@@ -101,12 +104,13 @@ def apply_back_front_exception(anim_dict, background_opacity: int | None = 128):
 
 
 class AnimationController:
+    """Classe pour la gestion d'animations."""
 
     def __init__(
         self,
         animation_directory: str,
         size: Tuple[int, int] | None,
-        screen: pygame.surface.Surface,
+        screen: pygame.Surface,
     ):
         # Load animations
         self.animations = load_animations(animation_directory, size)
@@ -157,11 +161,12 @@ class AnimationController:
 
 
 class Button:
+    """Classe pour la gestion de boutons."""
 
     def __init__(
         self,
         path: str,
-        screen: pygame.surface.Surface,
+        screen: pygame.Surface,
         position: Tuple | List,
         *,
         size: Tuple | List | None = None,
@@ -170,7 +175,7 @@ class Button:
         """Load and create image for the button.\n
         Image size will be original if size is None
         Can set size and scale"""
-        assert not (scale != 1 and size != None)
+        assert not (scale != 1 and size is not None)
         assert len(position) == 2  # Verify that position is valid
         # Load image
         self.path = path
@@ -179,7 +184,7 @@ class Button:
         self.clicked = False
         self.image = pygame.image.load(self.path).convert_alpha()
         # Modify size if necessary
-        if size != None:
+        if size is not None:
             assert len(size) == 2
             self.image = pygame.transform.scale(self.image, size)
         else:
@@ -187,7 +192,7 @@ class Button:
         if scale != 1:
             size = (size[0] * scale, size[1] * scale)
             self.image = pygame.transform.scale(self.image, size)
-        self.rec = pygame.rect.Rect(
+        self.rec = pygame.Rect(
             position[0] - size[0] // 2, position[1] - size[1] // 2, size[0], size[1]
         )
 
@@ -200,7 +205,7 @@ class Button:
         self.clicked_image = pygame.transform.scale_by(self.clicked_image, 0.95)
 
         # Get or set size
-        size = self.image.get_size() if size == None else size
+        size = self.image.get_size() if size is None else size
 
         # Set display position
         self.display_pos = (position[0] - (size[0] // 2), position[1] - (size[1] // 2))
@@ -230,7 +235,7 @@ class Button:
 
 if __name__ == "__main__":
 
-    screen = pygame.display.set_mode((10, 10))
+    _ = pygame.display.set_mode((10, 10))
 
     display_directory(r"Ressources\Animations\Ennemis\ennemy_1")
 
