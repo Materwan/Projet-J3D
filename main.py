@@ -1,20 +1,23 @@
+import logging
+import traceback
+
 import pygame
+
+from menu import Principal_Menu, Setting_Menu, Play_Menu, Join_Multi_Menu, Pause_Menu
+from game import Game
+from player import HostController, GuestController
 
 pygame.init()
 pygame.mixer.init()
 pygame.display.set_caption("MoleTale")
+
 FPS = 60
 TAILLE_ECRAN = (500, 500)  # (0, 0) pour plein écran
 screen = pygame.display.set_mode(TAILLE_ECRAN)
 
-from menu import *
-from game import *
-from player import HostController, GuestController
-import logging
-import traceback
-
 
 class Manager:
+    """Gestionnaire des états du jeu."""
 
     def __init__(self):
         self.screen = screen

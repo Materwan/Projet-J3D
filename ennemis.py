@@ -1,9 +1,13 @@
-import pygame
-import numpy as np
-from typing import List, Tuple, Dict
+"""Module pour la gestion d'ennemis."""
+
+from typing import List, Tuple, Dict, Any
 import heapq
 import math
 import time
+
+import pygame
+
+import numpy as np
 from map import Map
 from camera_system import Camera
 from animations import AnimationController
@@ -109,13 +113,31 @@ class Ennemi:
         self.rect = pygame.Rect(position[0], position[1], 32, 32)
         self.speed = speed
         self.chase_range = chase_range
+        self.velocity: np.ndarray | None = None
         self.attack_range = 20
+        self.attack: bool | None = False
         self.map = map
         self.path = []
         self.direction = np.array((0, 0))
         self.last_calc = 0
 
-    def update(self, players_pos: Tuple[pygame.Vector2]):
+    def update_variables(self, data: Dict[str, Any]):
+        self.position = np.array(data["position"])
+        self.rect.topleft = data["position"]
+        self.velocity = data["velocity"]
+        self.attack = data["attack"]
+
+    def update_animation(self):
+        state = "run" if (self.velocity[0] != 0 or self.velocity[1] != 0) else "idle"
+        if self.velocity[0] < 0:
+            self.direction = "left"
+        elif self.velocity[0] > 0:
+            self.direction = "right"
+        if self.attack:
+            state = "attack"
+        self.animation.update(state, self.direction)
+
+    def update(self, *players_pos: pygame.Vector2):
 
         players_positions = [
             np.array((vec.x, vec.y), dtype=np.int32) // self.map.tile_size
@@ -145,14 +167,7 @@ class Ennemi:
             else:
                 self.attack = False
 
-        state = "run" if (self.velocity[0] != 0 or self.velocity[1] != 0) else "idle"
-        if self.velocity[0] < 0:
-            self.direction = "left"
-        elif self.velocity[0] > 0:
-            self.direction = "right"
-        if self.attack:
-            state = "attack"
-        self.animation.update(state, self.direction)
+        self.update_animation()
 
         return self.path
 

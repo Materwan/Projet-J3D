@@ -1,9 +1,6 @@
-import pygame
-from moteur import Moteur
-from map import Map
-from camera_system import Camera
-from animations import AnimationController
-from typing import Tuple, Dict
+"""Module pour la gestion du joueur en solo/multi"""
+
+from typing import Tuple, Dict, Any
 import time
 import asyncio
 import socket
@@ -11,6 +8,15 @@ import json
 import threading
 import psutil
 
+import pygame
+
+from moteur import Moteur
+from map import Map
+from camera_system import Camera
+from animations import AnimationController
+
+
+UDP_PORT = 9999
 SPEED = 3
 
 
@@ -44,14 +50,9 @@ def bytes_to_dict(byte: bytes) -> Dict:
     return json.loads(byte.decode().strip())
 
 
-# Défini le port et l'addresse sur laquel broadcast
-UDP_PORT = 9999
-HOST_IP = socket.gethostbyname(socket.gethostname())
-SUBNET_MASK = get_netmask_for_ip(HOST_IP)
-
-
 class PlayerControllerBase:
-    """Classe de joueur basique.\n
+    """Classe de joueur basique.
+
     Implémente les interactions et l'affichage"""
 
     def __init__(
@@ -62,9 +63,10 @@ class PlayerControllerBase:
         start_position: Tuple[int, int],
     ):
         """Initialise les éléments nécessaires à un joueur"""
+
+        # -- Controlleur --
         self.screen = screen
-        self.camera = None
-        self.camera: Camera
+        self.camera: Camera | None = None
         self.moteur = moteur
         self.map = map
         if moteur is not None and map is not None:
@@ -72,13 +74,14 @@ class PlayerControllerBase:
 
         self.show_hitbox = False  # pour F2
 
-        # Initialise les animations
-        self.animation = AnimationController(r"Ressources\Animations\Player", (100, 100), self.screen)
+        # -- Animations --
+        self.animation = AnimationController(
+            r"Ressources\Animations\Player", (100, 100), self.screen
+        )
         self.im_size = pygame.Vector2(self.animation.im_size)
 
-        # Initialise les données nécessaires pour un joueur
-        self.keybinds = None
-        self.keybinds: Dict
+        # -- Joueur --
+        self.keybinds: Dict | None = None
         self.position = pygame.Vector2(start_position)
         self.hitbox = pygame.Rect(0, 0, 28, 15)
         self.hitbox.center = self.position
@@ -86,12 +89,18 @@ class PlayerControllerBase:
         self.direction = "right"
         self.moving_intent = False
 
-        # attaque
+        # -- Attaque --
         self.attaque = False
         self.attaque_rect = None
 
-        # reseau
+        # -- Réseau --
         self.close = False
+
+    def set_camera(self, camera: Camera):
+        """Initialise la camera du joueur et du client si besoin."""
+
+    def toggle_hitbox(self):
+        """Change debug F2."""
 
     def event(self, keys: Tuple[bool]):
         """
@@ -105,6 +114,7 @@ class PlayerControllerBase:
         Le vecteur 'self.velocity' ainsi mis à jour contient des composantes
         x et y allant de -1 à 1, permettant aussi la gestion des diagonales.
         """
+
         self.velocity.update(
             keys[self.keybinds["right"]] - keys[self.keybinds["left"]],
             keys[self.keybinds["down"]] - keys[self.keybinds["up"]],
@@ -124,90 +134,89 @@ class PlayerControllerBase:
             self.host_data["direction"] = "up"
         """
 
-    def update(self):
+    def update_motor(self):
         """Met à jour toutes les données en lien avec le moteur"""
 
         mov = self.velocity.length_squared()
-        if mov > 0:
+        if mov > 0:  # Si mouvement
 
-            if mov > 1:
+            if mov > 1:  # Si en diagonale
                 self.velocity.normalize_ip()
 
-            self.position += self.velocity * SPEED
-            # on cale la hitbox sur le vecteur position
-            self.hitbox.center = self.position
+            self.position += self.velocity * SPEED  # Modif pos
 
-    def display(self):
-        # La caméra convertit la position en position écran
-        screen_pos = pygame.Vector2(self.camera.apply(self.hitbox).center)
-        self.animation.display(
-            screen_pos - pygame.Vector2(self.im_size[0] // 2, self.im_size[1] - 22)
-        )  # -22 pour afficher le joueur un peu au dessus de la hitbox
+            self.hitbox.center = self.position  # Place hitbox sur pos
 
-        if self.show_hitbox:
-            pygame.draw.rect(self.screen, "red", self.camera.apply(self.hitbox), 2)
-            if self.attaque_rect and self.animation.attacking:
-                pygame.draw.rect(
-                    self.screen, "red", self.camera.apply(self.attaque_rect), 2
-                )
+    def authority_update(self, collision_hitbox: pygame.Rect | None = None):
+        """Met à jour les donnée d'un controlleur autoritaire (Solo / Host)."""
 
-
-class SoloPlayerController(PlayerControllerBase):
-    """Classe pour un joueur solo"""
-
-    def __init__(
-        self,
-        screen: pygame.Surface,
-        moteur: Moteur,
-        map: Map,
-        start_position: Tuple[int, int],
-    ):
-        super().__init__(screen, moteur, map, start_position)
-
-    def set_camera(self, camera):
-        self.camera = camera
-
-    def toggle_hitbox(self):
-        self.show_hitbox = not self.show_hitbox
-
-    def event(self, keys):
-
-        super().event(keys)
-
-    def update(self):
-
-        self.map.load_chunks(self.position)
-
+        # -- Mouvements --
         self.moving_intent = self.velocity.length_squared() > 0
-        if self.moving_intent:  # si le joueur veut se deplacer alors :
+        if self.moving_intent:  # Si le joueur veux bouger
 
             self.update_direction()
 
-            self.moteur.collision(self.hitbox, self.velocity, None)
+            self.moteur.collision(self.hitbox, self.velocity, collision_hitbox)
 
-            super().update()
+            self.update_motor()  # Update vitesse
 
+        # -- Animation --
         state = "run" if self.moving_intent else "idle"
         if self.attaque:
             state = "attack"
             self.attaque_rect = self.moteur.create_rect_attaque(
                 self.position, self.direction
             )
-            self.attaque = False  # consommé, on attend le prochain appui
+            self.attaque = False  # Bloque anti spam
 
         self.animation.update(state, self.direction)
 
     def display(self):
+        """Affiche tous les éléments avec la camera."""
 
-        super().display()
+        # -- Joueur --
+        screen_pos = pygame.Vector2(
+            self.camera.apply(self.hitbox).center
+        )  # La caméra convertit la position en position écran
+        self.animation.display(
+            screen_pos - pygame.Vector2(self.im_size[0] // 2, self.im_size[1] - 22)
+        )  # -22 pour afficher le joueur un peu au dessus de la hitbox
 
+        # -- Debug F2 --
         if self.show_hitbox:
+            pygame.draw.rect(self.screen, "red", self.camera.apply(self.hitbox), 2)
+            # -- Box Joueur --
+            if self.attaque_rect and self.animation.current_state == "attack":
+                pygame.draw.rect(
+                    self.screen, "red", self.camera.apply(self.attaque_rect), 2
+                )
+            # -- Box Environnement --
             for obstacle in self.moteur.nearby_obstacles:
                 pygame.draw.rect(self.screen, "red", self.camera.apply(obstacle), 2)
 
 
+class SoloPlayerController(PlayerControllerBase):
+    """Classe pour un joueur solo"""
+
+    def set_camera(self, camera: Camera):
+        self.camera = camera
+
+    def toggle_hitbox(self):
+        self.show_hitbox = not self.show_hitbox
+
+    def update(self):
+        """Met à jour les éléments nécessaire du joueur."""
+
+        # -- Map --
+        self.map.load_chunks(self.position)
+
+        # -- Joueur --
+        self.authority_update()
+
+
 class HostController(PlayerControllerBase):
-    """Classe pour un hôte de partie.\n
+    """Classe pour un hôte de partie.
+
     Implémente les joueurs et les fonctions nécessaires ainsi
     que les fonctions de communication avec le client
     ainsi que la fonction de découverte dans les menus."""
@@ -219,30 +228,35 @@ class HostController(PlayerControllerBase):
         map: Map,
         start_position: Tuple[int, int],
     ):
+        """Initialise les données du joueur et du protocole réseau
+        dans un thread en parallèle."""
 
+        # -- Joueur --
         super().__init__(screen, moteur, map, start_position)
 
-        # Initialise les données de l'invité
+        # -- Invité --
         self.guest = PlayerControllerBase(
             self.screen, moteur, self.map, (start_position[0] + 50, start_position[1])
         )
 
-        self.serveur: asyncio.Server  # pour savoir le type
-        self.serveur = None  # initialise
-        self.connected = False  # True si un invité est connecté
+        # -- Réseau --
+        self.serveur: asyncio.Server | None = None
+        self.connected = False
+        self.ip = socket.gethostbyname(socket.gethostname())
+        self.subnet_mask = get_netmask_for_ip(self.ip)
 
-        # Créer des processus sur d'autre thread du processeur
-        # Pour le fonctionnement du serveur et du broadcast
-        # Créer un event pour savoir quand broadcast
-        # Démare les processus
-        self.asyncio_loop = None
+        # -- Ennemis --
+        self.ennemis_data: Dict[int, Dict[str, Any]]
+
+        # -- Processus --
+        self.asyncio_loop: asyncio.AbstractEventLoop | None = None
         self.loop = threading.Thread(target=self.initialize_tcp)
         self.loop.start()
         self.udp_prot = threading.Thread(target=self.upd_broadcast)
         self.udp_prot.start()
         self.udp_run = True
 
-    def set_camera(self, camera):
+    def set_camera(self, camera: Camera):
         self.camera = camera
         self.guest.camera = camera
 
@@ -251,9 +265,8 @@ class HostController(PlayerControllerBase):
         self.guest.show_hitbox = self.show_hitbox
 
     def initialize_tcp(self):
-        """Lance la fonction en thread partagé"""
-
-        self.serveur_task = asyncio.run(self.tcp_server())
+        """Lance la fonction en thread partagé."""
+        asyncio.run(self.tcp_server())
 
     def upd_broadcast(self):
         """Permet d'envoyer des messages au autres appareils sur le réseau
@@ -261,20 +274,20 @@ class HostController(PlayerControllerBase):
 
         print("UDP sending protocole start")
 
-        broadcast_ip = get_broadcast_ip(HOST_IP, SUBNET_MASK)
-
-        print(f"Broadcast on subnet mask : {broadcast_ip}")
+        # -- Setup variables --
+        broadcast_ip = get_broadcast_ip(self.ip, self.subnet_mask)
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         sock.settimeout(0.5)
 
-        message = bytes(
-            json.dumps({"Game name": "My game", "Port": 8888, "last": time.time()})
-            + "\n",
-            encoding="utf-8",
+        message = dict_to_bytes(
+            {"Game name": "My game", "Port": 8888, "last": time.time()}
         )  # définit le message à envoyer
 
+        print(f"Broadcast on subnet mask : {broadcast_ip}")
+
+        # -- Envoi --
         while self.udp_run:  # tourne tant que le serveur n'es pas fermé
             try:
                 sock.sendto(message, (broadcast_ip, UDP_PORT))
@@ -286,122 +299,133 @@ class HostController(PlayerControllerBase):
 
         print("UDP sending protocole stopped")
 
+    def get_to_send_data(self, *include: str) -> Dict:
+        """Créer le dictionnaire de valeurs à envoyer au client."""
+        dic = {
+            "guest": {
+                "position": list(self.guest.position),
+                "attaque_rect": (
+                    list(self.guest.attaque_rect)
+                    if self.guest.attaque_rect and self.guest.attaque
+                    else None
+                ),
+            },
+            "host": {
+                "position": list(self.position),
+                "moving_intent": self.moving_intent,
+                "direction": self.direction,
+                "attaque": self.attaque,
+                "attaque_rect": (
+                    list(self.attaque_rect)
+                    if self.attaque_rect and self.attaque
+                    else None
+                ),
+            },
+            "ennemis": self.ennemis_data,
+            "close": False,
+        }
+        if "map" in include:
+            dic["map"] = {
+                "nb_chunks": self.map.nb_chunks.tolist(),
+                "chunk_size": self.map.chunk_size_tile.tolist(),
+                "octaves": self.map.octaves,
+                "seed": self.map.seed,
+            }
+        return dic
+
+    def update_variables(self, data: Dict):
+        """Met à jour toutes les variables reçu par le client."""
+        self.guest.velocity = self.moteur.verif_velocity(
+            data["guest"]["velocity"]
+        )  # verification de la vélocité dès qu'on le recoit
+        self.guest.moving_intent = data["guest"]["moving_intent"]
+        self.guest.attaque = data["guest"]["attaque"]
+
     async def handle_client(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ):
         """Une instance de cette fonction est executé pour chaque joueur
-        qui se connecte.\n
+        qui se connecte.
+
         La fonction vérifie que aucun joueur n'est déjà connecté, sinon la
-        connexion est refusé.\n
+        connexion est refusé.
+
         Il fait tourner la boucle de communication entre le serveur
         et le joueur"""
 
-        def get_to_send_data() -> Dict:
-            return {
-                "guest": {
-                    "position": list(self.guest.position),
-                    "attaque_rect": (
-                        list(self.guest.attaque_rect)
-                        if self.guest.attaque_rect and self.guest.animation.attacking
-                        else None
-                    ),
-                },
-                "host": {
-                    "position": list(self.position),
-                    "moving_intent": self.moving_intent,
-                    "direction": self.direction,
-                    "attaque": self.attaque,
-                    "attaque_rect": (
-                        list(self.attaque_rect)
-                        if self.attaque_rect and self.animation.attacking
-                        else None
-                    ),  # attaque_rect sert juste pour l'affichage de la hitbox d'attaque si F2 enclencher
-                },
-                "close": False,
-            }
+        # -- Premier client --
+        if not self.connected:
+            print("Joueur connecté")
+            self.connected = True
 
-        # Si un au client est connecté
-        if self.connected:
+            # Arrêt le serveur : n'accepte plus les connections
+            self.serveur.close()
+            print("N'accepte plus les connexions")
+
+            # Défini les variables à envoyer
+            to_send_data = self.get_to_send_data("map")
+
+            writer.write(dict_to_bytes(to_send_data))
+            await writer.drain()
+
+            recieved_bytes = await reader.readline()
+
+        # -- Client déjà connecté --
+        else:
             writer.close()
             return
 
-        # Si aucun autre client n'est connecté
-        print("Joueur connecté")
-        self.connected = True
-
-        # Arrêt le serveur : n'accepte plus les connections
-        self.serveur.close()
-        print("N'accepte plus les connexions")
-
-        # Défini les variables à envoyer
-        to_send_data = get_to_send_data()
-        to_send_data["map"] = {
-            "nb_chunks": self.map.nb_chunks.tolist(),
-            "chunk_size": self.map.chunk_size_tile.tolist(),
-            "octaves": self.map.octaves,
-            "seed": self.map.seed,
-        }
-        writer.write(dict_to_bytes(to_send_data))
-        await writer.drain()
-
-        recieved_bytes = await reader.readline()
-
+        # -- Boucle réseau --
         try:
             while True:
 
-                # Si le jeu est fermé, envoie l'info au client et ferme la connexion
+                # -- Si host ferme --
                 if self.close:
                     writer.write(dict_to_bytes({"close": True}))
                     await writer.drain()
                     break
 
-                # Récupère les données, les décodes et verifie leur existence
+                # -- Récupère les données --
                 recieved_bytes = await asyncio.wait_for(reader.readline(), timeout=1.0)
-                recieved_data = bytes_to_dict(recieved_bytes)
                 if not recieved_bytes:
                     break
 
-                # Si le client ferme son jeu, ferme le jeu et la connexion
-                if recieved_data["close"] == True:
+                recieved_data = bytes_to_dict(recieved_bytes)
+
+                # -- Si client ferme --
+                if recieved_data["close"]:
                     print("Le client a fermé la connexion")
                     self.close = True
                     break
 
-                # Met à jour les variables
-                self.guest.velocity = self.moteur.verif_velocity(
-                    recieved_data["guest"]["velocity"]
-                )  # verification de la vélocité dès qu'on le recoit
-                self.guest.moving_intent = recieved_data["guest"]["moving_intent"]
-                self.guest.attaque = recieved_data["guest"]["attaque"]
+                # -- Update variables --
+                self.update_variables(recieved_data)
 
-                # Défini les variables à envoyer et les encodes
-                to_send_data = get_to_send_data()
-                # dès qu'on envoie attaque = True une fois au client on met sur False
+                # -- Envoie données --
+                to_send_data = self.get_to_send_data()
                 self.attaque = False
                 to_send_bytes = dict_to_bytes(to_send_data)
 
-                # Envoie les données
                 writer.write(to_send_bytes)
                 await writer.drain()
 
-                # Attend de manière à envoyer seulement 30 fois par secondes
+                # -- Wait --
                 await asyncio.sleep(1 / 30)
         finally:
-            # Ferme la connexion
+            # -- Ferme connexion --
             writer.close()
             print("Connexion fermé")
 
     async def tcp_server(self):
-        """Lance le server et donc autorise le client à se connecter;"""
+        """Lance le server et donc autorise le client à se connecter."""
 
+        # -- Lancer serveur --
         self.asyncio_loop = asyncio.get_running_loop()
-        # Défini un serveur sur le port 8888
         self.serveur = await asyncio.start_server(
             self.handle_client, host="0.0.0.0", port=8888
         )
 
-        # Lance le serveur qui s'execute tant que
-        # le jeu tourne et que le client est connecté
+        # -- Tourner le serveur --
         print("Attente de client")
         async with self.serveur:
             try:
@@ -412,79 +436,40 @@ class HostController(PlayerControllerBase):
     def stop_server(self):
         """Arrête le protocole de communication avec le client."""
 
+        # -- Définit fonction dtop --
         async def stop_server():
             if self.serveur and self.serveur.is_serving():
                 self.serveur.close()
                 await self.serveur.wait_closed()
 
+        # -- Appel fonction stop --
         asyncio.run_coroutine_threadsafe(stop_server(), self.asyncio_loop)
 
-    def event(self, keys):
-
-        super().event(keys)
-
     def update(self):
+        """Met à jour les éléments nécessaire du joueur et du client."""
 
+        # -- Charge chunks --
         self.map.load_chunks(self.position)
 
-        # Hôte
-        self.moving_intent = self.velocity.length_squared() > 0
-        if self.moving_intent:  # Si l'hôte veux bouger
+        # -- Update Host --
+        self.authority_update(self.guest.hitbox)
 
-            self.update_direction()
-
-            self.moteur.collision(self.hitbox, self.velocity, self.guest.hitbox)
-
-            super().update()
-
-        if self.attaque and not self.connected:
-            self.animation.trigger_attack()
-            self.attaque_rect = self.moteur.create_rect_attaque(
-                self.position, self.direction
-            )
-            self.attaque = False
-
-        elif self.attaque:
-            self.animation.trigger_attack()
-            self.attaque_rect = self.moteur.create_rect_attaque(
-                self.position, self.direction
-            )
-            # le self.attaque = False de l'hôte est effectuer juste après l'avoir envoyer au client
-
-        self.animation.update(self.moving_intent, self.direction)
-
-        # Client
-        if self.guest.moving_intent:  # Si le client veux bouger
-
-            self.guest.update_direction()
-
-            self.moteur.collision(self.guest.hitbox, self.guest.velocity, self.hitbox)
-
-            self.guest.update()
-
-        if self.guest.attaque:  # regarde si client attaque
-            self.guest.animation.trigger_attack()
-            self.guest.attaque_rect = self.moteur.create_rect_attaque(
-                self.guest.position, self.guest.direction
-            )
-            self.guest.attaque = False
-
-        self.guest.animation.update(self.guest.moving_intent, self.guest.direction)
+        # -- Update Client --
+        self.guest.authority_update(self.hitbox)
 
     def display(self):
         """Affiche le joueur ainsi que l'invité"""
 
+        # -- Client --
         self.guest.display()
 
+        # -- Host --
         super().display()
-
-        if self.show_hitbox:
-            for obstacle in self.moteur.nearby_obstacles:
-                pygame.draw.rect(self.screen, "red", self.camera.apply(obstacle), 2)
 
 
 class GuestController(PlayerControllerBase):
-    """Classe pour un client.\n
+    """Classe pour un client.
+
     Implémente les joueurs et les fonctions nécessaires ainsi
     que les fonction de communications avec l'hôte."""
 
@@ -497,25 +482,31 @@ class GuestController(PlayerControllerBase):
         port: int,
     ):
 
+        # -- Joueur --
         super().__init__(screen, moteur, map, (0, 0))
-        # Défini un player pour l'hôte
-        self.host = PlayerControllerBase(self.screen, None, map, (0, 0))
 
+        # -- Host --
+        self.host = PlayerControllerBase(self.screen, moteur, map, (0, 0))
+
+        # -- Réseau --
         self.address = address
         self.port = port
         self.loaded = False
+        self.reader: asyncio.StreamReader | None = None
+        self.writer: asyncio.StreamWriter | None = None
 
-        # Défini un processus pour la connexion
-        # sur un autre thread du processeur
+        # -- Ennemis --
+        self.ennemis_data: Dict[int, Dict[str, Any]]
+
+        # -- Processus --
         self.loop = threading.Thread(target=self.run)
         self.loop.start()
 
-        # position du client et l'hôte reçu par le serveur/hôte
-        self.server_pos = None
-        self.host_target_pos = None
+        # -- Interpolation --
+        self.target_pos: pygame.Vector2 | None = None
+        self.host_target_pos: pygame.Vector2 | None = None
 
-    def set_camera(self, camera):
-        self.camera: Camera
+    def set_camera(self, camera: Camera):
         self.camera = camera
         self.host.camera = camera
 
@@ -523,42 +514,51 @@ class GuestController(PlayerControllerBase):
         self.show_hitbox = not self.show_hitbox
         self.host.show_hitbox = self.show_hitbox
 
+    def init_variables(self, data: Dict):
+        """Initialise les variables lors de la première connection."""
+
+        # -- Invité --
+        self.position.update(data["guest"]["position"])
+
+        # -- Host --
+        self.host.moving_intent = data["host"]["moving_intent"]
+        self.host.direction = data["host"]["direction"]
+        self.host.position.update(data["host"]["position"])
+
+        # -- Map --
+        self.map = Map(
+            data["map"]["nb_chunks"],
+            data["map"]["chunk_size"],
+            data["map"]["octaves"],
+            (32, 32),
+            r"Ressources\Pixel Art Top Down - Basic v1.2.3",
+            self.screen,
+            data["map"]["seed"],
+        )
+
     async def connect(self):
-        """Se connecte au serveur"""
+        """Se connecte au serveur."""
 
         try:
+            # -- Récupère les données --
             self.reader, self.writer = await asyncio.open_connection(
                 self.address, self.port
             )
 
-            # Récupère la position initiale des joueurs
+            # Récupère les variables initiales
             recieved_bytes = await self.reader.readline()
             recieved_data = bytes_to_dict(recieved_bytes)
-
-            # Met à jour les variable correspondantes
-            self.position.update(recieved_data["guest"]["position"])
-            self.host.position.update(recieved_data["host"]["position"])
-            self.host.moving_intent = recieved_data["host"]["moving_intent"]
-            self.host.direction = recieved_data["host"]["direction"]
-
-            self.map = Map(
-                recieved_data["map"]["nb_chunks"],
-                recieved_data["map"]["chunk_size"],
-                recieved_data["map"]["octaves"],
-                (32, 32),
-                r"Ressources\Pixel Art Top Down - Basic v1.2.3",
-                self.screen,
-                recieved_data["map"]["seed"],
-            )
+            self.init_variables(recieved_data)
 
             self.writer.write(dict_to_bytes({"close": False}))
-        except ConnectionRefusedError:
+
+        except ConnectionRefusedError:  # Si pb connexion
             self.close = True
 
         self.loaded = True
 
     async def initialize(self):
-        """Fonction de lancement du réseau"""
+        """Fonction de lancement du réseau."""
 
         await self.connect()
         if not self.close:
@@ -566,99 +566,104 @@ class GuestController(PlayerControllerBase):
 
     def run(self):
         """Lance le serveur en se connectant à l'hôte puis
-        en lancant le processus de communication"""
+        en lancant le processus de communication."""
 
         asyncio.run(self.initialize())
+
+    def get_to_send_data(self) -> Dict:
+        """Créer le dictionnaire de valeurs à envoyer à l'hôte."""
+        return {
+            "guest": {
+                "velocity": list(self.velocity),
+                "moving_intent": self.moving_intent,
+                "attaque": self.attaque,
+            },
+            "close": False,
+        }
+
+    def update_variables(self, data: Dict):
+        """Update variables."""
+
+        # -- Invité --
+        self.target_pos = pygame.Vector2(data["guest"]["position"])
+        raw_rect = data["guest"]["attaque_rect"]
+        self.attaque_rect = pygame.Rect(raw_rect) if raw_rect else None
+
+        # -- Host --
+        self.host_target_pos = pygame.Vector2(data["host"]["position"])
+        self.host.moving_intent = data["host"]["moving_intent"]
+        self.host.direction = data["host"]["direction"]
+        self.host.attaque = data["host"]["attaque"]
+        raw_rect = data["host"]["attaque_rect"]
+        self.host.attaque_rect = pygame.Rect(raw_rect) if raw_rect else None
+
+        # -- Ennemis --
+        self.ennemis_data = data["ennemis"]
 
     async def handle_host(self):
         """Gére les communications entre le client et l'hôte."""
 
-        def get_to_send_data() -> Dict:
-            return {
-                "guest": {
-                    "velocity": list(self.velocity),
-                    "moving_intent": self.moving_intent,
-                    "attaque": self.attaque,
-                },
-                "close": False,
-            }
-
         try:
             while True:
 
-                # Si le jeu est fermé, envoyer l'info à l'hôte et ferme la connexion
+                # -- Si client ferme --
                 if self.close:
                     self.writer.write(dict_to_bytes({"close": True}))
                     await self.writer.drain()
                     break
 
-                # Défini les variables à envoyer à l'hôte et les encodes
-                to_send_data = get_to_send_data()
+                # -- Envoie données --
+                to_send_data = self.get_to_send_data()
                 self.attaque = False  # consommé après envoi
                 to_send_bytes = dict_to_bytes(to_send_data)
 
-                # Envoie les données
                 self.writer.write(to_send_bytes)
                 await self.writer.drain()
 
-                # Récupère les donnée les décode et verifie leur existence
+                # -- Récupère les donnée --
                 recieved_bytes = await asyncio.wait_for(
                     self.reader.readline(), timeout=1.0
                 )
-                recieved_data = bytes_to_dict(recieved_bytes)
-                if not recieved_data:
+                if not recieved_bytes:
                     break
 
-                # Si l'hôte a fermé son jeu, fermer le jeu
+                recieved_data = bytes_to_dict(recieved_bytes)
+
+                # -- Si l'hôte fermé --
                 if recieved_data["close"] is True:
                     self.close = True
                     print("L'hôte a fermé la connexion")
                     break
 
-                # Met à jour les variables
-                self.server_pos = pygame.Vector2(recieved_data["guest"]["position"])
-                raw_rect = recieved_data["guest"]["attaque_rect"]
-                self.attaque_rect = pygame.Rect(raw_rect) if raw_rect else None
+                self.update_variables(recieved_data)
 
-                self.host_target_pos = pygame.Vector2(recieved_data["host"]["position"])
-                self.host.moving_intent = recieved_data["host"]["moving_intent"]
-                self.host.direction = recieved_data["host"]["direction"]
-                self.host.attaque = recieved_data["host"]["attaque"]
-                raw_rect = recieved_data["host"]["attaque_rect"]
-                self.host.attaque_rect = pygame.Rect(raw_rect) if raw_rect else None
-
-                # Attend de manière à ce qu'il y ai 30 envoie par secondes
+                # -- Wait --
                 await asyncio.sleep(1 / 30)
         finally:
             self.writer.close()
             print("Connexion fermé")
 
-    def event(self, keys):
-
-        super().event(keys)
-
     def update(self):
+        """Met à jour les éléments nécessaire du joueur et du client."""
 
+        # -- Map --
         self.map.load_chunks(self.position)
 
-        # le client calcule de son côté ça propre direction et moving_intent
-        # + Client Side prediction : bouge sans attendre le serveur
-        self.moving_intent = self.velocity.length_squared() > 0
-        if self.moving_intent:
-            self.update_direction()
-            self.moteur.collision(self.hitbox, self.velocity, self.host.hitbox)
-            super().update()
+        # -- Guest --
+        self.authority_update(self.host.hitbox)
 
-        # mise à jour fluide de la position du client : corrige doucement l'écart
-        if self.server_pos is not None:
-            delta = (self.server_pos - self.position).length()
+        if self.target_pos is not None:
+            delta = (self.target_pos - self.position).length()
             if delta > SPEED * 4:  # téléport si désync > 4 frames de mouvement
-                self.position.update(self.server_pos)
+                self.position.update(self.target_pos)
             elif delta > SPEED * 0.5:
                 lerp = 0.3 if self.moving_intent else 0.6
-                self.position += (self.server_pos - self.position) * lerp
+                self.position += (self.target_pos - self.position) * lerp
             self.hitbox.center = self.position
-            self.server_pos = None
+            self.target_pos = None
+
+        # -- Host --
+        self.host.authority_update(self.hitbox)
 
         if self.host_target_pos is not None:
             delta = (self.host_target_pos - self.host.position).length()
@@ -668,26 +673,16 @@ class GuestController(PlayerControllerBase):
                 self.host.position.update(self.host_target_pos)
             self.host.hitbox.center = self.host.position
 
-        # gestion animation attaque
-        if self.attaque:
-            self.animation.trigger_attack()
-            # le self.attaque = False du client est effectuer juste après l'avoir envoyer a l'hôte
-
-        if self.host.attaque:
-            self.host.animation.trigger_attack()
-            self.host.attaque = False
-
-        # gestion animation
-        self.animation.update(self.moving_intent, self.direction)
-        self.host.animation.update(self.host.moving_intent, self.host.direction)
-
     def display(self):
         """Affiche le joueur ainsi que l'hôte"""
 
+        # -- Host --
         self.host.display()
 
+        # -- Guest --
         super().display()
 
+        # -- Debug F2 --
         if self.show_hitbox:
             for obstacle in self.moteur.nearby_obstacles:
                 pygame.draw.rect(self.screen, "red", self.camera.apply(obstacle), 2)
