@@ -306,18 +306,20 @@ class HostController(PlayerControllerBase):
                 "position": list(self.guest.position),
                 "attaque_rect": (
                     list(self.guest.attaque_rect)
-                    if self.guest.attaque_rect and self.guest.attaque
+                    if self.guest.attaque_rect
+                    and self.guest.animation.current_state == "attack"
                     else None
                 ),
             },
             "host": {
                 "position": list(self.position),
                 "moving_intent": self.moving_intent,
+                "velocity": list(self.velocity),
                 "direction": self.direction,
-                "attaque": self.attaque,
+                "attaque": self.animation.current_state == "attack",
                 "attaque_rect": (
                     list(self.attaque_rect)
-                    if self.attaque_rect and self.attaque
+                    if self.attaque_rect and self.animation.current_state == "attack"
                     else None
                 ),
             },
@@ -452,6 +454,7 @@ class HostController(PlayerControllerBase):
         self.map.load_chunks(self.position)
 
         # -- Update Host --
+        print(self.attaque)
         self.authority_update(self.guest.hitbox)
 
         # -- Update Client --
@@ -576,7 +579,7 @@ class GuestController(PlayerControllerBase):
             "guest": {
                 "velocity": list(self.velocity),
                 "moving_intent": self.moving_intent,
-                "attaque": self.attaque,
+                "attaque": self.animation.current_state == "attack",
             },
             "close": False,
         }
@@ -592,6 +595,7 @@ class GuestController(PlayerControllerBase):
         # -- Host --
         self.host_target_pos = pygame.Vector2(data["host"]["position"])
         self.host.moving_intent = data["host"]["moving_intent"]
+        self.host.velocity = pygame.Vector2(data["host"]["velocity"])
         self.host.direction = data["host"]["direction"]
         self.host.attaque = data["host"]["attaque"]
         raw_rect = data["host"]["attaque_rect"]

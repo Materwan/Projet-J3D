@@ -85,7 +85,7 @@ def apply_back_front_exception(anim_dict, background_opacity: int | None = 128):
     if keys == {"back", "front"}:
         back_val = apply_back_front_exception(anim_dict["back"], background_opacity)
         front_val = apply_back_front_exception(anim_dict["front"], background_opacity)
-        print(back_val, front_val)
+        # print(back_val, front_val)
 
         if not isinstance(back_val, list) or not isinstance(front_val, list):
             raise TypeError("'back' et 'front' doivent contenir des listes d'images")
