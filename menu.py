@@ -19,10 +19,6 @@ UDP_IP = "0.0.0.0"
 UDP_PORT = 9999
 
 p.font.init()
-p.mixer.init()
-
-p.mixer.music.load("Ressources/Musics/placeholder.mp3")
-p.mixer.music.play(-1)
 
 
 class Text:
@@ -119,7 +115,7 @@ class Principal_Menu(Menu):
             EXIT_BUTTON, self.screen, (self.half[0], self.half[1] + 200)
         )
         self.titre, _ = create_button_with_text(
-            TITLE, self.screen, (self.half[0], self.half[1] - 250), "", 0.6
+            TITLE, self.screen, (self.half[0], self.half[1] // 3), "", 0.6
         )
         # =======================Button End=======================
 
@@ -416,14 +412,12 @@ class Play_Menu(Menu):
             if event.type == p.MOUSEBUTTONDOWN:
                 if self.solo.rec.collidepoint(coord):
                     self.solo.clicked = True
-                    p.mixer.music.stop()
                     self.solo.hover = False
                     self.manager.states["GAME"].playing_mode = "solo"
                     self.manager.change_state("GAME")
                     self.manager.state.initialize()
                 elif self.multiplayer.rec.collidepoint(coord):
                     self.multiplayer.clicked = True
-                    p.mixer.music.stop()
                     self.multiplayer.hover = False
                     self.manager.states["GAME"].playing_mode = "host"
                     self.manager.change_state("GAME")
@@ -560,7 +554,6 @@ class Join_Multi_Menu(Menu):
                             self.manager.states["GAME"].address = elt[1][0].caractere
                             self.manager.change_state("GAME")
                             self.manager.state.initialize()
-                            p.mixer.music.stop()
                             break
             else:
                 self.retour.hover = False

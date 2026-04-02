@@ -6,13 +6,27 @@ import pygame
 from menu import Principal_Menu, Setting_Menu, Play_Menu, Join_Multi_Menu, Pause_Menu
 from game import Game
 from player import HostController, GuestController
+from sound import SoundController
 
 pygame.init()
 pygame.mixer.init()
 pygame.display.set_caption("MoleTale")
 
 FPS = 60
-TAILLE_ECRAN = (500, 500)  # (0, 0) pour plein écran
+TAILLE_ECRAN = (500, 500)  # (0, 0)(500, 500) pour plein écran
+
+SOUND_PATH = "Ressources/Musics/"
+MUSIC_HOLDER = SOUND_PATH + "placeholder.mp3"
+SOUND_AMBIANCE = SOUND_PATH + "ambiance.mp3"
+SOUND_FOOTSTEP = SOUND_PATH + "footstep.mp3"
+SOUND_ATTACK = SOUND_PATH + "attack.mp3"
+SOUND = {
+    "main_music": SoundController(MUSIC_HOLDER),
+    "ambiance": SoundController(SOUND_AMBIANCE),
+    "footstep": SoundController(SOUND_FOOTSTEP, 1),
+    "attack": SoundController(SOUND_ATTACK, 1),
+}
+
 screen = pygame.display.set_mode(TAILLE_ECRAN)
 
 
@@ -37,9 +51,16 @@ class Manager:
         self.fps = False
         self.font = pygame.font.SysFont(None, 24)  # fps
         self.clock = pygame.time.Clock()
+        SOUND["main_music"].plays_sound()
 
     def change_state(self, name):
         self.state = self.states[name]
+        if name == "GAME":
+            SOUND["main_music"].stop_sound()
+            SOUND["ambiance"].plays_sound()
+        else:
+            SOUND["ambiance"].stop_sound()
+            SOUND["main_music"].plays_sound()
 
     def run(self):
         while self.running:
