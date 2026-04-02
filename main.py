@@ -54,6 +54,7 @@ class Manager:
         SOUND["main_music"].plays_sound()
 
     def change_state(self, name):
+        self.state.update()
         self.state = self.states[name]
         if name == "GAME":
             SOUND["main_music"].stop_sound()

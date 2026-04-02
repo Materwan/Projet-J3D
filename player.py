@@ -162,7 +162,7 @@ class PlayerControllerBase:
 
         # -- Animation --
         state = "run" if self.moving_intent else "idle"
-        if self.attaque:
+        if self.attaque and self.animation.current_state != "attack":
             state = "attack"
             self.attaque_rect = self.moteur.create_rect_attaque(
                 self.position, self.direction
@@ -454,7 +454,6 @@ class HostController(PlayerControllerBase):
         self.map.load_chunks(self.position)
 
         # -- Update Host --
-        print(self.attaque)
         self.authority_update(self.guest.hitbox)
 
         # -- Update Client --
@@ -634,7 +633,7 @@ class GuestController(PlayerControllerBase):
                 recieved_data = bytes_to_dict(recieved_bytes)
 
                 # -- Si l'hôte fermé --
-                if recieved_data["close"] is True:
+                if recieved_data["close"]:
                     self.close = True
                     print("L'hôte a fermé la connexion")
                     break

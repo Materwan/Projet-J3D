@@ -196,7 +196,6 @@ class Game:
 
     def update(self):
         """Met à jour le jeu."""
-
         dt = self.clock.tick(60) / 1000.0
 
         # -- Joueur --
@@ -204,6 +203,9 @@ class Game:
         self.camera.update(self.player_controller.hitbox)
 
         if self.player_controller.close:
+            if isinstance(self.player_controller, HostController):
+                if self.player_controller.serveur.is_serving():
+                    self.player_controller.serveur.close()
             self.manager.state = self.manager.states["MENU_P"]
 
         # -- Ennemis --
