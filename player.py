@@ -617,7 +617,6 @@ class GuestController(PlayerControllerBase):
 
                 # -- Envoie données --
                 to_send_data = self.get_to_send_data()
-                self.attaque = False  # consommé après envoi
                 to_send_bytes = dict_to_bytes(to_send_data)
 
                 self.writer.write(to_send_bytes)
