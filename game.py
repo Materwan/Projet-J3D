@@ -2,7 +2,8 @@
 
 import time
 from random import randint
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Tuple
+import json
 
 import pygame
 
@@ -58,6 +59,10 @@ class Game:
         # -- Map --
         self.map = None
         self.map: Map
+        self.nb_chunks = (8, 8)
+        self.chunk_size = (32, 32)
+        self.octaves = (8, 8)
+        self.seed = 0
 
         # -- Moteur --
         self.moteur: Moteur | None = None
@@ -137,13 +142,13 @@ class Game:
 
             # -- Map --
             self.map = Map(
-                (8, 8),
-                (32, 32),
-                (8, 8),
+                self.nb_chunks,
+                self.chunk_size,
+                self.octaves,
                 (32, 32),
                 r"Ressources\Pixel Art Top Down - Basic v1.2.3",
                 self.screen,
-                1,
+                self.seed,
             )
 
             # -- Controlleur --
@@ -184,6 +189,8 @@ class Game:
                     if self.camera:
                         self.camera.start_shake(intensity=2, duration=10)
                     self.player_controller.attaque = True
+                elif event.key == pygame.K_0:
+                    self.save()
 
                 elif event.key == pygame.K_F2:  # Debug F2
                     self.player_controller.toggle_hitbox()
@@ -292,3 +299,53 @@ class Game:
 
         # -- Inventaire --
         self.drag_mgr.draw(pygame.mouse.get_pos())
+
+    def save(self, file: str | None = "save.json"):
+
+        if isinstance(self.player_controller, SoloPlayerController):
+            data = {
+                "playing_mode": "solo",
+                "map": {
+                    "seed": self.map.seed,
+                    "nb_chunks": self.map.nb_chunks.tolist(),
+                    "chunk_size": self.map.chunk_size_tile.tolist(),
+                    "octaves": self.map.octaves,
+                },
+                "player": {
+                    "position": list(self.player_controller.position),
+                },
+            }
+        else:
+            data = {
+                "playing_mode": "multi",
+                "map": {
+                    "seed": self.map.seed,
+                    "nb_chunks": self.map.nb_chunks,
+                    "chunk_size": self.map.chunk_size_tile,
+                    "octaves": self.map.octaves,
+                },
+                "host": {
+                    "position": list(self.player_controller.position),
+                },
+                "guest": {
+                    "position": list(self.player_controller.guest.position),
+                },
+            }
+
+        with open(file, "w") as f:
+
+            raw = json.dumps(data, indent="\t")
+            f.write(raw)
+
+    def load_save(self, file: str):
+
+        with open(file, "r") as f:
+
+            raw = f.read()
+            data = json.loads(raw)
+
+        self.nb_chunks = data["map"]["nb_chunks"]
+        self.chunk_size = data["map"]["chunk_size"]
+        self.octaves = data["map"]["octaves"]
+        self.seed = data["map"]["seed"]
+        self.playing_mode = data["playing_mode"]

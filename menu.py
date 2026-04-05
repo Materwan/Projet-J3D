@@ -409,6 +409,8 @@ class Play_Menu(Menu):
             if event.type == p.KEYDOWN:
                 if event.key == p.K_ESCAPE:
                     self.manager.change_state("MENU_P")
+                if event.key == p.K_0:
+                    self.manager.states["GAME"].load_save("save.json")
             if event.type == p.MOUSEBUTTONDOWN:
                 if self.solo.rec.collidepoint(coord):
                     self.solo.clicked = True
