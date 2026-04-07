@@ -3,7 +3,15 @@ import traceback
 
 import pygame
 
-from menu import Principal_Menu, Setting_Menu, Play_Menu, Join_Multi_Menu, Pause_Menu
+from menu import (
+    Principal_Menu,
+    Setting_Menu,
+    Play_Menu,
+    Join_Multi_Menu,
+    Pause_Menu,
+    Reprendre_Menu,
+    Creer_Menu,
+)
 from game import Game
 from player import HostController, GuestController
 from sound import SoundController
@@ -13,7 +21,7 @@ pygame.mixer.init()
 pygame.display.set_caption("MoleTale")
 
 FPS = 60
-TAILLE_ECRAN = (500, 500)  # (0, 0) pour plein écran
+TAILLE_ECRAN = (1000, 700)  # (500, 500) pour petit ecran (0, 0) pour plein ecran
 
 SOUND_PATH = "Ressources/Musics/"
 MUSIC_HOLDER = SOUND_PATH + "placeholder.mp3"
@@ -45,6 +53,8 @@ class Manager:
             "MENU_PLAY": Play_Menu(self.screen, self),
             "MENU_MULTI": Join_Multi_Menu(self.screen, self),
             "MENU_PAUSE": Pause_Menu(self.screen, self),
+            "MENU_REPRENDRE": Reprendre_Menu(self.screen, self),
+            "MENU_CREER": Creer_Menu(self.screen, self),
         }
         self.state = self.states["MENU_P"]
 
@@ -100,6 +110,15 @@ class Manager:
                 and self.states["GAME"].player_controller.serveur.is_serving()
             ):
                 self.states["GAME"].player_controller.stop_server()
+
+    def change_volume(self, change_volume: bool):
+        """True = increase the volume of all sounds | False = decrease the volume of all sounds"""
+        if change_volume:
+            for key in SOUND.keys():
+                SOUND[key].volume_increase()
+        else:
+            for key in SOUND.keys():
+                SOUND[key].volume_decrease()
 
 
 manager = Manager()

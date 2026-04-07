@@ -29,7 +29,14 @@ class SoundController:
         elif self.loop != -1:
             p.mixer.music.unload()
 
-    def change_volume(self, newvol: float):
-        """set the volume to the new volume"""
-        if newvol > 1.0 and newvol < 0.0:
-            self.volume = newvol
+    def volume_increase(self):
+        """increase the volume"""
+        if self.volume <= 0.9:
+            self.volume += 0.1
+            p.mixer.music.set_volume(self.volume)
+
+    def volume_decrease(self):
+        """decrease the volume"""
+        if self.volume >= 0.1:
+            self.volume -= 0.1
+            p.mixer.music.set_volume(self.volume)
