@@ -108,7 +108,7 @@ class Game:
         """Initialise le moteur, le controlleur à utiliser, les keybinds et la camera."""
 
         # -- Moteur --
-        self.moteur = Moteur()
+        self.moteur = Moteur(self.camera)
 
         # -- Client --
         if self.playing_mode == "guest":
@@ -168,7 +168,9 @@ class Game:
             self.player_controller.set_camera(self.camera)
 
             # -- Ennemis --
-            ennemi = Ennemi(self.screen, (3500, 3500), 1, 32, self.map)
+            ennemi = Ennemi(
+                self.screen, (3500, 3500), 1, 32, self.moteur, self.map, self.camera
+            )
             self.ennemis_id.append(0)
             self.ennemis[0] = ennemi
 
@@ -219,7 +221,10 @@ class Game:
         if isinstance(self.player_controller, SoloPlayerController):
             # -- Solo --
             for ennemi in self.ennemis.values():
-                ennemi.update(self.player_controller.position)
+                ennemi.update(
+                    self.player_controller.position,
+                    hitbox_joueur=[self.player_controller.hitbox],
+                )
 
         if isinstance(self.player_controller, HostController):
             # -- Host --
@@ -227,6 +232,10 @@ class Game:
                 ennemi.update(
                     self.player_controller.position,
                     self.player_controller.guest.position,
+                    hitbox_joueur=[
+                        self.player_controller.hitbox,
+                        self.player_controller.guest.hitbox,
+                    ],
                 )
             self.player_controller.ennemis_data = serialize_ennemis(self.ennemis)
 
@@ -291,7 +300,7 @@ class Game:
 
         # -- Ennemis --
         for ennemi in self.ennemis.values():
-            ennemi.display(self.camera)
+            ennemi.display(self.player_controller.show_hitbox)
 
         # -- Particules --
         for sprite in self.particles:

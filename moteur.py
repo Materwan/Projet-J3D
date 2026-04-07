@@ -1,11 +1,14 @@
 import pygame
 from map import Map
+from camera_system import Camera
 
 
 class Moteur:
-    def __init__(self):
+    def __init__(self, camera):
         self.map = None
         self.map: Map
+        self.camera: Camera = camera
+        self.show_hitbox: bool = False
         self.nearby_obstacles = []
 
         # Configuration : { "direction": (decalage_x, decalage_y, largeur, hauteur) }
@@ -52,7 +55,7 @@ class Moteur:
         self,
         hitbox: pygame.Rect,
         velocity: pygame.Vector2,
-        other_hitbox: pygame.Rect | None,
+        other_hitbox: list[pygame.Rect],
     ):
         """
         Anticipe et résout les collisions avec les obstacles environnants.
@@ -67,24 +70,25 @@ class Moteur:
             other_hitbox (pygame.Rect|None): La boîte de collision actuelle de l'autre joueur.
         """
         self.nearby_obstacles = self.get_nearby_obstacles(hitbox)
-        if other_hitbox is not None:
-            self.nearby_obstacles.append(other_hitbox)
+        for elt in other_hitbox:
+            self.nearby_obstacles.append(elt)
+        print(self.nearby_obstacles)
 
-        if velocity.x != 0:
-            future_hitbox = hitbox.move(velocity.x * 3, 0)
+        if velocity[0] != 0:
+            future_hitbox = hitbox.move(velocity[0] * 3, 0)
             if any(
                 future_hitbox.colliderect(obstacle)
                 for obstacle in self.nearby_obstacles
             ):
-                velocity.x = 0
+                velocity[0] = 0
 
-        if velocity.y != 0:
-            future_hitbox = hitbox.move(0, velocity.y * 3)
+        if velocity[1] != 0:
+            future_hitbox = hitbox.move(0, velocity[1] * 3)
             if any(
                 future_hitbox.colliderect(obstacle)
                 for obstacle in self.nearby_obstacles
             ):
-                velocity.y = 0
+                velocity[1] = 0
 
     def verif_velocity(self, velocity: list) -> pygame.Vector2:
         """

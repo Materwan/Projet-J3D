@@ -11,6 +11,7 @@ import numpy as np
 from map import Map
 from camera_system import Camera
 from animations import AnimationController
+from moteur import Moteur
 
 
 def create_node(
@@ -103,14 +104,16 @@ class Ennemi:
         position: List[int],
         speed: int,
         chase_range: float,
+        moteur: Moteur,
         map: Map,
+        camera: Camera,
     ):
         self.screen = screen
         self.animation = AnimationController(
             r"Ressources\Animations\Ennemis\ennemy_1", None, self.screen
         )
         self.position = np.array(position)
-        self.rect = pygame.Rect(position[0], position[1], 32, 32)
+        self.rect = pygame.Rect(position[0], position[1], 28, 20)
         self.speed = speed
         self.chase_range = chase_range
         self.velocity: np.ndarray | None = None
@@ -120,6 +123,10 @@ class Ennemi:
         self.path = []
         self.direction = np.array((0, 0))
         self.last_calc = 0
+
+        # ajouter par thibaut range ou tu veux
+        self.camera = camera
+        self.moteur = moteur
 
     def update_variables(self, data: Dict[str, Any]):
         self.position = np.array(data["position"])
@@ -137,7 +144,7 @@ class Ennemi:
             state = "attack"
         self.animation.update(state, self.direction)
 
-    def update(self, *players_pos: pygame.Vector2):
+    def update(self, *players_pos: pygame.Vector2, hitbox_joueur: list[pygame.Rect]):
 
         players_positions = [
             np.array((vec.x, vec.y), dtype=np.int32) // self.map.tile_size
@@ -157,6 +164,11 @@ class Ennemi:
                 if len(self.path) > 1:
                     self.velocity = -(tile_position - np.array(self.path[1]))
                 self.last_calc = time.time()
+
+            # collision :
+            if (self.velocity**2).sum() > 0:
+                self.moteur.collision(self.rect, self.velocity, hitbox_joueur)
+
             self.position += self.velocity * self.speed
             self.rect.move_ip(self.velocity * self.speed)
             if (
@@ -171,16 +183,20 @@ class Ennemi:
 
         return self.path
 
-    def display(self, camera: Camera):
+    def display(self, show_hitbox):
 
-        screen_pos = pygame.Vector2(camera.apply(self.rect).center)
+        screen_pos = pygame.Vector2(self.camera.apply(self.rect).center)
 
         self.animation.display(
             screen_pos
             - pygame.Vector2(
-                self.animation.im_size[0] // 2, self.animation.im_size[1] - 22
+                self.animation.im_size[0] // 2, self.animation.im_size[1] - 15
             )
         )
+        if show_hitbox:
+            pygame.draw.rect(
+                self.screen, "red", self.camera.apply(self.rect), 2
+            )  # hitbox ennemie
 
 
 if __name__ == "__main__":

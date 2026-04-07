@@ -147,7 +147,7 @@ class PlayerControllerBase:
 
             self.hitbox.center = self.position  # Place hitbox sur pos
 
-    def authority_update(self, collision_hitbox: pygame.Rect | None = None):
+    def authority_update(self, collision_hitbox: list[pygame.Rect] = []):
         """Met à jour les donnée d'un controlleur autoritaire (Solo / Host)."""
 
         # -- Mouvements --
