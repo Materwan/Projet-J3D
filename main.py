@@ -13,7 +13,7 @@ pygame.mixer.init()
 pygame.display.set_caption("MoleTale")
 
 FPS = 60
-TAILLE_ECRAN = (500, 500)  # (0, 0)(500, 500) pour plein écran
+TAILLE_ECRAN = (500, 500)  # (0, 0) pour plein écran
 
 SOUND_PATH = "Ressources/Musics/"
 MUSIC_HOLDER = SOUND_PATH + "placeholder.mp3"

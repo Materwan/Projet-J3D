@@ -104,9 +104,9 @@ class Ennemi:
         position: List[int],
         speed: int,
         chase_range: float,
-        moteur: Moteur,
         map: Map,
         camera: Camera,
+        moteur: Moteur,
     ):
         self.screen = screen
         self.animation = AnimationController(
@@ -124,7 +124,7 @@ class Ennemi:
         self.direction = np.array((0, 0))
         self.last_calc = 0
 
-        # ajouter par thibaut range ou tu veux
+        # ajouter par thibaut le BG : range ou tu veux
         self.camera = camera
         self.moteur = moteur
 
@@ -183,7 +183,7 @@ class Ennemi:
 
         return self.path
 
-    def display(self, show_hitbox):
+    def display(self):
 
         screen_pos = pygame.Vector2(self.camera.apply(self.rect).center)
 
@@ -193,10 +193,6 @@ class Ennemi:
                 self.animation.im_size[0] // 2, self.animation.im_size[1] - 15
             )
         )
-        if show_hitbox:
-            pygame.draw.rect(
-                self.screen, "red", self.camera.apply(self.rect), 2
-            )  # hitbox ennemie
 
 
 if __name__ == "__main__":

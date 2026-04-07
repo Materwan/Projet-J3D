@@ -1,15 +1,11 @@
 import pygame
 from map import Map
-from camera_system import Camera
 
 
 class Moteur:
-    def __init__(self, camera):
+    def __init__(self):
         self.map = None
         self.map: Map
-        self.camera: Camera = camera
-        self.show_hitbox: bool = False
-        self.nearby_obstacles = []
 
         # Configuration : { "direction": (decalage_x, decalage_y, largeur, hauteur) }
         self.attaque_config = {
@@ -69,24 +65,22 @@ class Moteur:
             velocity (pygame.Vector2): Vecteur de déplacement souhaité (modifié sur place).
             other_hitbox (pygame.Rect|None): La boîte de collision actuelle de l'autre joueur.
         """
-        self.nearby_obstacles = self.get_nearby_obstacles(hitbox)
+        nearby_obstacles = self.get_nearby_obstacles(hitbox)
+
         for elt in other_hitbox:
-            self.nearby_obstacles.append(elt)
-        print(self.nearby_obstacles)
+            nearby_obstacles.append(elt)
 
         if velocity[0] != 0:
             future_hitbox = hitbox.move(velocity[0] * 3, 0)
             if any(
-                future_hitbox.colliderect(obstacle)
-                for obstacle in self.nearby_obstacles
+                future_hitbox.colliderect(obstacle) for obstacle in nearby_obstacles
             ):
                 velocity[0] = 0
 
         if velocity[1] != 0:
             future_hitbox = hitbox.move(0, velocity[1] * 3)
             if any(
-                future_hitbox.colliderect(obstacle)
-                for obstacle in self.nearby_obstacles
+                future_hitbox.colliderect(obstacle) for obstacle in nearby_obstacles
             ):
                 velocity[1] = 0
 

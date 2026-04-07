@@ -72,8 +72,6 @@ class PlayerControllerBase:
         if moteur is not None and map is not None:
             self.moteur.map = map
 
-        self.show_hitbox = False  # pour F2
-
         # -- Animations --
         self.animation = AnimationController(
             r"Ressources\Animations\Player", (100, 100), self.screen
@@ -98,9 +96,6 @@ class PlayerControllerBase:
 
     def set_camera(self, camera: Camera):
         """Initialise la camera du joueur et du client si besoin."""
-
-    def toggle_hitbox(self):
-        """Change debug F2."""
 
     def event(self, keys: Tuple[bool]):
         """
@@ -158,7 +153,7 @@ class PlayerControllerBase:
 
             self.moteur.collision(self.hitbox, self.velocity, collision_hitbox)
 
-            self.update_motor()  # Update vitesse
+            self.update_motor()  # Update position
 
         # -- Animation --
         state = "run" if self.moving_intent else "idle"
@@ -182,27 +177,12 @@ class PlayerControllerBase:
             screen_pos - pygame.Vector2(self.im_size[0] // 2, self.im_size[1] - 22)
         )  # -22 pour afficher le joueur un peu au dessus de la hitbox
 
-        # -- Debug F2 --
-        if self.show_hitbox:
-            pygame.draw.rect(self.screen, "red", self.camera.apply(self.hitbox), 2)
-            # -- Box Joueur --
-            if self.attaque_rect and self.animation.current_state == "attack":
-                pygame.draw.rect(
-                    self.screen, "red", self.camera.apply(self.attaque_rect), 2
-                )
-            # -- Box Environnement --
-            for obstacle in self.moteur.nearby_obstacles:
-                pygame.draw.rect(self.screen, "red", self.camera.apply(obstacle), 2)
-
 
 class SoloPlayerController(PlayerControllerBase):
     """Classe pour un joueur solo"""
 
     def set_camera(self, camera: Camera):
         self.camera = camera
-
-    def toggle_hitbox(self):
-        self.show_hitbox = not self.show_hitbox
 
     def update(self):
         """Met à jour les éléments nécessaire du joueur."""
@@ -259,10 +239,6 @@ class HostController(PlayerControllerBase):
     def set_camera(self, camera: Camera):
         self.camera = camera
         self.guest.camera = camera
-
-    def toggle_hitbox(self):
-        self.show_hitbox = not self.show_hitbox
-        self.guest.show_hitbox = self.show_hitbox
 
     def initialize_tcp(self):
         """Lance la fonction en thread partagé."""
@@ -453,10 +429,10 @@ class HostController(PlayerControllerBase):
         self.map.load_chunks(self.position)
 
         # -- Update Host --
-        self.authority_update(self.guest.hitbox)
+        self.authority_update([self.guest.hitbox])
 
         # -- Update Client --
-        self.guest.authority_update(self.hitbox)
+        self.guest.authority_update([self.hitbox])
 
     def display(self):
         """Affiche le joueur ainsi que l'invité"""
@@ -510,10 +486,6 @@ class GuestController(PlayerControllerBase):
     def set_camera(self, camera: Camera):
         self.camera = camera
         self.host.camera = camera
-
-    def toggle_hitbox(self):
-        self.show_hitbox = not self.show_hitbox
-        self.host.show_hitbox = self.show_hitbox
 
     def init_variables(self, data: Dict):
         """Initialise les variables lors de la première connection."""
@@ -651,7 +623,7 @@ class GuestController(PlayerControllerBase):
         self.map.load_chunks(self.position)
 
         # -- Guest --
-        self.authority_update(self.host.hitbox)
+        self.authority_update([self.host.hitbox])
 
         if self.target_pos is not None:
             delta = (self.target_pos - self.position).length()
@@ -664,7 +636,7 @@ class GuestController(PlayerControllerBase):
             self.target_pos = None
 
         # -- Host --
-        self.host.authority_update(self.hitbox)
+        self.host.authority_update([self.hitbox])
 
         if self.host_target_pos is not None:
             delta = (self.host_target_pos - self.host.position).length()
@@ -682,8 +654,3 @@ class GuestController(PlayerControllerBase):
 
         # -- Guest --
         super().display()
-
-        # -- Debug F2 --
-        if self.show_hitbox:
-            for obstacle in self.moteur.nearby_obstacles:
-                pygame.draw.rect(self.screen, "red", self.camera.apply(obstacle), 2)

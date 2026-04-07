@@ -56,6 +56,9 @@ class Game:
         # -- Particules --
         self.particles = pygame.sprite.Group()
 
+        # -- F2 --
+        self.show_hitbox = False
+
         # -- Map --
         self.map = None
         self.map: Map
@@ -108,7 +111,7 @@ class Game:
         """Initialise le moteur, le controlleur à utiliser, les keybinds et la camera."""
 
         # -- Moteur --
-        self.moteur = Moteur(self.camera)
+        self.moteur = Moteur()
 
         # -- Client --
         if self.playing_mode == "guest":
@@ -130,12 +133,6 @@ class Game:
                 self.moteur.map = (
                     self.map
                 )  # donner à moteur pour Client-side prediction
-
-                # -- Camera --
-                self.player_controller.keybinds = self.keybinds
-                self.camera.map_width = self.map.size[0] * self.map.tile_size[0]
-                self.camera.map_height = self.map.size[1] * self.map.tile_size[1]
-                self.player_controller.set_camera(self.camera)
 
         # -- Hote / Solo --
         else:
@@ -161,18 +158,18 @@ class Game:
                     self.screen, self.moteur, self.map, (4000, 4096)
                 )
 
-            # -- Camera --
-            self.player_controller.keybinds = self.keybinds
-            self.camera.map_width = self.map.size[0] * self.map.tile_size[0]
-            self.camera.map_height = self.map.size[1] * self.map.tile_size[1]
-            self.player_controller.set_camera(self.camera)
-
             # -- Ennemis --
             ennemi = Ennemi(
-                self.screen, (3500, 3500), 1, 32, self.moteur, self.map, self.camera
+                self.screen, (3500, 3500), 1, 32, self.map, self.camera, self.moteur
             )
             self.ennemis_id.append(0)
             self.ennemis[0] = ennemi
+
+        # -- Camera --
+        self.player_controller.keybinds = self.keybinds
+        self.camera.map_width = self.map.size[0] * self.map.tile_size[0]
+        self.camera.map_height = self.map.size[1] * self.map.tile_size[1]
+        self.player_controller.set_camera(self.camera)
 
     def event(self, events: List[pygame.event.Event]) -> bool:
         """Gére les entré de l'utilisateur."""
@@ -193,9 +190,8 @@ class Game:
                     self.player_controller.attaque = True
                 elif event.key == pygame.K_0:
                     self.save()
-
                 elif event.key == pygame.K_F2:  # Debug F2
-                    self.player_controller.toggle_hitbox()
+                    self.show_hitbox = not self.show_hitbox
                 elif event.key == pygame.K_i:  # Ouvre inventaire
                     self.ui_joueur.visible = not self.ui_joueur.visible
 
@@ -205,7 +201,6 @@ class Game:
 
     def update(self):
         """Met à jour le jeu."""
-        dt = self.clock.tick(60) / 1000.0
 
         # -- Joueur --
         self.player_controller.update()
@@ -244,7 +239,13 @@ class Game:
             for key, ennemi in self.player_controller.ennemis_data.items():
                 if not key in self.ennemis_id:
                     self.ennemis[key] = Ennemi(
-                        self.screen, ennemi["position"], -1, -1, None
+                        self.screen,
+                        ennemi["position"],
+                        -1,
+                        -1,
+                        None,
+                        self.camera,
+                        None,
                     )
                     self.ennemis[key].update_variables(ennemi)
                     self.ennemis_id.append(key)
@@ -285,7 +286,7 @@ class Game:
                 shrink_range=(2, 15),
                 rot=10,
             )
-        self.particles.update(dt)
+        self.particles.update(self.manager.clock.get_time() / 1000)
 
     def display(self):
         """Affiche tout les éléments."""
@@ -300,14 +301,52 @@ class Game:
 
         # -- Ennemis --
         for ennemi in self.ennemis.values():
-            ennemi.display(self.player_controller.show_hitbox)
+            ennemi.display()
 
         # -- Particules --
         for sprite in self.particles:
             self.screen.blit(sprite.image, self.camera.apply(sprite.rect))
 
+        # -- F2 : TOUTES les hitboxes --
+        if self.show_hitbox:
+            self.draw_debug_hitboxes()
+
         # -- Inventaire --
         self.drag_mgr.draw(pygame.mouse.get_pos())
+
+    def draw_debug_hitboxes(self):
+        """
+        Affiche l'hitbox des joueurs et des ennemies ainsi que leur hitbox
+        d'attaque et les obstacles proches de toutes les entités vivantes.
+        """
+        entities = [self.player_controller]
+
+        # En multi on rajoute l'autre joueur
+        if isinstance(self.player_controller, HostController):
+            entities.append(self.player_controller.guest)
+        elif isinstance(self.player_controller, GuestController):
+            entities.append(self.player_controller.host)
+
+        # Affichage des hitbox et des zones d'attaque
+        for entity in entities:
+            pygame.draw.rect(self.screen, "green", self.camera.apply(entity.hitbox), 2)
+
+            if entity.attaque_rect and entity.animation.current_state == "attack":
+                pygame.draw.rect(
+                    self.screen, "yellow", self.camera.apply(entity.attaque_rect), 2
+                )
+
+        all_hitboxes = [e.hitbox for e in entities]
+
+        # Affichage des hitbox ennemie
+        for ennemi in self.ennemis.values():
+            pygame.draw.rect(self.screen, "orange", self.camera.apply(ennemi.rect), 2)
+            all_hitboxes.append(ennemi.rect)
+
+        # Affichage des obstacles du jeu
+        for hitbox in all_hitboxes:
+            for obs in self.moteur.get_nearby_obstacles(hitbox):
+                pygame.draw.rect(self.screen, "red", self.camera.apply(obs), 2)
 
     def save(self, file: str | None = "save.json"):
 
