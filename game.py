@@ -219,17 +219,23 @@ class Game:
 
         if isinstance(self.player_controller, SoloPlayerController):
             # -- Solo --
-            for ennemi in self.ennemis.values():
+            del_key = []
+            for key, ennemi in self.ennemis.items():
                 self.paths.append(
                     ennemi.update(
                         self.player_controller.position,
                         hitbox_joueur=[self.player_controller.hitbox],
                     )
                 )
+                if time.time() > ennemi.death_time:
+                    del_key.append(key)
+            for key in del_key:
+                del self.ennemis[key]
 
         if isinstance(self.player_controller, HostController):
             # -- Host --
-            for ennemi in self.ennemis.values():
+            del_key = []
+            for key, ennemi in self.ennemis.items():
                 self.paths.append(
                     ennemi.update(
                         self.player_controller.position,
@@ -240,6 +246,10 @@ class Game:
                         ],
                     )
                 )
+                if time.time() > ennemi.death_time:
+                    del_key.append(key)
+            for key in del_key:
+                del self.ennemis[key]
             self.player_controller.ennemis_data = serialize_ennemis(self.ennemis)
 
         elif isinstance(self.player_controller, GuestController):
@@ -381,8 +391,11 @@ class Game:
 
         # Affichage des hitbox ennemie
         for ennemi in self.ennemis.values():
-            pygame.draw.rect(self.screen, "orange", self.camera.apply(ennemi.hitbox), 2)
-            all_hitboxes.append(ennemi.hitbox)
+            if ennemi.hitbox:
+                pygame.draw.rect(
+                    self.screen, "orange", self.camera.apply(ennemi.hitbox), 2
+                )
+                all_hitboxes.append(ennemi.hitbox)
 
         # Affichage des obstacles du jeu
         for hitbox in all_hitboxes:

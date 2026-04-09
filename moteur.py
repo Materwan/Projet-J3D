@@ -109,6 +109,5 @@ class Moteur:
     ):
         ennemi_touch = []
         for id, ennemi in ennemi_list.items():
-            if attaque_rect.colliderect(ennemi.hitbox):
-                ennemi.pv -= 10
-                print(ennemi.pv)
+            if ennemi.hitbox and attaque_rect.colliderect(ennemi.hitbox):
+                ennemi.update_pv(-10)

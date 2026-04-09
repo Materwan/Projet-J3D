@@ -12,9 +12,13 @@ from map import Map
 from camera_system import Camera
 from animations import AnimationController
 from moteur import Moteur
+from particle_system_2 import spawn_local_particle
 
 
 RECALC_MAX = 0.5
+PARTICULES_AT_DEATH = 50
+DEATH_TIME = 1
+DUST_IMAGE_PATH = r"Ressources\particles\dust.png"
 
 
 def create_node(
@@ -110,44 +114,68 @@ class Ennemi:
         moteur: Moteur,
     ):
         self.screen = screen
-        self.animation = AnimationController(
-            r"Ressources\Animations\Ennemis\ennemy_1", None, self.screen
-        )
+
+        # -- Game --
+        self.camera = camera
+        self.moteur = moteur
+        self.map = map
+
+        # -- State --
         self.position = np.array(position, dtype=np.float32)
         self.hitbox = pygame.Rect(position[0], position[1], 28, 20)
         self.speed = speed
+        self.path: List[Tuple[int, int]] | None = []
         self.chase_range = chase_range
         self.velocity = np.array((0, 0), dtype=np.float32)
-        self.attack_range = 20
-        self.attack: bool | None = False
-        self.map = map
-        self.path = []
-        self.dihitboxion = "right"
         self.last_calc = 0
 
-        # ajouter par thibaut le BG : range ou tu veux
-        self.camera = camera
-        self.moteur = moteur
-        self.pv = 100
+        # -- Attaque --
+        self.attack_range = 20
+        self.attack: bool | None = False
+
+        # -- Animation --
+        self.animation = AnimationController(
+            r"Ressources\Animations\Ennemis\ennemy_1", None, self.screen
+        )
+        self.direction = "right"
+
+        # -- PV --
+        self.pv = 20
+        self.last_hit = time.time()
+        self.hit_interval = 1.0
+
+        # -- Mort --
+        self.dying = False
+        self.death_time = float("inf")
+        self.particules = pygame.sprite.Group()
 
     def update_variables(self, data: Dict[str, Any]):
+        """Met à jour les variable."""
+
+        # -- State --
         self.position = np.array(data["position"])
         self.hitbox.topleft = data["position"]
         self.velocity = data["velocity"]
+
+        # -- Attaque --
         self.attack = data["attack"]
 
     def update_animation(self):
+        """Met à jour l'animation."""
+
         state = "run" if (self.velocity[0] != 0 or self.velocity[1] != 0) else "idle"
         if self.velocity[0] < 0:
-            self.dihitboxion = "left"
+            self.direction = "left"
         elif self.velocity[0] > 0:
-            self.dihitboxion = "right"
+            self.direction = "right"
         if self.attack:
             state = "attack"
-        self.animation.update(state, self.dihitboxion)
+        self.animation.update(state, self.direction)
 
-    def update(self, *players_pos: pygame.Vector2, hitbox_joueur: list[pygame.Rect]):
+    def update_path(self, *players_pos: pygame.Vector2):
+        """Génère le chemin vers le joueur le plus proche en tiles."""
 
+        # Calcule la position des joueurs et de l'ennemi en tuile
         players_positions = [
             np.array((vec.x, vec.y), dtype=np.float32) // self.map.tile_size
             for vec in players_pos
@@ -156,69 +184,129 @@ class Ennemi:
             np.array((int(self.position[0]), int(self.position[1])))
             // self.map.tile_size
         )
+
+        # Calcule le joueur le plus proche
         distances = [heuristic(tile_position, x) for x in players_positions]
         closest = min(distances)
+
+        # Si le joueur es assez proche et que le délai est terminé
         if closest < self.chase_range:
             if time.time() - self.last_calc > min(closest * 0.02, RECALC_MAX):
                 player = players_positions[distances.index(closest)]
+                # Transforme les array en tuples
                 player = (int(player[0]), int(player[1]))
-                position = (tile_position[0], tile_position[1])
+                position = (int(tile_position[0]), int(tile_position[1]))
+                # Génère le nouveau chemin
                 self.path = a_star(self.map, position, player)
-                if len(self.path) > 1:
-                    diff = -(
-                        self.position
-                        - (
-                            np.array(self.path[1], dtype=np.float32) * 32
-                            + np.array((16, 16), dtype=np.float32)
-                        )
-                    )
-                    dist = np.linalg.norm(diff)
-
-                    # Si on est arrivé sur cette tile, on passe à la suivante
-                    if dist < self.speed:
-                        self.path.pop(0)
-                    else:
-                        self.velocity = diff / dist  # dihitboxion normalisée
                 self.last_calc = time.time()
 
-            # collision :
+    def update_velocity(self, hitbox_joueur: List[pygame.Rect]):
+        """Calcule la vélocité en fonction du chemin si besoin, et la
+        normalise si besoin."""
+
+        # Calcule la vélocité
+        if len(self.path) > 1:
+            diff = (
+                np.array(self.path[1], dtype=np.float32) * 32 + self.map.tile_size / 2
+            ) - self.position  # Différence à la tuile suivante
+            dist = np.linalg.norm(diff)
+
+            # Supprime la tuile du chemin
+            if dist < self.speed:
+                self.path.pop(0)
+            else:
+                self.velocity = diff / dist
+
+        # Vérifie les collision
+        if (self.velocity**2).sum() > 0:
+            self.moteur.collision(self.hitbox, self.velocity, hitbox_joueur)
+
             if (self.velocity**2).sum() > 0:
-                self.moteur.collision(self.hitbox, self.velocity, hitbox_joueur)
 
-                if (self.velocity**2).sum() > 0:
+                # Normalise la vélocité
+                if (self.velocity**2).sum() > 1:
+                    norm = math.sqrt(self.velocity[0] ** 2 + self.velocity[1] ** 2)
 
-                    if (self.velocity**2).sum() > 1:
-                        norm = math.sqrt(self.velocity[0] ** 2 + self.velocity[1] ** 2)
+                    if norm > 0:
+                        self.velocity = self.velocity / norm
 
-                        if norm > 0:
-                            self.velocity = self.velocity / norm
+                self.position += self.velocity * self.speed
+                self.hitbox.center = self.position
 
-                    # print(self.velocity)
-                    self.position += self.velocity * self.speed
-                    self.hitbox.center = self.position
+    def update(self, *players_pos: pygame.Vector2, hitbox_joueur: List[pygame.Rect]):
 
-            if (
-                heuristic(players_pos[distances.index(closest)], self.position)
-                < self.attack_range
-            ):
+        if not self.dying:
+
+            # -- Path --
+            self.update_path(*players_pos)
+
+            # -- State --
+            self.update_velocity(hitbox_joueur)
+
+            # -- Attaque --
+            mini = min([heuristic(player, self.position) for player in players_pos])
+            if mini < self.attack_range:
                 self.attack = True
             else:
                 self.attack = False
 
-        self.update_animation()
+            # -- Animation --
+            self.update_animation()
 
-        return self.path
+            return self.path
+
+        else:
+
+            # -- Mort --
+            if self.dying:
+                for particule in self.particules:
+                    particule.update(1 / 60)
+
+            return []
+
+    def update_pv(self, modif: int):
+        """Met à jour les PV et tue l'ennemi si besoin."""
+
+        # Cooldown entre chaque coup
+        if self.last_hit + self.hit_interval < time.time():
+
+            self.pv += modif
+            self.last_hit = time.time()
+
+            # Si meurt
+            if self.pv <= 0:
+
+                self.dying = True
+                self.death_time = time.time() + DEATH_TIME
+                self.hitbox = None
+
+                # Créer les particules
+                for _ in range(PARTICULES_AT_DEATH):
+                    spawn_local_particle(
+                        self.particules,
+                        pos=self.position.tolist(),
+                        sprite_path=DUST_IMAGE_PATH,
+                        shrink_range=(20, 50),
+                    )
 
     def display(self):
+        """Affiche l'ennemis."""
 
-        screen_pos = pygame.Vector2(self.camera.apply(self.hitbox).center)
+        # -- Vivant --
+        if not self.dying:
+            screen_pos = pygame.Vector2(self.camera.apply(self.hitbox).center)
 
-        self.animation.display(
-            screen_pos
-            - pygame.Vector2(
-                self.animation.im_size[0] // 2, self.animation.im_size[1] - 15
+            self.animation.display(
+                screen_pos
+                - pygame.Vector2(
+                    self.animation.im_size[0] // 2, self.animation.im_size[1] - 15
+                )
             )
-        )
+
+        # -- Meurt --
+        else:
+            for particule in self.particules:
+                self.screen.blit(particule.image, self.camera.apply(particule.rect))
 
 
 if __name__ == "__main__":
