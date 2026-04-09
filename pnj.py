@@ -6,7 +6,7 @@ pnj_dic c'est la base de données des PNJ du jeu
 Chaque PNJ a :
   - pnj_type           : "Basic", "Merchant" ou "Quest"
   - image_path         : chemin vers l'image depuis le dossier Ressources
-  - dialogues          : liste de dialogues (affiché quand on clique "Parler" sans quête active)
+  - dialogues          : liste de dialogues (pas mettre plus de 550 caractères par element)
   - interaction_radius : rayon en pixels pour afficher la touche [E]
   - stock              : dictionnaire du stock : { name_item: quantite } pour pnj_type == "Merchant", None sinon
   - quests             : liste de quêtes pour pnj_type == "Quest", None sinon
@@ -252,3 +252,259 @@ class PNJ:
             stock=data["stock"],
             quests=data["quests"],
         )
+
+
+class MenuInteractionUI:
+    """
+    Affiche le menu d'interaction (Parler, Optionnel(Quête ou Échanger), Quitter) en bas d'écran.
+    Pour la navigation : souris uniquement + la touche Échap pour quitter.
+    """
+
+    def __init__(self, screen: pygame.Surface):
+        self.screen = screen
+        self.pnj: PNJ | None = None
+        self.options = []
+
+        self.font_nom = pygame.font.SysFont("segoeui", 14, bold=True)
+        self.font_btn = pygame.font.SysFont("segoeui", 13)
+        self.font_hint = pygame.font.SysFont("segoeui", 11)
+
+        largeur, hauteur = self.screen.get_size()
+        self.x = 22
+        self.y = hauteur - 172
+        self.larg = largeur - 44
+        self.haut = 150
+
+    def open(self, pnj: PNJ):
+        self.pnj = pnj
+        self.options = ["Parler"]
+        if pnj.pnj_type == "Merchant":
+            self.options.append("Échanger")
+        elif pnj.pnj_type == "Quest" and pnj.quest_etat != "terminee":
+            self.options.append("Quête")
+        self.options.append("Quitter")
+
+    def handle_event(self, event: pygame.event.Event, mouse_pos) -> str | None:
+        """Renvoie None si rien de nouveau sinon soit Parler, Quête, Échanger ou Quitter"""
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            self.pnj = None
+            return "Quitter"
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            rects = []
+            for i in range(len(self.options)):
+                rects.append(pygame.Rect(136 + i * 162, self.y + 45, 150, 36))
+            for i in range(len(self.options)):
+                if rects[i].collidepoint(mouse_pos):
+                    self.pnj = None
+                    return self.options[i]
+        return None
+
+    def draw(self, mouse_pos):
+        # Background
+        interface = pygame.Surface((self.larg, self.haut), pygame.SRCALPHA)
+        pygame.draw.rect(
+            interface, (10, 10, 22, 200), (0, 0, self.larg, self.haut), border_radius=10
+        )
+        pygame.draw.rect(
+            interface,
+            (75, 75, 120, 255),
+            (0, 0, self.larg, self.haut),
+            width=2,
+            border_radius=10,
+        )
+        self.screen.blit(interface, (self.x, self.y))
+
+        # Portrait
+        p_rect = pygame.Rect(self.x + 12, self.y + 12, 90, self.haut - 24)
+        pygame.draw.rect(self.screen, (22, 22, 40), p_rect, border_radius=6)
+        pygame.draw.rect(self.screen, (70, 70, 110), p_rect, width=2, border_radius=6)
+        portrait = pygame.transform.scale(
+            self.pnj.sprite, (p_rect.width - 10, p_rect.height - 10)
+        )
+        self.screen.blit(portrait, (p_rect.x + 5, p_rect.y + 5))
+
+        # Le nom du PNJ
+        nom_s = self.font_nom.render(self.pnj.name, True, (230, 210, 160))
+        self.screen.blit(nom_s, (136, self.y + 14))
+
+        # Les boutons d'interactions
+        for i in range(len(self.options)):
+            option = self.options[i]
+            btn = pygame.Rect(136 + 162 * i, self.y + 45, 150, 36)
+            hovered = btn.collidepoint(mouse_pos)
+
+            if hovered:
+                col_bg = (60, 90, 160, 220)
+                col_brd = (130, 160, 230, 255)
+            else:
+                col_bg = (28, 28, 48, 200)
+                col_brd = (60, 60, 100, 255)
+
+            bs = pygame.Surface((btn.width, btn.height), pygame.SRCALPHA)
+            pygame.draw.rect(bs, col_bg, (0, 0, btn.width, btn.height), border_radius=7)
+            pygame.draw.rect(
+                bs, col_brd, (0, 0, btn.width, btn.height), width=2, border_radius=7
+            )
+            self.screen.blit(bs, (btn.x, btn.y))
+
+            text = self.font_btn.render(option, True, (240, 240, 255))
+            self.screen.blit(
+                text,
+                (
+                    btn.x + (btn.width - text.get_width()) // 2,
+                    btn.y + (btn.height - text.get_height()) // 2,
+                ),
+            )
+
+
+class DialogueUI:
+    """
+    Affiche les dialogues d'un PNJ dialogue par dialogue avec effet machine à écrire.
+    Avancer : [E], [Entrée], [Espace] ou clic gauche.
+    """
+
+    def __init__(self, screen: pygame.Surface):
+        self.screen = screen
+        self.pnj: PNJ | None = None
+        self.list_dialogue: list[str] = []
+        self.dialogue = 0
+        self.caractere = 0
+        self.timer = 0.0
+        self.done = False  # True quand le dialogue a été entièrement affichée
+        self.char_delay = 28  # le délai en ms entre chaque caractère
+
+        self.font_nom = pygame.font.SysFont("segoeui", 14, bold=True)
+        self.font_text = pygame.font.SysFont("segoeui", 13)
+        self.font_hint = pygame.font.SysFont("segoeui", 11)
+
+        w, h = self.screen.get_size()
+        self.x = 22
+        self.y = h - 172
+        self.larg = w - 44
+        self.haut = 150
+        self.larg_max = self.larg - (136 - self.x) - 12
+
+    def open(self, pnj: PNJ):
+        self.pnj = pnj
+        self.list_dialogue = pnj.get_current_dialogue()
+        self.dialogue = 0
+        self.caractere = 0
+        self.timer = 0.0
+        self.done = False
+
+    def update(self, dt):
+        self.timer += dt
+        while self.timer >= self.char_delay:
+            self.timer -= self.char_delay
+            self.caractere += 1
+            if self.caractere >= len(self.list_dialogue[self.dialogue]):
+                self.done = True
+
+    def handle_event(self, event: pygame.event.Event) -> bool:
+        """Renvoie True si fin du dialogue sinon False"""
+        if (
+            event.type == pygame.KEYDOWN
+            and event.key in (pygame.K_e, pygame.K_RETURN, pygame.K_SPACE)
+        ) or (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1):
+
+            # si dialogue finie alors dialogue suivante
+            if self.done:
+
+                self.dialogue += 1
+                if self.dialogue >= len(self.list_dialogue):
+                    self.pnj = None
+                    return True
+
+                self.caractere = 0
+                self.timer = 0.0
+                self.done = False
+
+            else:  # dialogue pas fini alors l'afficher en entier
+                self.caractere = len(self.list_dialogue[self.dialogue])
+                self.done = True
+
+        return False
+
+    def draw(self):
+        # Background
+        interface = pygame.Surface((self.larg, self.haut), pygame.SRCALPHA)
+        pygame.draw.rect(
+            interface, (10, 10, 22, 200), (0, 0, self.larg, self.haut), border_radius=10
+        )
+        pygame.draw.rect(
+            interface,
+            (75, 75, 120, 255),
+            (0, 0, self.larg, self.haut),
+            width=2,
+            border_radius=10,
+        )
+        self.screen.blit(interface, (self.x, self.y))
+
+        # Portrait
+        p_rect = pygame.Rect(self.x + 12, self.y + 12, 90, self.haut - 24)
+        pygame.draw.rect(self.screen, (22, 22, 40), p_rect, border_radius=6)
+        pygame.draw.rect(self.screen, (70, 70, 110), p_rect, width=2, border_radius=6)
+        portrait = pygame.transform.scale(
+            self.pnj.sprite, (p_rect.width - 10, p_rect.height - 10)
+        )
+        self.screen.blit(portrait, (p_rect.x + 5, p_rect.y + 5))
+
+        # Le nom du PNJ
+        nom_s = self.font_nom.render(self.pnj.name, True, (230, 210, 160))
+        self.screen.blit(nom_s, (136, self.y + 14))
+
+        # Texte style machine à écrire
+        for elt in wrap_text(
+            self.list_dialogue[self.dialogue][: self.caractere],
+            self.font_text,
+            self.larg_max,
+        ):
+            self.screen.blit(
+                self.font_text.render(elt, True, (210, 210, 222)), (136, self.y + 39)
+            )
+
+        # Numéro de dialogue
+        dialogue_s = self.font_hint.render(
+            f"{self.dialogue + 1} / {len(self.list_dialogue)}", True, (110, 110, 155)
+        )
+        self.screen.blit(
+            dialogue_s,
+            (
+                self.x + self.larg - dialogue_s.get_width() - 12,
+                self.y + self.haut - dialogue_s.get_height() - 8,
+            ),
+        )
+
+        # Si dialogue complet alors info pour switch de paragraphe
+        if self.done:
+            if self.dialogue >= len(self.list_dialogue) - 1:
+                hint = "[E] Fermer"
+            else:
+                hint = "[E] Continuer"
+
+            hs = self.font_hint.render(hint, True, (130, 200, 130))
+            self.screen.blit(
+                hs,
+                (
+                    self.x + self.larg - hs.get_width() - dialogue_s.get_width() - 26,
+                    self.y + self.haut - hs.get_height() - 8,
+                ),
+            )
+
+
+def wrap_text(text: str, font: pygame.font.Font, max_width: int) -> list[str]:
+    """Découpe le texte en une liste d'element pour que ça tiennent dans max_width pixels."""
+    words = text.split(" ")
+    liste = []
+    current = ""
+    for word in words:
+        test = (current + " " + word).strip()
+        if font.size(test)[0] <= max_width:
+            current = test
+        else:
+            if current:
+                liste.append(current)
+            current = word
+    if current:
+        liste.append(current)
+    return liste
