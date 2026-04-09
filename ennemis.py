@@ -169,8 +169,19 @@ class Ennemi:
             if (self.velocity**2).sum() > 0:
                 self.moteur.collision(self.rect, self.velocity, hitbox_joueur)
 
-            self.position += self.velocity * self.speed
-            self.rect.move_ip(self.velocity * self.speed)
+                if (self.velocity**2).sum() > 0:
+
+                    """
+                    if (self.velocity**2).sum() > 1:
+                        norm = math.sqrt(self.velocity[0] ** 2 + self.velocity[1] ** 2)
+
+                        if norm > 0:
+                            self.velocity = self.velocity / norm
+                    """
+
+                    self.position += self.velocity * self.speed
+                    self.rect.center = self.position
+
             if (
                 heuristic(players_pos[distances.index(closest)], self.position)
                 < self.attack_range
