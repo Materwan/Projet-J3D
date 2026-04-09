@@ -12,7 +12,7 @@ from map import Map
 from camera_system import Camera
 from animations import AnimationController
 from moteur import Moteur
-from particle_system_2 import spawn_local_particle
+from particule import spawn_local_particle
 
 
 RECALC_MAX = 0.5

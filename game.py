@@ -13,7 +13,7 @@ from map import Map
 from camera_system import Camera
 from inventory import Item, Inventaire, InventaireUI, InventaireManager
 from ennemis import Ennemi
-from particle_system_2 import spawn_local_particle
+from particule import spawn_local_particle
 
 if TYPE_CHECKING:
     from main import Manager
