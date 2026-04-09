@@ -214,7 +214,7 @@ class Game:
         if isinstance(self.player_controller, SoloPlayerController):
             # -- Solo --
             for ennemi in self.ennemis.values():
-                ennemi.update(
+                self.path = ennemi.update(
                     self.player_controller.position,
                     hitbox_joueur=[self.player_controller.hitbox],
                 )
@@ -293,6 +293,23 @@ class Game:
 
         # -- Map --
         self.camera.display_map(self.map)
+
+        # -- Path --
+        if self.show_hitbox:
+            for i in range(len(self.path) - 1):
+                # print(self.path[i], self.path[i + 1])
+                pygame.draw.line(
+                    self.screen,
+                    (255, 0, 128),
+                    (
+                        self.path[i][0] * 32 + 16 + self.camera.camera.x,
+                        self.path[i][1] * 32 + 16 + self.camera.camera.y,
+                    ),
+                    (
+                        self.path[i + 1][0] * 32 + 16 + self.camera.camera.x,
+                        self.path[i + 1][1] * 32 + 16 + self.camera.camera.y,
+                    ),
+                )
 
         # -- Joueur --
         self.player_controller.display()

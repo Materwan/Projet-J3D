@@ -14,6 +14,9 @@ from animations import AnimationController
 from moteur import Moteur
 
 
+RECALC_MAX = 0.5
+
+
 def create_node(
     position: Tuple[int, int],
     g: float = float("inf"),
@@ -35,9 +38,7 @@ def get_neighbors(grid: Map, pos: Tuple[int, int]) -> List[Tuple[int, int]]:
     """Voisins valides (8 directions, sans obstacles)."""
     x, y = pos
     cols, rows = grid.size
-    moves = [
-        (x + dx, y + dy) for dx in [-1, 0, 1] for dy in [-1, 0, 1] if dx != 0 or dy != 0
-    ]
+    moves = [(x + 1, y), (x, y - 1), (x, y + 1), (x - 1, y)]
     return [
         (nx, ny)
         for nx, ny in moves
@@ -121,7 +122,7 @@ class Ennemi:
         self.attack: bool | None = False
         self.map = map
         self.path = []
-        self.direction = np.array((0, 0))
+        self.direction = "right"
         self.last_calc = 0
 
         # ajouter par thibaut le BG : range ou tu veux
@@ -157,15 +158,26 @@ class Ennemi:
         distances = [heuristic(tile_position, x) for x in players_positions]
         closest = min(distances)
         if closest < self.chase_range:
-            if time.time() - self.last_calc > closest * 0.02:
+            if time.time() - self.last_calc > min(closest * 0.02, RECALC_MAX):
                 player = players_positions[distances.index(closest)]
                 player = (int(player[0]), int(player[1]))
                 position = (tile_position[0], tile_position[1])
                 self.path = a_star(self.map, position, player)
                 if len(self.path) > 1:
-                    self.velocity = -(
-                        tile_position - np.array(self.path[1], dtype=np.float32)
+                    diff = -(
+                        self.position
+                        - (
+                            np.array(self.path[1], dtype=np.float32) * 32
+                            + np.array((16, 16), dtype=np.float32)
+                        )
                     )
+                    dist = np.linalg.norm(diff)
+
+                    # Si on est arrivé sur cette tile, on passe à la suivante
+                    if dist < self.speed:
+                        self.path.pop(0)
+                    else:
+                        self.velocity = diff / dist  # direction normalisée
                 self.last_calc = time.time()
 
             # collision :
@@ -180,6 +192,7 @@ class Ennemi:
                         if norm > 0:
                             self.velocity = self.velocity / norm
 
+                    # print(self.velocity)
                     self.position += self.velocity * self.speed
                     self.rect.center = self.position
 
