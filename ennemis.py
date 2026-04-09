@@ -128,6 +128,7 @@ class Ennemi:
         # ajouter par thibaut le BG : range ou tu veux
         self.camera = camera
         self.moteur = moteur
+        self.pv = 100
 
     def update_variables(self, data: Dict[str, Any]):
         self.position = np.array(data["position"])

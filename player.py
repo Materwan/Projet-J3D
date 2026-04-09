@@ -86,6 +86,7 @@ class PlayerControllerBase:
         self.velocity = pygame.Vector2(0, 0)
         self.direction = "right"
         self.moving_intent = False
+        self.pv = 100
 
         # -- Attaque --
         self.attaque = False

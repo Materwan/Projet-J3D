@@ -1,5 +1,9 @@
 import pygame
 from map import Map
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ennemis import Ennemi
 
 
 class Moteur:
@@ -99,3 +103,12 @@ class Moteur:
         dec_x, dec_y, wide, high = self.attaque_config[direction]
 
         return pygame.Rect(position.x + dec_x, position.y + dec_y, wide, high)
+
+    def apply_attaque(
+        self, attaque_rect: pygame.Rect, ennemi_list: dict[int, "Ennemi"]
+    ):
+        ennemi_touch = []
+        for id, ennemi in ennemi_list.items():
+            if attaque_rect.colliderect(ennemi.hitbox):
+                ennemi.pv -= 10
+                print(ennemi.pv)

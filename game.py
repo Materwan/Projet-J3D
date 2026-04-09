@@ -296,6 +296,9 @@ class Game:
             )
         self.particles.update(self.manager.clock.get_time() / 1000)
 
+        if self.player_controller.attaque_rect is not None:
+            self.moteur.apply_attaque(self.player_controller.attaque_rect, self.ennemis)
+
     def display(self):
         """Affiche tout les éléments."""
         # -- Reset --
