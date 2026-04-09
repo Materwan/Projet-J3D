@@ -503,8 +503,6 @@ class GuestController(PlayerControllerBase):
             data["map"]["nb_chunks"],
             data["map"]["chunk_size"],
             data["map"]["octaves"],
-            (32, 32),
-            r"Ressources\Pixel Art Top Down - Basic v1.2.3",
             self.screen,
             data["map"]["seed"],
         )

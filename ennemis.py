@@ -102,7 +102,7 @@ class Ennemi:
         self,
         screen: pygame.Surface,
         position: List[int],
-        speed: int,
+        speed: float,
         chase_range: float,
         map: Map,
         camera: Camera,
@@ -112,11 +112,11 @@ class Ennemi:
         self.animation = AnimationController(
             r"Ressources\Animations\Ennemis\ennemy_1", None, self.screen
         )
-        self.position = np.array(position)
+        self.position = np.array(position, dtype=np.float32)
         self.rect = pygame.Rect(position[0], position[1], 28, 20)
         self.speed = speed
         self.chase_range = chase_range
-        self.velocity: np.ndarray | None = None
+        self.velocity = np.array((0, 0), dtype=np.float32)
         self.attack_range = 20
         self.attack: bool | None = False
         self.map = map
@@ -147,11 +147,12 @@ class Ennemi:
     def update(self, *players_pos: pygame.Vector2, hitbox_joueur: list[pygame.Rect]):
 
         players_positions = [
-            np.array((vec.x, vec.y), dtype=np.int32) // self.map.tile_size
+            np.array((vec.x, vec.y), dtype=np.float32) // self.map.tile_size
             for vec in players_pos
         ]
         tile_position = (
-            np.array((self.position[0], self.position[1])) // self.map.tile_size
+            np.array((int(self.position[0]), int(self.position[1])))
+            // self.map.tile_size
         )
         distances = [heuristic(tile_position, x) for x in players_positions]
         closest = min(distances)
@@ -162,7 +163,9 @@ class Ennemi:
                 position = (tile_position[0], tile_position[1])
                 self.path = a_star(self.map, position, player)
                 if len(self.path) > 1:
-                    self.velocity = -(tile_position - np.array(self.path[1]))
+                    self.velocity = -(
+                        tile_position - np.array(self.path[1], dtype=np.float32)
+                    )
                 self.last_calc = time.time()
 
             # collision :
@@ -171,13 +174,11 @@ class Ennemi:
 
                 if (self.velocity**2).sum() > 0:
 
-                    """
                     if (self.velocity**2).sum() > 1:
                         norm = math.sqrt(self.velocity[0] ** 2 + self.velocity[1] ** 2)
 
                         if norm > 0:
                             self.velocity = self.velocity / norm
-                    """
 
                     self.position += self.velocity * self.speed
                     self.rect.center = self.position
