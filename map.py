@@ -1,18 +1,24 @@
+"Module pour la carte"
+
 from typing import Tuple, List, Dict
 from collections.abc import Callable
 from itertools import combinations
+from os import path
+import math
+import json
+import heapq
+
 import numpy as np
 from perlin_numpy import generate_perlin_noise_2d
+from camera_system import Camera
 import matplotlib.pyplot as plt
-import math
 import pygame
-import heapq
-from os import path
-import json
-import time
 
 
 REPLACE_VALUE = 0.3
+TILE_SIZE = (32, 32)
+ASSET_DIRECTORY = r"Ressources\Pixel Art Top Down - Basic v1.2.3"
+TILESET_DIRECTORY = r"Ressources\tileset"
 
 
 def load_assets(file: str, asset_folder: str, tile_size: Tuple[int, int]):
@@ -332,8 +338,6 @@ class Map:
         nb_chunks: Tuple[int, int],
         chunk_size: Tuple[int, int],
         octaves: Tuple[int, int],
-        tile_size: Tuple[int, int],
-        asset_directory: str,
         screen: pygame.Surface,
         seed: int | None,
     ):
@@ -341,11 +345,11 @@ class Map:
         self.chunk_size_tile = np.array(chunk_size, dtype=np.int32)
         self.size = self.nb_chunks * self.chunk_size_tile
         self.octaves = octaves
-        self.tile_size = np.array(tile_size, dtype=np.int32)
+        self.tile_size = np.array(TILE_SIZE, dtype=np.int32)
         self.chunk_size_pix = self.chunk_size_tile * self.tile_size
         self.asset = load_assets(
-            path.join(asset_directory, "tile_data.json"),
-            asset_directory,
+            path.join(ASSET_DIRECTORY, "tile_data.json"),
+            ASSET_DIRECTORY,
             self.tile_size,
         )
         self.screen = screen
@@ -665,6 +669,57 @@ class Map:
             if key not in valid:
                 del self.loaded_chunks[key]
 
+    def update(self, absolute_position: Tuple[int, int]):
+
+        self.load_chunks(absolute_position)
+
+    def get_nearby_obstacles(self, hitbox: pygame.Rect):
+        """
+        Récupère la matrice de la map du jeu.
+        Analyse une zone de 3x3 tuiles autour de la position
+        centrale du joueur pour optimiser les tests de collision.
+
+        Args:
+            hitbox (pygame.Rect): La hitbox du joueur pour calculer sa position sur la grille.
+        Returns:
+            list[pygame.Rect]: Liste des obstacles à proximité immédiate.
+        """
+        nearby_obstacles = []
+
+        # Trouver la position du joueur dans la grille
+        grid_x = hitbox.centerx // self.tile_size[0]
+        grid_y = hitbox.centery // self.tile_size[1]
+
+        # Vérifier un carré de 3x3 tuiles autour du joueur
+        for x in range(grid_x - 1, grid_x + 2):
+            for y in range(grid_y - 1, grid_y + 2):
+
+                x_chunk = x // self.chunk_size_tile[0]
+                y_chunk = y // self.chunk_size_tile[1]
+                rel_x = x % self.chunk_size_tile[0]
+                rel_y = y % self.chunk_size_tile[1]
+                # Collision sur la tuile
+                if self.chunks[(x_chunk, y_chunk)].collision[rel_x][rel_y]:
+                    # On crée le rectangle de collision pour cette tuile
+                    nearby_obstacles.append(pygame.Rect(x * 32, y * 32, 32, 32))
+
+        return nearby_obstacles
+
+    def display(self, camera: Camera):
+
+        L = list(self.loaded_chunks.keys())
+        L.sort(key=lambda p: p[1] * 10 + p[0], reverse=True)
+
+        for x, y in L:
+            chunk_world_x = x * self.chunk_size_pix[0]
+            chunk_world_y = y * self.chunk_size_pix[1]
+
+            # Ces deux lignes doivent être DANS la boucle (indentation manquante)
+            screen_x = chunk_world_x + camera.camera.x + camera.offset_x
+            screen_y = chunk_world_y + camera.camera.y + camera.offset_y
+
+            self.screen.blit(self.loaded_chunks[(x, y)], (screen_x, screen_y))
+
     def _display(self):
 
         plt.subplot(221)
@@ -676,6 +731,59 @@ class Map:
         plt.colorbar()
 
         plt.show()
+
+
+class Hub:
+
+    def __init__(self, screen: pygame.Surface):
+
+        self.screen = screen
+
+        with open(path.join(TILESET_DIRECTORY, "tileset_data.json"), "r") as file:
+            data = json.loads(file.read())
+
+        self.image = pygame.image.load(
+            path.join(TILESET_DIRECTORY, data["hub"]["file"])
+        )
+        self.image = pygame.transform.scale_by(self.image, 2)
+        self.size = (data["hub"]["width"] * 2, data["hub"]["height"] * 2)
+
+    def get_nearby_obstacles(self, hitbox: pygame.Rect):
+
+        return []
+
+    def update(self, absolute_position: Tuple[int, int]):
+
+        pass
+
+    def display(self, camera: Camera):
+
+        screen_x = camera.camera.x + camera.offset_x
+        screen_y = camera.camera.y + camera.offset_y
+
+        self.screen.blit(self.image, (screen_x, screen_y))
+
+
+class MapManager:
+
+    def __init__(self, principal_map: Map, hub: Hub):
+        self.maps = {
+            "Principale": principal_map,
+            "Hub": hub,
+        }
+        self.map = self.maps["Hub"]
+
+    def get_nearby_obstacles(self, hitbox: pygame.Rect):
+
+        return self.map.get_nearby_obstacles(hitbox)
+
+    def update(self, absolute_position: Tuple[int, int]):
+
+        self.map.update(absolute_position)
+
+    def display(self, camera: Camera):
+
+        self.map.display(camera)
 
 
 if __name__ == "__main__":
@@ -696,8 +804,6 @@ if __name__ == "__main__":
                 (8, 8),
                 (32, 32),
                 (8, 8),
-                (32, 32),
-                r"Ressources\Pixel Art Top Down - Basic v1.2.3",
                 self.screen,
                 0,
             )

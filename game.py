@@ -142,8 +142,6 @@ class Game:
                 self.nb_chunks,
                 self.chunk_size,
                 self.octaves,
-                (32, 32),
-                r"Ressources\Pixel Art Top Down - Basic v1.2.3",
                 self.screen,
                 self.seed,
             )
