@@ -847,7 +847,7 @@ class Creer_Menu(Menu):
                 elif self.create.rec.collidepoint(coord):
                     self.create.clicked = True
                     self.create.hover = False
-                    if self.create_t[0].caractere == "SOLO":
+                    if self.mode_jeu_t[0].caractere == "SOLO":
                         self.nbr_file_solo += 1
                         self.manager.states["GAME"].playing_mode = "solo"
                         self.manager.change_state("GAME")

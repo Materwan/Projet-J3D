@@ -403,8 +403,8 @@ class Game:
                 "playing_mode": "multi",
                 "map": {
                     "seed": self.map.seed,
-                    "nb_chunks": self.map.nb_chunks,
-                    "chunk_size": self.map.chunk_size_tile,
+                    "nb_chunks": self.map.nb_chunks.tolist(),
+                    "chunk_size": self.map.chunk_size_tile.tolist(),
                     "octaves": self.map.octaves,
                 },
                 "host": {
