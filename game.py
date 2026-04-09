@@ -2,7 +2,7 @@
 
 import time
 from random import randint
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any, Tuple, TYPE_CHECKING
 import json
 
 import pygame
@@ -14,6 +14,9 @@ from camera_system import Camera
 from inventory import Item, Inventaire, InventaireUI, InventaireManager
 from ennemis import Ennemi
 from particle_system_2 import spawn_local_particle
+
+if TYPE_CHECKING:
+    from main import Manager
 
 
 def serialize_ennemis(ennemis: Dict[int, Ennemi]) -> Dict[int, Any]:
@@ -33,7 +36,7 @@ def serialize_ennemis(ennemis: Dict[int, Ennemi]) -> Dict[int, Any]:
 class Game:
     """Classe de gestion du jeu : joueur et carte."""
 
-    def __init__(self, screen: pygame.Surface, manager):
+    def __init__(self, screen: pygame.Surface, manager: "Manager"):
         self.clock = pygame.time.Clock()
         self.screen = screen
         self.manager = manager
@@ -100,7 +103,7 @@ class Game:
         # Items de départ :
         self.inv_joueur.add_item(Item.create("Potion Rouge", 3))
 
-    def _on_use(self, item: Item, slot, ui: InventaireUI):
+    def _on_use(self, item: Item, slot: Tuple[int, int], ui: InventaireUI):
         """Appelé au clic droit sur un consommable."""
 
         if item.item_type == "Consommable" and item.effect is not None:
@@ -375,8 +378,8 @@ class Game:
 
         # Affichage des hitbox ennemie
         for ennemi in self.ennemis.values():
-            pygame.draw.rect(self.screen, "orange", self.camera.apply(ennemi.rect), 2)
-            all_hitboxes.append(ennemi.rect)
+            pygame.draw.rect(self.screen, "orange", self.camera.apply(ennemi.hitbox), 2)
+            all_hitboxes.append(ennemi.hitbox)
 
         # Affichage des obstacles du jeu
         for hitbox in all_hitboxes:
