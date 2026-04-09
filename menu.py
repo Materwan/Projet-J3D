@@ -641,18 +641,21 @@ class Pause_Menu(Menu):
 
         # =======================Button Start=======================
         self.resume, self.resume_t = create_button_with_text(
-            EMPTY_BUTTON, self.screen, (self.half[0], self.half[1] - 150), "RESUME"
+            EMPTY_BUTTON, self.screen, (self.half[0], self.half[1] - 220), "RESUME"
+        )
+        self.save, self.save_t = create_button_with_text(
+            EMPTY_BUTTON, self.screen, (self.half[0], self.half[1] - 70), "SAVE"
         )
         self.settings, _ = create_button_with_text(
-            SETTING_BUTTON, self.screen, self.half, "", 0.8
+            SETTING_BUTTON, self.screen, (self.half[0], self.half[1] + 70), "", 0.8
         )
         self.quit, _ = create_button_with_text(
-            EXIT_BUTTON, self.screen, (self.half[0], self.half[1] + 150)
+            EXIT_BUTTON, self.screen, (self.half[0], self.half[1] + 220)
         )
         # =======================Button End=======================
 
-        self.eltpages = [self.resume, self.settings, self.quit]
-        self.elttexts = [self.resume_t]
+        self.eltpages = [self.resume, self.save, self.settings, self.quit]
+        self.elttexts = [self.resume_t, self.save_t]
 
     def event(self, events: list[p.event.Event]) -> None:
         coord = p.mouse.get_pos()
@@ -672,35 +675,37 @@ class Pause_Menu(Menu):
                     self.manager.states["MENU_SETTING_PAUSE"].keybinds = (
                         self.manager.states["GAME"].keybinds
                     )
-                    self.manager.states["MENU_SETTING_PAUSE"].surface_copie = (
-                        self.surface_copie
-                    )
+                    # self.manager.states["MENU_SETTING_PAUSE"].surface_copie = (
+                    #    self.surface_copie
+                    # )
                     self.manager.change_state("MENU_SETTING_PAUSE")
+                elif self.save.rec.collidepoint(coord):
+                    self.save.clicked = True
+                    if self.manager.states["GAME"].playing_mode == "solo":
+                        self.manager.states["GAME"].save(
+                            SAVE_SOLO + "/save_" + str(self.nbr_file_solo)
+                        )
+                    else:
+                        self.manager.states["GAME"].save(
+                            SAVE_MULTI + "/save_" + str(self.nbr_file_multi)
+                        )
 
             elif event.type == p.KEYDOWN and event.key == p.K_ESCAPE:
                 self.resume.clicked = True
                 self.manager.change_state("GAME")
             else:
+                (
+                    self.resume.hover,
+                    self.settings.hover,
+                    self.save.hover,
+                    self.quit.hover,
+                ) = (False, False, False, False)
                 if self.quit.rec.collidepoint(coord):
-                    self.quit.hover, self.resume.hover, self.settings.hover = (
-                        True,
-                        False,
-                        False,
-                    )
+                    self.quit.hover = True
                 elif self.resume.rec.collidepoint(coord):
-                    self.resume.hover, self.quit.hover = True, False
+                    self.resume.hover = True
                 elif self.settings.rec.collidepoint(coord):
-                    self.quit.hover, self.resume.hover, self.settings.hover = (
-                        False,
-                        False,
-                        True,
-                    )
-                else:
-                    self.quit.hover, self.resume.hover, self.settings.hover = (
-                        False,
-                        False,
-                        False,
-                    )
+                    self.settings.hover = True
 
     def update(self) -> None:
         if self.manager.states["GAME"].playing_mode != "solo":
@@ -712,6 +717,7 @@ class Pause_Menu(Menu):
         self.pagedisplay()
         self.textdisplay()
         self.resume.clicked = False
+        self.save.clicked = False
         self.settings.clicked = False
         self.quit.clicked = False
 
@@ -841,22 +847,16 @@ class Creer_Menu(Menu):
                 elif self.create.rec.collidepoint(coord):
                     self.create.clicked = True
                     self.create.hover = False
-                    if self.mode_jeu_t[0].caractere == "SOLO":
+                    if self.create_t[0].caractere == "SOLO":
                         self.nbr_file_solo += 1
                         self.manager.states["GAME"].playing_mode = "solo"
                         self.manager.change_state("GAME")
                         self.manager.state.initialize()
-                        self.manager.states["GAME"].save(
-                            SAVE_SOLO + "/save_" + str(self.nbr_file_solo)
-                        )
                     else:
                         self.nbr_file_multi += 1
                         self.manager.states["GAME"].playing_mode = "host"
                         self.manager.change_state("GAME")
                         self.manager.state.initialize()
-                        self.manager.states["GAME"].save(
-                            SAVE_MULTI + "/save_" + str(self.nbr_file_multi)
-                        )
 
             else:
                 self.retour.hover, self.mode_jeu.hover, self.create.hover = (
