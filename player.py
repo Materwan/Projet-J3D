@@ -90,6 +90,8 @@ class PlayerControllerBase:
         # -- Attaque --
         self.attaque = False
         self.attaque_rect = None
+        self.timer: float | None = 0.0
+        self.attack_duration = 0.2
 
         # -- Réseau --
         self.close = False
@@ -162,7 +164,11 @@ class PlayerControllerBase:
             self.attaque_rect = self.moteur.create_rect_attaque(
                 self.position, self.direction
             )
+            self.timer = time.time()
             self.attaque = False  # Bloque anti spam
+
+        if self.attaque_rect and self.timer + self.attack_duration < time.time():
+            self.attaque_rect = None
 
         self.animation.update(state, self.direction)
 

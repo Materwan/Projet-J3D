@@ -310,12 +310,24 @@ class Game:
                         self.screen,
                         (255, 0, 128),
                         (
-                            path[i][0] * 32 + 16 + self.camera.camera.x,
-                            path[i][1] * 32 + 16 + self.camera.camera.y,
+                            path[i][0] * 32
+                            + 16
+                            + self.camera.camera.x
+                            + self.camera.offset_x,
+                            path[i][1] * 32
+                            + 16
+                            + self.camera.camera.y
+                            + self.camera.offset_y,
                         ),
                         (
-                            path[i + 1][0] * 32 + 16 + self.camera.camera.x,
-                            path[i + 1][1] * 32 + 16 + self.camera.camera.y,
+                            path[i + 1][0] * 32
+                            + 16
+                            + self.camera.camera.x
+                            + self.camera.offset_x,
+                            path[i + 1][1] * 32
+                            + 16
+                            + self.camera.camera.y
+                            + self.camera.offset_y,
                         ),
                     )
 
@@ -354,7 +366,7 @@ class Game:
         for entity in entities:
             pygame.draw.rect(self.screen, "green", self.camera.apply(entity.hitbox), 2)
 
-            if entity.attaque_rect and entity.animation.current_state == "attack":
+            if entity.attaque_rect:
                 pygame.draw.rect(
                     self.screen, "yellow", self.camera.apply(entity.attaque_rect), 2
                 )
