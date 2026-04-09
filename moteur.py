@@ -71,14 +71,14 @@ class Moteur:
             nearby_obstacles.append(elt)
 
         if velocity[0] != 0:
-            future_hitbox = hitbox.move(velocity[0] * 3, 0)
+            future_hitbox = hitbox.move(float(velocity[0]) * 3, 0)
             if any(
                 future_hitbox.colliderect(obstacle) for obstacle in nearby_obstacles
             ):
                 velocity[0] = 0
 
         if velocity[1] != 0:
-            future_hitbox = hitbox.move(0, velocity[1] * 3)
+            future_hitbox = hitbox.move(0, float(velocity[1]) * 3)
             if any(
                 future_hitbox.colliderect(obstacle) for obstacle in nearby_obstacles
             ):
