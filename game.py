@@ -28,6 +28,9 @@ def serialize_ennemis(ennemis: Dict[int, Ennemi]) -> Dict[int, Any]:
             "position": ennemi.position.tolist(),
             "velocity": ennemi.velocity.tolist(),
             "attack": ennemi.attack,
+            "death_time": ennemi.death_time,
+            "PV": ennemi.pv,
+            "dying": ennemi.dying,
         }
 
     return dic
@@ -254,6 +257,7 @@ class Game:
 
         elif isinstance(self.player_controller, GuestController):
             # -- Guest --
+            del_key = []
             for key, ennemi in self.player_controller.ennemis_data.items():
                 if not key in self.ennemis_id:
                     self.ennemis[key] = Ennemi(
@@ -271,6 +275,10 @@ class Game:
                 else:
                     self.ennemis[key].update_variables(ennemi)
                     self.ennemis[key].update_animation()
+                if time.time() > ennemi["death_time"]:
+                    del_key.append(key)
+            for key in del_key:
+                del self.ennemis[key]
 
         # -- Particules --
         if len(self.particles) < 50:  # Limite pour les performances

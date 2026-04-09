@@ -153,9 +153,13 @@ class Ennemi:
         """Met à jour les variable."""
 
         # -- State --
-        self.position = np.array(data["position"])
-        self.hitbox.topleft = data["position"]
-        self.velocity = data["velocity"]
+        self.pv = data["PV"]
+        self.dying = data["dying"]
+        if not self.dying:
+            self.position = np.array(data["position"])
+            self.hitbox.topleft = data["position"]
+            self.velocity = data["velocity"]
+        self.death_time = data["death_time"]
 
         # -- Attaque --
         self.attack = data["attack"]
