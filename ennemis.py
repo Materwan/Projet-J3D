@@ -35,7 +35,7 @@ def heuristic(pos1: Tuple[int, int], pos2: Tuple[int, int]) -> float:
 
 
 def get_neighbors(grid: Map, pos: Tuple[int, int]) -> List[Tuple[int, int]]:
-    """Voisins valides (8 directions, sans obstacles)."""
+    """Voisins valides (8 dihitboxions, sans obstacles)."""
     x, y = pos
     cols, rows = grid.size
     moves = [(x + 1, y), (x, y - 1), (x, y + 1), (x - 1, y)]
@@ -114,7 +114,7 @@ class Ennemi:
             r"Ressources\Animations\Ennemis\ennemy_1", None, self.screen
         )
         self.position = np.array(position, dtype=np.float32)
-        self.rect = pygame.Rect(position[0], position[1], 28, 20)
+        self.hitbox = pygame.Rect(position[0], position[1], 28, 20)
         self.speed = speed
         self.chase_range = chase_range
         self.velocity = np.array((0, 0), dtype=np.float32)
@@ -122,7 +122,7 @@ class Ennemi:
         self.attack: bool | None = False
         self.map = map
         self.path = []
-        self.direction = "right"
+        self.dihitboxion = "right"
         self.last_calc = 0
 
         # ajouter par thibaut le BG : range ou tu veux
@@ -131,19 +131,19 @@ class Ennemi:
 
     def update_variables(self, data: Dict[str, Any]):
         self.position = np.array(data["position"])
-        self.rect.topleft = data["position"]
+        self.hitbox.topleft = data["position"]
         self.velocity = data["velocity"]
         self.attack = data["attack"]
 
     def update_animation(self):
         state = "run" if (self.velocity[0] != 0 or self.velocity[1] != 0) else "idle"
         if self.velocity[0] < 0:
-            self.direction = "left"
+            self.dihitboxion = "left"
         elif self.velocity[0] > 0:
-            self.direction = "right"
+            self.dihitboxion = "right"
         if self.attack:
             state = "attack"
-        self.animation.update(state, self.direction)
+        self.animation.update(state, self.dihitboxion)
 
     def update(self, *players_pos: pygame.Vector2, hitbox_joueur: list[pygame.Rect]):
 
@@ -177,12 +177,12 @@ class Ennemi:
                     if dist < self.speed:
                         self.path.pop(0)
                     else:
-                        self.velocity = diff / dist  # direction normalisée
+                        self.velocity = diff / dist  # dihitboxion normalisée
                 self.last_calc = time.time()
 
             # collision :
             if (self.velocity**2).sum() > 0:
-                self.moteur.collision(self.rect, self.velocity, hitbox_joueur)
+                self.moteur.collision(self.hitbox, self.velocity, hitbox_joueur)
 
                 if (self.velocity**2).sum() > 0:
 
@@ -194,7 +194,7 @@ class Ennemi:
 
                     # print(self.velocity)
                     self.position += self.velocity * self.speed
-                    self.rect.center = self.position
+                    self.hitbox.center = self.position
 
             if (
                 heuristic(players_pos[distances.index(closest)], self.position)
@@ -210,7 +210,7 @@ class Ennemi:
 
     def display(self):
 
-        screen_pos = pygame.Vector2(self.camera.apply(self.rect).center)
+        screen_pos = pygame.Vector2(self.camera.apply(self.hitbox).center)
 
         self.animation.display(
             screen_pos
