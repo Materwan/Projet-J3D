@@ -15,6 +15,7 @@ from menu import (
 from game import Game
 from player import HostController, GuestController
 from sound import SoundController
+from hud import HUD
 
 pygame.init()
 pygame.mixer.init()
@@ -44,6 +45,8 @@ class Manager:
     def __init__(self):
         self.screen = screen
         self.running = True
+
+        self.hud = HUD(TAILLE_ECRAN[0], TAILLE_ECRAN[1])
 
         self.states = {
             "MENU_P": Principal_Menu(self.screen, self),
@@ -86,6 +89,9 @@ class Manager:
 
             self.state.display()
 
+
+            
+
             if self.fps:  # fps
                 self.screen.blit(
                     self.font.render(
@@ -94,9 +100,27 @@ class Manager:
                     (10, 10),
                 )
 
+           
+
+            dt = self.clock.tick(FPS) / 1000  # à ne pas toucher
+            
+            # ____affichage du HUD______(+des trucs pour debugs mais tkt touche pas ca marche )          
+           
+            if self.state == self.states["GAME"]:
+                game_obj = self.state
+                
+                
+                player_to_draw = None
+                if game_obj.player_controller is not None:
+                    player_to_draw = getattr(game_obj.player_controller, "player", None)
+
+                
+                self.hud.draw(self.screen, player_to_draw, dt, camera = game_obj.camera)
+            
+
             pygame.display.flip()
 
-            self.clock.tick(FPS)  # à ne pas toucher
+                
 
         # Arrêt les processus multijoueur
         if isinstance(
