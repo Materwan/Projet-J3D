@@ -159,7 +159,7 @@ class Ennemi:
         if closest < self.chase_range:
             if time.time() - self.last_calc > closest * 0.02:
                 player = players_positions[distances.index(closest)]
-                player = (player[0], player[1])
+                player = (int(player[0]), int(player[1]))
                 position = (tile_position[0], tile_position[1])
                 self.path = a_star(self.map, position, player)
                 if len(self.path) > 1:
