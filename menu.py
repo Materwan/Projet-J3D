@@ -85,6 +85,30 @@ class Menu:
             (button.rec.height - text[0].lenth[1]) // 2 + button.rec.top,
         )
 
+    def change_button_text(
+        self,
+        changetext: List | Text | Tuple[int, int],
+        button: a.Button,
+        caractere: str,
+    ):
+        """change the text in a button"""
+        changetext[0].text = changetext[0].font.render(caractere, False, (0, 0, 0))
+        changetext[0].lenth = changetext[0].text.get_size()
+        changetext[0].caractere = caractere
+        changetext[1] = self.recalculcoord(changetext, button)
+
+    def interchange(
+        self,
+        changetext: List | Text | Tuple[int, int],
+        button: a.Button,
+        direction: str,
+        caractere: str,
+        bool: bool,
+    ) -> None:
+        """change the texte of the button that you want to change the keybind"""
+        self.change_button_text(changetext, button, caractere)
+        self.key[direction] = bool
+
     def pagedisplay(self) -> None:
         """draw the page"""
         for elt in self.eltpages:
@@ -254,20 +278,6 @@ class Setting_Menu(Menu):
                 return False
         return True
 
-    def interchange(
-        self,
-        changetext: List | Text | Tuple[int, int],
-        button: a.Button,
-        direction: str,
-        caractere: str,
-        bool: bool,
-    ) -> None:
-        """change the texte of the button that you want to change the keybind"""
-        changetext[0].text = changetext[0].font.render(caractere, False, (0, 0, 0))
-        changetext[0].lenth = changetext[0].text.get_size()
-        changetext[1] = super().recalculcoord(changetext, button)
-        self.key[direction] = bool
-
     def event(self, events: list[p.event.Event]) -> None:
         coord = p.mouse.get_pos()
         for event in events:
@@ -282,35 +292,35 @@ class Setting_Menu(Menu):
                     self.manager.states["GAME"].keybinds = self.keybinds
                     self.manager.change_state(self.menu_appel)
                 self.changekey(event)  # try to change the keybind
-                self.interchange(
+                super().interchange(
                     self.up_t,
                     self.changeup,
                     "up",
                     "UP: " + p.key.name(self.keybinds["up"]),
                     False,
                 )
-                self.interchange(
+                super().interchange(
                     self.down_t,
                     self.changedown,
                     "down",
                     "DOWN: " + p.key.name(self.keybinds["down"]),
                     False,
                 )
-                self.interchange(
+                super().interchange(
                     self.left_t,
                     self.changeleft,
                     "left",
                     "LEFT: " + p.key.name(self.keybinds["left"]),
                     False,
                 )
-                self.interchange(
+                super().interchange(
                     self.right_t,
                     self.changeright,
                     "right",
                     "RIGHT: " + p.key.name(self.keybinds["right"]),
                     False,
                 )
-                self.interchange(
+                super().interchange(
                     self.attack_t,
                     self.changeattack,
                     "attack",
@@ -341,29 +351,29 @@ class Setting_Menu(Menu):
                 elif self.changeup.rec.collidepoint(coord):
                     self.changeup.hover = True
                     if checkevent:
-                        self.interchange(self.up_t, self.changeup, "up", "...", True)
+                        super().interchange(self.up_t, self.changeup, "up", "...", True)
                 elif self.changedown.rec.collidepoint(coord):
                     self.changedown.hover = True
                     if checkevent:
-                        self.interchange(
+                        super().interchange(
                             self.down_t, self.changedown, "down", "...", True
                         )
                 elif self.changeleft.rec.collidepoint(coord):
                     self.changeleft.hover = True
                     if checkevent:
-                        self.interchange(
+                        super().interchange(
                             self.left_t, self.changeleft, "left", "...", True
                         )
                 elif self.changeright.rec.collidepoint(coord):
                     self.changeright.hover = True
                     if checkevent:
-                        self.interchange(
+                        super().interchange(
                             self.right_t, self.changeright, "right", "...", True
                         )
                 elif self.changeattack.rec.collidepoint(coord):
                     self.changeattack.hover = True
                     if checkevent:
-                        self.interchange(
+                        super().interchange(
                             self.attack_t, self.changeattack, "attack", "...", True
                         )
                 elif self.volume_up.rec.collidepoint(coord):
@@ -773,10 +783,16 @@ class Creer_Menu(Menu):
         self.manager.running = True
 
         # =======================Button Start=======================
+        self.mode_jeu, self.mode_jeu_t = create_button_with_text(
+            EMPTY_BUTTON,
+            self.screen,
+            (self.WINDOWS[0] // 2 - 200, self.WINDOWS[1] // 2),
+            "SOLO",
+        )
         # =======================Button End=======================
 
-        self.eltpages = [self.retour]
-        self.elttexts = [self.retour_t]
+        self.eltpages = [self.retour, self.mode_jeu]
+        self.elttexts = [self.retour_t, self.mode_jeu_t]
 
     def event(self, events: list[p.event.Event]) -> None:
         coord = p.mouse.get_pos()
@@ -791,10 +807,23 @@ class Creer_Menu(Menu):
                     self.retour.clicked = True
                     self.retour.hover = False
                     self.manager.change_state("MENU_PLAY")
+                elif self.mode_jeu.rec.collidepoint(coord):
+                    self.mode_jeu.clicked = True
+                    self.mode_jeu.hover = False
+                    if self.mode_jeu_t[0].caractere == "SOLO":
+                        super().change_button_text(
+                            self.mode_jeu_t, self.mode_jeu, "MULTIPLAYER"
+                        )
+                    else:
+                        super().change_button_text(
+                            self.mode_jeu_t, self.mode_jeu, "SOLO"
+                        )
             else:
-                self.retour.hover = False
+                self.retour.hover, self.mode_jeu.hover = False, False
                 if self.retour.rec.collidepoint(coord):
                     self.retour.hover = True
+                elif self.mode_jeu.rec.collidepoint(coord):
+                    self.mode_jeu.hover = True
 
     def update(self) -> None:
         pass
@@ -804,6 +833,7 @@ class Creer_Menu(Menu):
         self.pagedisplay()
         self.textdisplay()
         self.retour.clicked = False
+        self.mode_jeu.clicked = False
 
 
 def create_button_with_text(
