@@ -71,6 +71,7 @@ class Game:
         self.moteur: Moteur | None = None
 
         # -- Ennemis --
+        self.paths = [[]]
         self.ennemis: Dict[int, Ennemi] | None = {}
         self.ennemis_id: List[int] | None = []
 
@@ -211,24 +212,30 @@ class Game:
             self.manager.state = self.manager.states["MENU_P"]
 
         # -- Ennemis --
+        self.paths = [[]]
+
         if isinstance(self.player_controller, SoloPlayerController):
             # -- Solo --
             for ennemi in self.ennemis.values():
-                self.path = ennemi.update(
-                    self.player_controller.position,
-                    hitbox_joueur=[self.player_controller.hitbox],
+                self.paths.append(
+                    ennemi.update(
+                        self.player_controller.position,
+                        hitbox_joueur=[self.player_controller.hitbox],
+                    )
                 )
 
         if isinstance(self.player_controller, HostController):
             # -- Host --
             for ennemi in self.ennemis.values():
-                ennemi.update(
-                    self.player_controller.position,
-                    self.player_controller.guest.position,
-                    hitbox_joueur=[
-                        self.player_controller.hitbox,
-                        self.player_controller.guest.hitbox,
-                    ],
+                self.paths.append(
+                    ennemi.update(
+                        self.player_controller.position,
+                        self.player_controller.guest.position,
+                        hitbox_joueur=[
+                            self.player_controller.hitbox,
+                            self.player_controller.guest.hitbox,
+                        ],
+                    )
                 )
             self.player_controller.ennemis_data = serialize_ennemis(self.ennemis)
 
@@ -296,20 +303,21 @@ class Game:
 
         # -- Path --
         if self.show_hitbox:
-            for i in range(len(self.path) - 1):
-                # print(self.path[i], self.path[i + 1])
-                pygame.draw.line(
-                    self.screen,
-                    (255, 0, 128),
-                    (
-                        self.path[i][0] * 32 + 16 + self.camera.camera.x,
-                        self.path[i][1] * 32 + 16 + self.camera.camera.y,
-                    ),
-                    (
-                        self.path[i + 1][0] * 32 + 16 + self.camera.camera.x,
-                        self.path[i + 1][1] * 32 + 16 + self.camera.camera.y,
-                    ),
-                )
+            for path in self.paths:
+                for i in range(len(path) - 1):
+                    # print(self.path[i], self.path[i + 1])
+                    pygame.draw.line(
+                        self.screen,
+                        (255, 0, 128),
+                        (
+                            path[i][0] * 32 + 16 + self.camera.camera.x,
+                            path[i][1] * 32 + 16 + self.camera.camera.y,
+                        ),
+                        (
+                            path[i + 1][0] * 32 + 16 + self.camera.camera.x,
+                            path[i + 1][1] * 32 + 16 + self.camera.camera.y,
+                        ),
+                    )
 
         # -- Joueur --
         self.player_controller.display()
