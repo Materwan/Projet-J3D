@@ -1,2 +1,4 @@
 pygame
 psutil
+numpy
+perlin_numpy
