@@ -6,6 +6,7 @@ import socket
 import json
 import asyncio
 import time
+import os
 
 MENU_ASSET_DIRECTORY = "Ressources/UI_&_élements_graphiques/"
 BACKGROUND = MENU_ASSET_DIRECTORY + "fond ecran menu.png"
@@ -14,6 +15,10 @@ SETTING_BUTTON = MENU_ASSET_DIRECTORY + "SETTINGS.png"
 EXIT_BUTTON = MENU_ASSET_DIRECTORY + "EXIT.png"
 EMPTY_BUTTON = MENU_ASSET_DIRECTORY + "EMPTY.png"
 TITLE = MENU_ASSET_DIRECTORY + "logo.png"
+
+SAVE_FILE = "save/"
+SAVE_MULTI = SAVE_FILE + "multiplayer"
+SAVE_SOLO = SAVE_FILE + "solo"
 
 UDP_IP = "0.0.0.0"
 UDP_PORT = 9999
@@ -69,6 +74,8 @@ class Menu:
             (10, 10, 22, 100),
             (0, 0, self.WINDOWS[0], self.WINDOWS[1]),
         )
+        self.nbr_file_solo = len(os.listdir(SAVE_SOLO))
+        self.nbr_file_multi = len(os.listdir(SAVE_MULTI))
 
         # =======================Button Start=======================
         self.retour, self.retour_t = create_button_with_text(
@@ -237,6 +244,12 @@ class Setting_Menu(Menu):
             (self.WINDOWS[0] // 2 + 400, self.WINDOWS[1] // 2 + 70),
             "-",
         )
+        _, self.volume_t = create_button_with_text(
+            EMPTY_BUTTON,
+            self.screen,
+            (self.WINDOWS[0] // 2 + 400, self.WINDOWS[1] // 2 - 180),
+            "Sounds volume",
+        )
         # =======================Button End=======================
 
         self.elttexts = [
@@ -247,6 +260,7 @@ class Setting_Menu(Menu):
             self.attack_t,
             self.volume_up_t,
             self.volume_down_t,
+            self.volume_t,
             self.retour_t,
         ]
         self.eltpages = [
@@ -412,13 +426,13 @@ class Play_Menu(Menu):
         self.continu, self.continu_t = create_button_with_text(
             EMPTY_BUTTON,
             self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 150),
+            self.half,
             "CONTINUE",
         )
         self.new, self.new_t = create_button_with_text(
             EMPTY_BUTTON,
             self.screen,
-            self.half,
+            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 150),
             "NEW GAME",
         )
         self.joinmultiplayer, self.joinmultiplayer_t = create_button_with_text(
@@ -786,13 +800,19 @@ class Creer_Menu(Menu):
         self.mode_jeu, self.mode_jeu_t = create_button_with_text(
             EMPTY_BUTTON,
             self.screen,
-            (self.WINDOWS[0] // 2 - 200, self.WINDOWS[1] // 2),
+            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 70),
             "SOLO",
+        )
+        self.create, self.create_t = create_button_with_text(
+            EMPTY_BUTTON,
+            self.screen,
+            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 70),
+            "CREATE",
         )
         # =======================Button End=======================
 
-        self.eltpages = [self.retour, self.mode_jeu]
-        self.elttexts = [self.retour_t, self.mode_jeu_t]
+        self.eltpages = [self.retour, self.mode_jeu, self.create]
+        self.elttexts = [self.retour_t, self.mode_jeu_t, self.create_t]
 
     def event(self, events: list[p.event.Event]) -> None:
         coord = p.mouse.get_pos()
@@ -818,12 +838,38 @@ class Creer_Menu(Menu):
                         super().change_button_text(
                             self.mode_jeu_t, self.mode_jeu, "SOLO"
                         )
+                elif self.create.rec.collidepoint(coord):
+                    self.create.clicked = True
+                    self.create.hover = False
+                    if self.mode_jeu_t[0].caractere == "SOLO":
+                        self.nbr_file_solo += 1
+                        self.manager.states["GAME"].playing_mode = "solo"
+                        self.manager.change_state("GAME")
+                        self.manager.state.initialize()
+                        self.manager.states["GAME"].save(
+                            SAVE_SOLO + "/save_" + str(self.nbr_file_solo)
+                        )
+                    else:
+                        self.nbr_file_multi += 1
+                        self.manager.states["GAME"].playing_mode = "host"
+                        self.manager.change_state("GAME")
+                        self.manager.state.initialize()
+                        self.manager.states["GAME"].save(
+                            SAVE_MULTI + "/save_" + str(self.nbr_file_multi)
+                        )
+
             else:
-                self.retour.hover, self.mode_jeu.hover = False, False
+                self.retour.hover, self.mode_jeu.hover, self.create.hover = (
+                    False,
+                    False,
+                    False,
+                )
                 if self.retour.rec.collidepoint(coord):
                     self.retour.hover = True
                 elif self.mode_jeu.rec.collidepoint(coord):
                     self.mode_jeu.hover = True
+                elif self.create.rec.collidepoint(coord):
+                    self.create.hover = True
 
     def update(self) -> None:
         pass
@@ -834,6 +880,7 @@ class Creer_Menu(Menu):
         self.textdisplay()
         self.retour.clicked = False
         self.mode_jeu.clicked = False
+        self.create.clicked = False
 
 
 def create_button_with_text(
