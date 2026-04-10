@@ -1,11 +1,13 @@
 import pygame
-from pygame import camera
+from camera_system import Camera
 from particule import spawn_local_particle
 
 
 class HUD:
-    def __init__(self):
+    def __init__(self, screen: pygame.Surface, camera: Camera):
         # --- RÉGLAGE TAILLE ET ÉCART ---
+        self.screen = screen
+        self.camera = camera
 
         self.size = 120
         self.particles = pygame.sprite.Group()
@@ -20,23 +22,22 @@ class HUD:
         self.is_flashing = False
         self.h_was_pressed = False
 
-        # Noms demandés
-        self.base_heart = self._load("Ressources/HUD/sprite_5.png", (255, 0, 0))
-        self.damaged_heart = self._load("Ressources/HUD/sprite_6.png", (255, 255, 255))
-        self.empty_heart = self._load("Ressources/HUD/sprite_7.png", (50, 50, 50))
-
-    # jsp ce que ca fait mais vazey trust claude : D
-    def _load(self, path, color):
-        try:
-            img = pygame.image.load(path).convert_alpha()
-            return pygame.transform.scale(img, (self.size, self.size))
-        except:
-            s = pygame.Surface((self.size, self.size))
-            s.fill(color)
-            return s
+        # image :
+        self.base_heart = pygame.transform.scale(
+            pygame.image.load("Ressources/HUD/sprite_5.png").convert_alpha(),
+            (self.size, self.size),
+        )
+        self.damaged_heart = pygame.transform.scale(
+            pygame.image.load("Ressources/HUD/sprite_6.png").convert_alpha(),
+            (self.size, self.size),
+        )
+        self.empty_heart = pygame.transform.scale(
+            pygame.image.load("Ressources/HUD/sprite_7.png").convert_alpha(),
+            (self.size, self.size),
+        )
 
     # affichage du HUD
-    def draw(self, screen, player, dt, camera=None):
+    def draw(self, dt):
         current_time = pygame.time.get_ticks()
 
         keys = pygame.key.get_pressed()
@@ -66,8 +67,7 @@ class HUD:
                     )
 
                 ## effet de caméra
-                if camera:
-                    camera.start_shake(intensity=8, duration=8)
+                self.camera.start_shake(intensity=8, duration=8)
         else:
             self.h_was_pressed = False
 
@@ -83,17 +83,15 @@ class HUD:
 
             # HP état normal ( pas perdu quoi )
             if i < current_h:
-                screen.blit(self.base_heart, (x, y))
+                self.screen.blit(self.base_heart, (x, y))
 
             # HP quand on se fait taper ( flash blanc)
             elif i == current_h and self.is_flashing:
-                screen.blit(self.damaged_heart, (x, y))
+                self.screen.blit(self.damaged_heart, (x, y))
 
             # HP vide
             else:
-                screen.blit(self.empty_heart, (x, y))
-
-            clock = pygame.time.Clock()
+                self.screen.blit(self.empty_heart, (x, y))
 
             self.particles.update(dt)
-            self.particles.draw(screen)
+            self.particles.draw(self.screen)

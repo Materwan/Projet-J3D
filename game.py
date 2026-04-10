@@ -12,6 +12,7 @@ from player import SoloPlayerController, HostController, GuestController
 from moteur import Moteur
 from map import Map
 from camera_system import Camera
+from hud import HUD
 from inventory import Item, Inventaire, InventaireUI, InventaireManager
 from ennemis import Ennemi
 from particule import spawn_local_particle
@@ -60,6 +61,9 @@ class Game:
         # -- Camera --
         width, height = self.screen.get_size()
         self.camera = Camera(width, height, 0, 0)
+
+        # -- HUD --
+        self.hud = HUD(screen, self.camera)
 
         # -- Particules --
         self.particles = pygame.sprite.Group()
@@ -287,6 +291,7 @@ class Game:
                     self.ennemis[key].update_animation()
                 if time.time() > ennemi["death_time"]:
                     del_key.append(key)
+                    self.ennemis_id.remove(key)
             for key in del_key:
                 del self.ennemis[key]
 
@@ -349,6 +354,9 @@ class Game:
 
         # -- Inventaire --
         self.drag_mgr.draw(pygame.mouse.get_pos())
+
+        # -- HUD --
+        self.hud.draw(self.manager.clock.get_time() / 1000)
 
     def draw_debug_hitboxes(self):
         """
