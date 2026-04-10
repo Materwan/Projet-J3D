@@ -226,8 +226,7 @@ class Game:
             for key, ennemi in self.ennemis.items():
                 self.paths.append(
                     ennemi.update(
-                        self.player_controller.position,
-                        hitbox_joueur=[self.player_controller.hitbox],
+                        self.player_controller.hitbox,
                     )
                 )
                 if time.time() > ennemi.death_time:
@@ -241,12 +240,8 @@ class Game:
             for key, ennemi in self.ennemis.items():
                 self.paths.append(
                     ennemi.update(
-                        self.player_controller.position,
-                        self.player_controller.guest.position,
-                        hitbox_joueur=[
-                            self.player_controller.hitbox,
-                            self.player_controller.guest.hitbox,
-                        ],
+                        self.player_controller.hitbox,
+                        self.player_controller.guest.hitbox,
                     )
                 )
                 if time.time() > ennemi.death_time:
@@ -374,6 +369,10 @@ class Game:
                     self.screen, "orange", self.camera.apply(ennemi.hitbox), 2
                 )
                 all_hitboxes.append(ennemi.hitbox)
+            if ennemi.attaque_rect:
+                pygame.draw.rect(
+                    self.screen, "yellow", self.camera.apply(ennemi.attaque_rect), 2
+                )
 
         # Affichage des obstacles du jeu
         for hitbox in all_hitboxes:
