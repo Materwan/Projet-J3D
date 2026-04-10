@@ -192,8 +192,6 @@ class Game:
                     else:  # Pause
                         self.manager.change_state("MENU_PAUSE")
                 elif event.key == self.keybinds["attack"]:  # Attaque
-                    if self.camera:
-                        self.camera.start_shake(intensity=2, duration=10)
                     self.player_controller.attaque = True
                 elif event.key == pygame.K_0:
                     self.save()
@@ -310,9 +308,6 @@ class Game:
                 rot=10,
             )
         self.particles.update(self.manager.clock.get_time() / 1000)
-
-        if self.player_controller.attaque_rect is not None:
-            self.moteur.apply_attaque(self.player_controller.attaque_rect, self.ennemis)
 
     def display(self):
         """Affiche tout les éléments."""
