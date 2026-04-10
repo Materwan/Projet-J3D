@@ -4,6 +4,7 @@ import time
 from random import randint
 from typing import Dict, List, Any, Tuple, TYPE_CHECKING
 import json
+import datetime
 
 import pygame
 
@@ -45,6 +46,7 @@ class Game:
         self.manager = manager
         self.playing_mode = None
         self.player_controller = None
+        self.game_name = "tt"
 
         # -- Raccourcis --
         self.keybinds = {
@@ -412,6 +414,8 @@ class Game:
 
         if isinstance(self.player_controller, SoloPlayerController):
             data = {
+                "last_save": str(datetime.datetime.today()),
+                "game_name": self.game_name,
                 "playing_mode": "solo",
                 "map": {
                     "seed": self.map.seed,
@@ -452,6 +456,7 @@ class Game:
             raw = f.read()
             data = json.loads(raw)
 
+        self.game_name = data["game_name"]
         self.nb_chunks = data["map"]["nb_chunks"]
         self.chunk_size = data["map"]["chunk_size"]
         self.octaves = data["map"]["octaves"]
