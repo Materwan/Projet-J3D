@@ -325,36 +325,6 @@ class Game:
         # -- Map --
         self.camera.display_map(self.map)
 
-        # -- Path --
-        if self.show_hitbox:
-            for path in self.paths:
-                for i in range(len(path) - 1):
-                    # print(self.path[i], self.path[i + 1])
-                    pygame.draw.line(
-                        self.screen,
-                        (255, 0, 128),
-                        (
-                            path[i][0] * 32
-                            + 16
-                            + self.camera.camera.x
-                            + self.camera.offset_x,
-                            path[i][1] * 32
-                            + 16
-                            + self.camera.camera.y
-                            + self.camera.offset_y,
-                        ),
-                        (
-                            path[i + 1][0] * 32
-                            + 16
-                            + self.camera.camera.x
-                            + self.camera.offset_x,
-                            path[i + 1][1] * 32
-                            + 16
-                            + self.camera.camera.y
-                            + self.camera.offset_y,
-                        ),
-                    )
-
         # -- Joueur --
         self.player_controller.display()
 
@@ -409,6 +379,35 @@ class Game:
         for hitbox in all_hitboxes:
             for obs in self.moteur.get_nearby_obstacles(hitbox):
                 pygame.draw.rect(self.screen, "red", self.camera.apply(obs), 2)
+
+        # Affichage du chemin jusqu'a l'ennemie
+        for path in self.paths:
+            for i in range(len(path) - 1):
+                # print(self.path[i], self.path[i + 1])
+                pygame.draw.line(
+                    self.screen,
+                    (255, 0, 128),
+                    (
+                        path[i][0] * 32
+                        + 16
+                        + self.camera.camera.x
+                        + self.camera.offset_x,
+                        path[i][1] * 32
+                        + 16
+                        + self.camera.camera.y
+                        + self.camera.offset_y,
+                    ),
+                    (
+                        path[i + 1][0] * 32
+                        + 16
+                        + self.camera.camera.x
+                        + self.camera.offset_x,
+                        path[i + 1][1] * 32
+                        + 16
+                        + self.camera.camera.y
+                        + self.camera.offset_y,
+                    ),
+                )
 
     def save(self, file: str | None = "save.json"):
 
