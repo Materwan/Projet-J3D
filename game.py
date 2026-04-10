@@ -234,6 +234,11 @@ class Game:
             for key in del_key:
                 del self.ennemis[key]
 
+            if self.player_controller.attaque_rect is not None:
+                self.moteur.apply_attaque(
+                    self.player_controller.attaque_rect, self.ennemis
+                )
+
         if isinstance(self.player_controller, HostController):
             # -- Host --
             del_key = []
@@ -249,6 +254,16 @@ class Game:
             for key in del_key:
                 del self.ennemis[key]
             self.player_controller.ennemis_data = serialize_ennemis(self.ennemis)
+
+            if self.player_controller.attaque_rect is not None:
+                self.moteur.apply_attaque(
+                    self.player_controller.attaque_rect, self.ennemis
+                )
+
+            if self.player_controller.guest.attaque_rect is not None:
+                self.moteur.apply_attaque(
+                    self.player_controller.guest.attaque_rect, self.ennemis
+                )
 
         elif isinstance(self.player_controller, GuestController):
             # -- Guest --
