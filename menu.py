@@ -101,7 +101,7 @@ class Menu:
         changetext: List | Text | Tuple[int, int],
         button: a.Button,
         caractere: str,
-    ):
+    ) -> None:
         """change the text in a button"""
         changetext[0].text = changetext[0].font.render(caractere, False, (0, 0, 0))
         changetext[0].lenth = changetext[0].text.get_size()
@@ -129,6 +129,14 @@ class Menu:
         """draw the text"""
         for elt in self.elttexts:
             elt[0].draw_text(elt[1])
+
+    def dehover_all(self) -> None:
+        for button in self.eltpages:
+            button.hover = False
+
+    def declicked_all(self) -> None:
+        for button in self.eltpages:
+            button.clicked = False
 
 
 class Principal_Menu(Menu):
@@ -173,11 +181,7 @@ class Principal_Menu(Menu):
                     self.settings.clicked = True
                     self.manager.change_state("MENU_SETTING")
             else:
-                self.quit.hover, self.start.hover, self.settings.hover = (
-                    False,
-                    False,
-                    False,
-                )
+                super().dehover_all()
                 if self.quit.rec.collidepoint(coord):
                     self.quit.hover = True
                 elif self.start.rec.collidepoint(coord):
@@ -192,9 +196,7 @@ class Principal_Menu(Menu):
         self.screen.blit(self.bg_img, self.bg_img_coord)
         self.textdisplay()
         self.pagedisplay()
-        self.start.clicked = False
-        self.settings.clicked = False
-        self.quit.clicked = False
+        super().declicked_all()
 
 
 class Setting_Menu(Menu):
@@ -349,16 +351,7 @@ class Setting_Menu(Menu):
                 )
             if self.checkchangekey():
                 """if a keybind is changing dont look for collidepoint"""
-                (
-                    self.retour.hover,
-                    self.changeup.hover,
-                    self.changedown.hover,
-                    self.changeleft.hover,
-                    self.changeright.hover,
-                    self.changeattack.hover,
-                    self.volume_up.hover,
-                    self.volume_down.hover,
-                ) = (False, False, False, False, False, False, False, False)
+                super().dehover_all()
                 checkevent = (
                     event.type == p.MOUSEBUTTONDOWN and event.button == p.BUTTON_LEFT
                 )
@@ -420,6 +413,7 @@ class Setting_Menu(Menu):
             self.screen.blit(self.blackscreen, (0, 0))
         self.pagedisplay()
         self.textdisplay()
+        super().declicked_all()
 
 
 class Play_Menu(Menu):
@@ -486,12 +480,7 @@ class Play_Menu(Menu):
                     self.retour.hover = False
                     self.manager.change_state("MENU_P")
             else:
-                (
-                    self.continu.hover,
-                    self.new.hover,
-                    self.joinmultiplayer.hover,
-                    self.retour.hover,
-                ) = (False, False, False, False)
+                super().dehover_all()
                 if self.continu.rec.collidepoint(coord):
                     self.continu.hover = True
                 elif self.new.rec.collidepoint(coord):
@@ -508,12 +497,7 @@ class Play_Menu(Menu):
         self.screen.blit(self.bg_img, self.bg_img_coord)
         self.pagedisplay()
         self.textdisplay()
-        (
-            self.retour.clicked,
-            self.continu.clicked,
-            self.new.clicked,
-            self.joinmultiplayer.clicked,
-        ) = (False, False, False, False)
+        super().declicked_all()
 
 
 class Join_Multi_Menu(Menu):
@@ -610,7 +594,7 @@ class Join_Multi_Menu(Menu):
                             self.manager.state.initialize()
                             break
             else:
-                self.retour.hover = False
+                super().dehover_all()
                 if self.retour.rec.collidepoint(coord):
                     self.retour.hover = True
 
@@ -629,7 +613,7 @@ class Join_Multi_Menu(Menu):
                 self.elttexts.append(elt[1])
         self.pagedisplay()
         self.textdisplay()
-        self.retour.clicked = False
+        super().declicked_all()
 
 
 class Pause_Menu(Menu):
@@ -681,9 +665,6 @@ class Pause_Menu(Menu):
                     self.manager.states["MENU_SETTING_PAUSE"].keybinds = (
                         self.manager.states["GAME"].keybinds
                     )
-                    # self.manager.states["MENU_SETTING_PAUSE"].surface_copie = (
-                    #    self.surface_copie
-                    # )
                     self.manager.change_state("MENU_SETTING_PAUSE")
                 elif self.save.rec.collidepoint(coord):
                     self.save.clicked = True
@@ -700,18 +681,15 @@ class Pause_Menu(Menu):
                 self.resume.clicked = True
                 self.manager.change_state("GAME")
             else:
-                (
-                    self.resume.hover,
-                    self.settings.hover,
-                    self.save.hover,
-                    self.quit.hover,
-                ) = (False, False, False, False)
+                super().dehover_all()
                 if self.quit.rec.collidepoint(coord):
                     self.quit.hover = True
                 elif self.resume.rec.collidepoint(coord):
                     self.resume.hover = True
                 elif self.settings.rec.collidepoint(coord):
                     self.settings.hover = True
+                elif self.save.rec.collidepoint(coord):
+                    self.save.hover = True
 
     def update(self) -> None:
         if self.manager.states["GAME"].playing_mode != "solo":
@@ -722,10 +700,7 @@ class Pause_Menu(Menu):
         self.screen.blit(self.blackscreen, (0, 0))
         self.pagedisplay()
         self.textdisplay()
-        self.resume.clicked = False
-        self.save.clicked = False
-        self.settings.clicked = False
-        self.quit.clicked = False
+        super().declicked_all()
 
 
 class Reprendre_Menu(Menu):
@@ -778,11 +753,7 @@ class Reprendre_Menu(Menu):
                     self.retour.hover = False
                     self.manager.change_state("MENU_PLAY")
             else:
-                (
-                    self.solo.hover,
-                    self.multiplayer.hover,
-                    self.retour.hover,
-                ) = (False, False, False)
+                super().dehover_all()
                 if self.solo.rec.collidepoint(coord):
                     self.solo.hover = True
                 elif self.multiplayer.rec.collidepoint(coord):
@@ -797,9 +768,7 @@ class Reprendre_Menu(Menu):
         self.screen.blit(self.bg_img, self.bg_img_coord)
         self.pagedisplay()
         self.textdisplay()
-        self.retour.clicked = False
-        self.solo.clicked = False
-        self.multiplayer.clicked = False
+        super().declicked_all()
 
 
 class Creer_Menu(Menu):
@@ -865,11 +834,7 @@ class Creer_Menu(Menu):
                         self.manager.state.initialize()
 
             else:
-                self.retour.hover, self.mode_jeu.hover, self.create.hover = (
-                    False,
-                    False,
-                    False,
-                )
+                super().dehover_all()
                 if self.retour.rec.collidepoint(coord):
                     self.retour.hover = True
                 elif self.mode_jeu.rec.collidepoint(coord):
@@ -884,9 +849,7 @@ class Creer_Menu(Menu):
         self.screen.blit(self.bg_img, self.bg_img_coord)
         self.pagedisplay()
         self.textdisplay()
-        self.retour.clicked = False
-        self.mode_jeu.clicked = False
-        self.create.clicked = False
+        super().declicked_all()
 
 
 def create_button_with_text(
