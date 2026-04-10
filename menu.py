@@ -1,12 +1,16 @@
-import pygame as p
-import animations as a
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, TYPE_CHECKING
 import threading
 import socket
 import json
 import asyncio
 import time
 import os
+
+import pygame as p
+import animations as a
+
+if TYPE_CHECKING:
+    from main import Manager
 
 MENU_ASSET_DIRECTORY = "Ressources/UI_&_élements_graphiques/"
 BACKGROUND = MENU_ASSET_DIRECTORY + "fond ecran menu.png"
@@ -50,7 +54,7 @@ class Text:
 
 class Menu:
 
-    def __init__(self, screen: p.Surface, manager):
+    def __init__(self, screen: p.Surface, manager: "Manager"):
         self.elttexts = []
         self.eltpages = []
         self.WINDOWS = screen.get_size()
@@ -129,7 +133,7 @@ class Menu:
 
 class Principal_Menu(Menu):
 
-    def __init__(self, screen: p.Surface, manager):
+    def __init__(self, screen: p.Surface, manager: "Manager"):
         super().__init__(screen, manager)
         self.manager.running = True
 
@@ -195,7 +199,9 @@ class Principal_Menu(Menu):
 
 class Setting_Menu(Menu):
 
-    def __init__(self, screen: p.Surface, manager, menu_appel: str = "MENU_P"):
+    def __init__(
+        self, screen: p.Surface, manager: "Manager", menu_appel: str = "MENU_P"
+    ):
         super().__init__(screen, manager)
         self.manager.running = True
         self.surface_copie = None
@@ -418,7 +424,7 @@ class Setting_Menu(Menu):
 
 class Play_Menu(Menu):
 
-    def __init__(self, screen: p.Surface, manager):
+    def __init__(self, screen: p.Surface, manager: "Manager"):
         super().__init__(screen, manager)
         self.manager.running = True
 
@@ -512,7 +518,7 @@ class Play_Menu(Menu):
 
 class Join_Multi_Menu(Menu):
 
-    def __init__(self, screen: p.Surface, manager):
+    def __init__(self, screen: p.Surface, manager: "Manager"):
         super().__init__(screen, manager)
         self.serveurs_save = 0
         self.list_button = []
@@ -628,7 +634,7 @@ class Join_Multi_Menu(Menu):
 
 class Pause_Menu(Menu):
 
-    def __init__(self, screen: p.Surface, manager):
+    def __init__(self, screen: p.Surface, manager: "Manager"):
         super().__init__(screen, manager)
         self.surface_copie = None
         self.blackscreen = p.Surface(self.WINDOWS, p.SRCALPHA)
@@ -724,7 +730,7 @@ class Pause_Menu(Menu):
 
 class Reprendre_Menu(Menu):
 
-    def __init__(self, screen: p.Surface, manager):
+    def __init__(self, screen: p.Surface, manager: "Manager"):
         super().__init__(screen, manager)
         self.manager.running = True
 
@@ -798,7 +804,7 @@ class Reprendre_Menu(Menu):
 
 class Creer_Menu(Menu):
 
-    def __init__(self, screen: p.Surface, manager):
+    def __init__(self, screen: p.Surface, manager: "Manager"):
         super().__init__(screen, manager)
         self.manager.running = True
 
