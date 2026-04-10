@@ -99,7 +99,9 @@ class Moteur:
         vel.y = max(-1.0, min(1.0, vel.y))
         return vel
 
-    def create_rect_attaque(self, position, direction):
+    def create_rect_attaque(
+        self, position: pygame.Vector2 | pygame.Rect, direction: str
+    ):
         dec_x, dec_y, wide, high = self.attaque_config[direction]
 
         return pygame.Rect(position.x + dec_x, position.y + dec_y, wide, high)
@@ -107,7 +109,6 @@ class Moteur:
     def apply_attaque(
         self, attaque_rect: pygame.Rect, ennemi_list: dict[int, "Ennemi"]
     ):
-        ennemi_touch = []
-        for id, ennemi in ennemi_list.items():
+        for ennemi in ennemi_list.values():
             if ennemi.hitbox and attaque_rect.colliderect(ennemi.hitbox):
                 ennemi.update_pv(-10)
