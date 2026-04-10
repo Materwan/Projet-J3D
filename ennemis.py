@@ -130,8 +130,11 @@ class Ennemi:
         self.last_calc = 0
 
         # -- Attaque --
-        self.attack_range = 20
+        self.attack_range = 60
         self.attack: bool | None = False
+        self.attaque_rect: pygame.Rect | None = None
+        self.attack_duration = 0.5
+        self.timer = -1
 
         # -- Animation --
         self.animation = AnimationController(
@@ -176,12 +179,12 @@ class Ennemi:
             state = "attack"
         self.animation.update(state, self.direction)
 
-    def update_path(self, *players_pos: pygame.Vector2):
+    def update_path(self, players_pos: List[Tuple[int, int]]):
         """Génère le chemin vers le joueur le plus proche en tiles."""
 
         # Calcule la position des joueurs et de l'ennemi en tuile
         players_positions = [
-            np.array((vec.x, vec.y), dtype=np.float32) // self.map.tile_size
+            np.array((vec[0], vec[1]), dtype=np.float32) // self.map.tile_size
             for vec in players_pos
         ]
         tile_position = (
@@ -237,22 +240,38 @@ class Ennemi:
                 self.position += self.velocity * self.speed
                 self.hitbox.center = self.position
 
-    def update(self, *players_pos: pygame.Vector2, hitbox_joueur: List[pygame.Rect]):
+    def update(self, *hitbox_joueur: pygame.Rect):
 
         if not self.dying:
 
             # -- Path --
-            self.update_path(*players_pos)
+            self.update_path([hitbox.center for hitbox in hitbox_joueur])
 
             # -- State --
             self.update_velocity(hitbox_joueur)
 
             # -- Attaque --
-            mini = min([heuristic(player, self.position) for player in players_pos])
-            if mini < self.attack_range:
+            mini = min(
+                [
+                    heuristic(hitbox.center, self.hitbox.center)
+                    for hitbox in hitbox_joueur
+                ]
+            )
+            if (
+                mini < self.attack_range
+                and self.timer + self.attack_duration < time.time()
+                and self.animation.current_state != "attack"
+            ):
+                self.attaque_rect = self.moteur.create_rect_attaque(
+                    self.hitbox, self.direction
+                )
                 self.attack = True
+                self.timer = time.time()
             else:
                 self.attack = False
+
+            if self.attaque_rect and self.timer + self.attack_duration < time.time():
+                self.attaque_rect = None
 
             # -- Animation --
             self.update_animation()
@@ -260,6 +279,8 @@ class Ennemi:
             return self.path
 
         else:
+
+            self.attaque_rect = None
 
             # -- Mort --
             if self.dying:
