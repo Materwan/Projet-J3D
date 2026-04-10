@@ -4,13 +4,13 @@ from particule import spawn_local_particle
 
 
 class HUD:
-    def __init__(self, screen_width, screen_height):
+    def __init__(self):
         # --- RÉGLAGE TAILLE ET ÉCART ---
 
         self.size = 120
         self.particles = pygame.sprite.Group()
-        self.max_health = 4
-        self.health = 4
+        self.max_health = 12
+        self.health = 12
         self.gap = self.size / 3
 
         self.margin_x = 20

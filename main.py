@@ -22,7 +22,7 @@ pygame.mixer.init()
 pygame.display.set_caption("MoleTale")
 
 FPS = 60
-TAILLE_ECRAN = (500, 500)  # (500, 500) pour petit ecran (0, 0) pour plein ecran
+TAILLE_ECRAN = (0, 0)  # (500, 500) pour petit ecran (0, 0) pour plein ecran
 
 SOUND_PATH = "Ressources/Musics/"
 MUSIC_HOLDER = SOUND_PATH + "placeholder.mp3"
@@ -46,7 +46,7 @@ class Manager:
         self.screen = screen
         self.running = True
 
-        self.hud = HUD(TAILLE_ECRAN[0], TAILLE_ECRAN[1])
+        self.hud = HUD()
 
         self.states = {
             "MENU_P": Principal_Menu(self.screen, self),
