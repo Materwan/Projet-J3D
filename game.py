@@ -134,6 +134,10 @@ class Game:
                 self.screen, self.moteur, self.map, self.address, self.port
             )
 
+            # -- Camera --
+            self.player_controller.camera = self.camera
+            self.player_controller.host.camera = self.camera
+
             # -- Connexion host --
             while not self.player_controller.loaded:
                 time.sleep(0.2)
@@ -164,10 +168,16 @@ class Game:
                 self.player_controller = SoloPlayerController(
                     self.screen, self.moteur, self.map, (4096, 4096)
                 )
+                # -- Camera --
+                self.player_controller.camera = self.camera
+
             elif self.playing_mode == "host":
                 self.player_controller = HostController(
                     self.screen, self.moteur, self.map, (4000, 4096)
                 )
+                # -- Camera --
+                self.player_controller.camera = self.camera
+                self.player_controller.guest.camera = self.camera
 
             # -- Ennemis --
             ennemi = Ennemi(
@@ -176,11 +186,12 @@ class Game:
             self.ennemis_id.append(0)
             self.ennemis[0] = ennemi
 
-        # -- Camera --
+        # -- Keybinds --
         self.player_controller.keybinds = self.keybinds
+
+        # -- Finition de la caméra grâce à la map. --
         self.camera.map_width = self.map.size[0] * self.map.tile_size[0]
         self.camera.map_height = self.map.size[1] * self.map.tile_size[1]
-        self.player_controller.set_camera(self.camera)
 
     def event(self, events: List[pygame.event.Event]) -> bool:
         """Gére les entré de l'utilisateur."""
@@ -203,8 +214,10 @@ class Game:
                     self.show_hitbox = not self.show_hitbox
                 elif event.key == pygame.K_i:  # Ouvre inventaire
                     self.ui_joueur.visible = not self.ui_joueur.visible
+
+                # TEMPORAIRE ! (perd X coeur avec HUD)
                 elif event.key == pygame.K_h:
-                    self.hud.take_damage = True
+                    self.hud.take_damage = 1
 
             self.drag_mgr.handle_event(event, mouse_pos, on_use=self._on_use)
 
@@ -245,7 +258,7 @@ class Game:
                     self.player_controller.attaque_rect, self.ennemis
                 )
 
-        if isinstance(self.player_controller, HostController):
+        elif isinstance(self.player_controller, HostController):
             # -- Host --
             del_key = []
             for key, ennemi in self.ennemis.items():

@@ -97,9 +97,6 @@ class PlayerControllerBase:
         # -- Réseau --
         self.close = False
 
-    def set_camera(self, camera: Camera):
-        """Initialise la camera du joueur et du client si besoin."""
-
     def event(self, keys: Tuple[bool]):
         """
         Détermine le vecteur de mouvement à partir des entrées clavier.
@@ -188,9 +185,6 @@ class PlayerControllerBase:
 class SoloPlayerController(PlayerControllerBase):
     """Classe pour un joueur solo"""
 
-    def set_camera(self, camera: Camera):
-        self.camera = camera
-
     def update(self):
         """Met à jour les éléments nécessaire du joueur."""
 
@@ -242,10 +236,6 @@ class HostController(PlayerControllerBase):
         self.udp_prot = threading.Thread(target=self.upd_broadcast)
         self.udp_prot.start()
         self.udp_run = True
-
-    def set_camera(self, camera: Camera):
-        self.camera = camera
-        self.guest.camera = camera
 
     def initialize_tcp(self):
         """Lance la fonction en thread partagé."""
@@ -489,10 +479,6 @@ class GuestController(PlayerControllerBase):
         # -- Interpolation --
         self.target_pos: pygame.Vector2 | None = None
         self.host_target_pos: pygame.Vector2 | None = None
-
-    def set_camera(self, camera: Camera):
-        self.camera = camera
-        self.host.camera = camera
 
     def init_variables(self, data: Dict):
         """Initialise les variables lors de la première connection."""

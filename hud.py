@@ -20,7 +20,7 @@ class HUD:
 
         self.anim_timer = 0
         self.is_flashing = False
-        self.take_damage = False
+        self.take_damage = 0
 
         # image :
         self.base_heart = pygame.transform.scale(
@@ -40,9 +40,9 @@ class HUD:
     def draw(self, dt):
         current_time = pygame.time.get_ticks()
 
-        if self.take_damage:
-            self.take_damage = False
-            self.health = max(0, self.health - 1)
+        if self.take_damage != 0:
+            self.health = max(0, self.health - self.take_damage)
+            self.take_damage = 0
             self.anim_timer = current_time
             self.is_flashing = True
 
