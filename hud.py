@@ -13,14 +13,14 @@ class HUD:
         self.particles = pygame.sprite.Group()
         self.max_health = 12
         self.health = 12
-        self.gap = self.size / 3
+        self.gap = self.size // 3
 
         self.margin_x = 20
         self.margin_y = 20
 
         self.anim_timer = 0
         self.is_flashing = False
-        self.h_was_pressed = False
+        self.take_damage = False
 
         # image :
         self.base_heart = pygame.transform.scale(
@@ -40,56 +40,50 @@ class HUD:
     def draw(self, dt):
         current_time = pygame.time.get_ticks()
 
-        keys = pygame.key.get_pressed()
-        if keys[pygame.K_h]:
-            if not self.h_was_pressed:
-                self.health = max(0, self.health - 1)
-                self.anim_timer = current_time
-                self.is_flashing = True
-                self.h_was_pressed = True
+        if self.take_damage:
+            self.take_damage = False
+            self.health = max(0, self.health - 1)
+            self.anim_timer = current_time
+            self.is_flashing = True
 
-                ## effet de particule
+            ## effet de particule
+            for i in range(10):
+                spawn_local_particle(
+                    group=self.particles,
+                    pos=(
+                        self.margin_x
+                        + ((self.health - 1) * self.gap)
+                        + (self.size * 0.45),
+                        self.margin_y + (self.size * 0.23),
+                    ),
+                    sprite_path="Ressources/particles/damage.png",
+                    chaos=0,
+                    speed_range=(150, 400),
+                    rot=0,
+                    angles=(0, 360),
+                    shrink_range=(12, 40),
+                    size=7,
+                )
 
-                damaged_index = self.health - 1
-                pos_x = self.margin_x + (damaged_index * self.gap) + self.size // 2
-                pos_y = self.margin_y + self.size // 2 - 40
-                for i in range(10):
-                    spawn_local_particle(
-                        group=self.particles,
-                        pos=(pos_x, pos_y),
-                        sprite_path="Ressources/particles/damage.png",
-                        chaos=0,
-                        speed_range=(150, 400),
-                        rot=0,
-                        angles=(0, 360),
-                        shrink_range=(12, 40),
-                        size=7,
-                    )
+            ## effet de caméra
+            self.camera.start_shake(intensity=8, duration=8)
 
-                ## effet de caméra
-                self.camera.start_shake(intensity=8, duration=8)
-        else:
-            self.h_was_pressed = False
-
-        if self.is_flashing and (current_time - self.anim_timer) > 50:
+        if self.is_flashing and (current_time - self.anim_timer) > 60:
             self.is_flashing = False
 
-        max_h = self.max_health
-        current_h = self.health
-
-        for i in range(max_h):
+        for i in range(self.max_health):
             x = self.margin_x + (i * self.gap)
             y = self.margin_y
 
-            # HP état normal ( pas perdu quoi )
-            if i < current_h:
+            # HP : état normal
+            if i < self.health:
                 self.screen.blit(self.base_heart, (x, y))
 
-            # HP quand on se fait taper ( flash blanc)
-            elif i == current_h and self.is_flashing:
+            # HP : flash blanc
+            elif i == self.health and self.is_flashing:
                 self.screen.blit(self.damaged_heart, (x, y))
 
-            # HP vide
+            # HP : vide
             else:
                 self.screen.blit(self.empty_heart, (x, y))
 

@@ -203,6 +203,8 @@ class Game:
                     self.show_hitbox = not self.show_hitbox
                 elif event.key == pygame.K_i:  # Ouvre inventaire
                     self.ui_joueur.visible = not self.ui_joueur.visible
+                elif event.key == pygame.K_h:
+                    self.hud.take_damage = True
 
             self.drag_mgr.handle_event(event, mouse_pos, on_use=self._on_use)
 

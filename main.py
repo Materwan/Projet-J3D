@@ -15,7 +15,6 @@ from menu import (
 from game import Game
 from player import HostController, GuestController
 from sound import SoundController
-from hud import HUD
 
 pygame.init()
 pygame.mixer.init()
