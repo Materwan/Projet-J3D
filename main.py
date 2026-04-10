@@ -89,9 +89,6 @@ class Manager:
 
             self.state.display()
 
-
-            
-
             if self.fps:  # fps
                 self.screen.blit(
                     self.font.render(
@@ -100,27 +97,20 @@ class Manager:
                     (10, 10),
                 )
 
-           
-
             dt = self.clock.tick(FPS) / 1000  # à ne pas toucher
-            
-            # ____affichage du HUD______(+des trucs pour debugs mais tkt touche pas ca marche )          
-           
+
+            # ____affichage du HUD______(+des trucs pour debugs mais tkt touche pas ca marche )
+
             if self.state == self.states["GAME"]:
                 game_obj = self.state
-                
-                
+
                 player_to_draw = None
                 if game_obj.player_controller is not None:
                     player_to_draw = getattr(game_obj.player_controller, "player", None)
 
-                
-                self.hud.draw(self.screen, player_to_draw, dt, camera = game_obj.camera)
-            
+                self.hud.draw(self.screen, player_to_draw, dt, camera=game_obj.camera)
 
             pygame.display.flip()
-
-                
 
         # Arrêt les processus multijoueur
         if isinstance(
