@@ -142,28 +142,28 @@ class PlayerControllerBase:
 
             self.hitbox.center = self.position  # Place hitbox sur pos
 
-    def authority_update(self, collision_hitbox: list[pygame.Rect] = []):
-        """Met à jour les donnée d'un controlleur autoritaire (Solo / Host)."""
+    def authority_update(self, collision_hitbox: list[pygame.Rect]):
 
-        # -- Mouvements --
-        self.moving_intent = self.velocity.length_squared() > 0
-        if self.moving_intent:  # Si le joueur veux bouger
-
+        if self.velocity.length_squared() > 0:
             self.update_direction()
-
             self.moteur.collision(self.hitbox, self.velocity, collision_hitbox)
+            self.update_motor()
 
-            self.update_motor()  # Update position
+        self.update_animation()
 
-        # -- Animation --
+    def update_animation(self):
+        """Logique d'animation partagée par les deux méthodes."""
+
         state = "run" if self.moving_intent else "idle"
+
         if self.attaque and self.animation.current_state != "attack":
             state = "attack"
-            self.attaque_rect = self.moteur.create_rect_attaque(
-                self.position, self.direction
-            )
+            if self.moteur:
+                self.attaque_rect = self.moteur.create_rect_attaque(
+                    self.position, self.direction
+                )
             self.timer = time.time()
-            self.attaque = False  # Bloque anti spam
+            self.attaque = False
 
         if self.attaque_rect and self.timer + self.attack_duration < time.time():
             self.attaque_rect = None
@@ -192,7 +192,7 @@ class SoloPlayerController(PlayerControllerBase):
         self.map.load_chunks(self.position)
 
         # -- Joueur --
-        self.authority_update()
+        self.authority_update([])
 
 
 class HostController(PlayerControllerBase):
@@ -426,6 +426,7 @@ class HostController(PlayerControllerBase):
         self.map.load_chunks(self.position)
 
         # -- Update Host --
+        self.moving_intent = self.velocity.length_squared() > 0
         self.authority_update([self.guest.hitbox])
 
         # -- Update Client --
@@ -614,6 +615,7 @@ class GuestController(PlayerControllerBase):
         self.map.load_chunks(self.position)
 
         # -- Guest --
+        self.moving_intent = self.velocity.length_squared() > 0
         self.authority_update([self.host.hitbox])
 
         if self.target_pos is not None:
@@ -627,7 +629,7 @@ class GuestController(PlayerControllerBase):
             self.target_pos = None
 
         # -- Host --
-        self.host.authority_update([self.hitbox])
+        self.host.update_animation()
 
         if self.host_target_pos is not None:
             delta = (self.host_target_pos - self.host.position).length()
