@@ -163,6 +163,17 @@ class DiscardPile:
         self.screen.blit(self.artwork, self.position)
 
 
+class SpellZone:
+    def __init__(self):
+        self.cards = []
+        self.size = 0
+
+
+class EquipZone:
+    def __init__(self):
+        self.cards = []
+        self.size = 0
+
 class PlayerCard:
     def __init__(
         self,
@@ -182,8 +193,8 @@ class PlayerCard:
         self.maxMp = mp
         self.maxAp = ap
         self.position = position
-        self.artwork = pygame.image.load(artwork)
-        self.bigArtWork = pygame.image.load(artwork)
+        self.artworkBase = pygame.image.load(artwork)
+        self.bigArtWorkBase = pygame.image.load(artwork)
         self.scale = (35 * 3.25, 47 * 3.25)
         self.running = True
         self.hover = False
@@ -208,21 +219,18 @@ class PlayerCard:
             self.biggerpicture = False
 
     def display(self):
-        self.artwork = pygame.transform.scale(self.artwork, self.scale)
-        self.screen.blit(self.artwork, self.position)
+        self.artwork = pygame.transform.scale(self.artworkBase, self.scale)
         self.hpDisplay = Text("Impact", 12, str(self.hp), "#FFFFFF", self.artwork)
         self.mpDisplay = Text("Impact", 12, str(self.mp), "#FFFFFF", self.artwork)
         self.apDisplay = Text("Impact", 12, str(self.ap), "#FFFFFF", self.artwork)
         self.hpDisplay.draw_text((18, 125))
         self.mpDisplay.draw_text((54, 125))
         self.apDisplay.draw_text((86, 125))
+        self.screen.blit(self.artwork, self.position)
 
         if self.biggerpicture == True:
             self.bigArtWork = pygame.transform.scale(
-                self.bigArtWork, (self.scale[0] * 3.5, self.scale[1] * 3.5)
-            )
-            self.screen.blit(
-                self.bigArtWork, (self.screenSize[0] / 1.55, self.screenSize[0] / 8)
+                self.bigArtWorkBase, (self.scale[0] * 3.5, self.scale[1] * 3.5)
             )
             self.hpDisplay = Text(
                 "Impact", 55, str(self.hp), "#FFFFFF", self.bigArtWork
@@ -236,7 +244,9 @@ class PlayerCard:
             self.hpDisplay.draw_text((56, 430))
             self.mpDisplay.draw_text((186, 430))
             self.apDisplay.draw_text((302, 430))
-
+            self.screen.blit(
+                self.bigArtWork, (self.screenSize[0] / 1.55, self.screenSize[0] / 8)
+            )
 
 class Game:
     def __init__(
@@ -266,6 +276,11 @@ class Game:
 
         self.running = True
         print(self.pDeck, self.pHand)
+    
+    def EndOfTurn(self):
+        self.bCard.hp -= self.pCard.ap
+        self.pCard.hp -= self.bCard.ap
+        self.bCard.mp, self.bCard.ap = self.bCard.maxMp, self.bCard.maxAp
 
     def display(self):
         self.artworkBG = pygame.transform.scale(self.artworkBG, self.screenSize)
@@ -286,15 +301,11 @@ class Game:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
-            if event.type == pygame.KEYDOWN and self.pDeck.size > 0:
-                self.pHand.add2Hand(self.pDeck.rmFromTopDeck())
-                print(self.pDeck, self.pHand)
-
-            if event.type == pygame.KEYUP and self.pHand.size > 0:
-                self.pDeck.add2Deck(self.pHand.rmFromHand(self.pHand.size - 1))
-                self.pDeck.shuffle()
-                print(self.pDeck, self.pHand)
-
+            if event.type == pygame.KEYDOWN:
+                print("Begining battle phase")
+                self.EndOfTurn()
+                print("Turn Ended")
+                
     def run(self):
         while self.running:
             self.display()
