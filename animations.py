@@ -1,6 +1,6 @@
 """Module pour les animations et boutons."""
 
-from typing import Tuple, List
+from typing import Tuple, List, Callable
 import os
 import pygame
 
@@ -169,6 +169,7 @@ class Button:
         screen: pygame.Surface,
         position: Tuple | List,
         *,
+        function: Callable,
         size: Tuple | List | None = None,
         scale: int | None = 1,
     ):
@@ -216,6 +217,9 @@ class Button:
             position[0] - (clicked_size[0] // 2),
             position[1] - (clicked_size[1] // 2),
         )
+
+        # Set the function to execute in the event
+        self.clicked_function = function
 
     def change_state(self, hover: bool, clicked: bool):
         """Update values for hover and clicked button"""
