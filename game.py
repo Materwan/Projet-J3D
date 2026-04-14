@@ -63,7 +63,7 @@ class Game:
         self.camera = Camera(width, height, 0, 0)
 
         # -- HUD --
-        self.hud = HUD(screen, self.camera)
+        self.hud = HUD(self.screen, self.camera)
 
         # -- Particules --
         self.particles = pygame.sprite.Group()
@@ -72,20 +72,19 @@ class Game:
         self.show_hitbox = False
 
         # -- Map --
-        self.map = None
-        self.map: Map
+        self.map: Map = None
         self.nb_chunks = (8, 8)
         self.chunk_size = (32, 32)
         self.octaves = (8, 8)
         self.seed = 0
 
         # -- Moteur --
-        self.moteur: Moteur | None = None
+        self.moteur: Moteur = None
 
         # -- Ennemis --
         self.paths = [[]]
-        self.ennemis: Dict[int, Ennemi] | None = {}
-        self.ennemis_id: List[int] | None = []
+        self.ennemis: Dict[int, Ennemi] = {}
+        self.ennemis_id: List[int] = []
 
         # -- Réseau --
         self.address = "0.0.0.0"
@@ -234,6 +233,7 @@ class Game:
             if isinstance(self.player_controller, HostController):
                 if self.player_controller.serveur.is_serving():
                     self.player_controller.serveur.close()
+            self.reset()
             self.manager.state = self.manager.states["MENU_P"]
 
         # -- Ennemis --
@@ -442,6 +442,73 @@ class Game:
                         + self.camera.offset_y,
                     ),
                 )
+
+    def reset(self):
+        self.playing_mode = None
+        self.player_controller = None
+        self.game_name = "tt"
+
+        # -- Raccourcis --
+        self.keybinds = {
+            "up": pygame.K_UP,
+            "down": pygame.K_DOWN,
+            "left": pygame.K_LEFT,
+            "right": pygame.K_RIGHT,
+            "attack": pygame.K_SPACE,
+        }
+
+        # -- Camera --
+        width, height = self.screen.get_size()
+        self.camera = Camera(width, height, 0, 0)
+
+        # -- HUD --
+        self.hud = HUD(self.screen, self.camera)
+
+        # -- Particules --
+        self.particles = pygame.sprite.Group()
+
+        # -- F2 --
+        self.show_hitbox = False
+
+        # -- Map --
+        self.map: Map = None
+        self.nb_chunks = (8, 8)
+        self.chunk_size = (32, 32)
+        self.octaves = (8, 8)
+        self.seed = 0
+
+        # -- Moteur --
+        self.moteur: Moteur = None
+
+        # -- Ennemis --
+        self.paths = [[]]
+        self.ennemis: Dict[int, Ennemi] = {}
+        self.ennemis_id: List[int] = []
+
+        # -- Réseau --
+        self.address = "0.0.0.0"
+        self.port = 8888
+
+        # -- Inventaire -- : touche I pour ouvrir et fermer l'inventaire
+        largeur, hauteur = self.screen.get_size()
+        self.inv_joueur = Inventaire(rows=4, cols=8)
+        self.ui_joueur = InventaireUI(
+            self.screen,
+            name="Sac du joueur",
+            inv=self.inv_joueur,
+            pos=((largeur - 486) // 2, hauteur - 293),
+            image_path="Ressources/inv_assets/chest.png",
+            slot_size=52,
+            slot_margin=4,
+            padding=21,
+            title_height=11,
+            visible=False,
+            is_merchant=False,
+        )
+        self.drag_mgr = InventaireManager(self.screen, [self.ui_joueur])
+
+        # Items de départ :
+        self.inv_joueur.add_item(Item.create("Potion Rouge", 3))
 
     def save(self, file: str | None = "save.json"):
 
