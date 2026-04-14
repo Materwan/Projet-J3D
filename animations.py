@@ -168,8 +168,8 @@ class Button:
         path: str,
         screen: pygame.Surface,
         position: Tuple | List,
-        *,
         function: Callable,
+        *,
         size: Tuple | List | None = None,
         scale: int | None = 1,
     ):

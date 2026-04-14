@@ -217,6 +217,8 @@ class Game:
                 # TEMPORAIRE ! (perd X coeur avec HUD)
                 elif event.key == pygame.K_h:
                     self.hud.take_damage = 1
+                    if self.hud.health <= 1:
+                        self.manager.change_state("DEATH_SCREEN")
 
             self.drag_mgr.handle_event(event, mouse_pos, on_use=self._on_use)
 

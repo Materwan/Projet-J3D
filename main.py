@@ -9,8 +9,9 @@ from menu import (
     Play_Menu,
     Join_Multi_Menu,
     Pause_Menu,
-    Reprendre_Menu,
-    Creer_Menu,
+    Solo_Menu,
+    Multiplayer_Menu,
+    Death_Screen,
 )
 from game import Game
 from player import HostController, GuestController
@@ -21,7 +22,7 @@ pygame.mixer.init()
 pygame.display.set_caption("MoleTale")
 
 FPS = 60
-TAILLE_ECRAN = (500, 500)  # (500, 500) pour petit ecran (0, 0) pour plein ecran
+TAILLE_ECRAN = (0, 0)  # (500, 500) pour petit ecran (0, 0) pour plein ecran
 
 SOUND_PATH = "Ressources/Musics/"
 MUSIC_HOLDER = SOUND_PATH + "placeholder.mp3"
@@ -53,8 +54,9 @@ class Manager:
             "MENU_PLAY": Play_Menu(self.screen, self),
             "MENU_MULTI": Join_Multi_Menu(self.screen, self),
             "MENU_PAUSE": Pause_Menu(self.screen, self),
-            "MENU_REPRENDRE": Reprendre_Menu(self.screen, self),
-            "MENU_CREER": Creer_Menu(self.screen, self),
+            "MENU_SOLO": Solo_Menu(self.screen, self),
+            "MENU_MULTIPLAYER": Multiplayer_Menu(self.screen, self),
+            "DEATH_SCREEN": Death_Screen(self.screen, self),
         }
         self.state = self.states["MENU_P"]
 
