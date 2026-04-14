@@ -226,7 +226,7 @@ class Game:
         """Met à jour le jeu."""
 
         # -- Joueur --
-        self.player_controller.update()
+        self.player_controller.update(self.ennemis)
         self.camera.update(self.player_controller.hitbox)
 
         if self.player_controller.close:

@@ -185,14 +185,18 @@ class PlayerControllerBase:
 class SoloPlayerController(PlayerControllerBase):
     """Classe pour un joueur solo"""
 
-    def update(self):
+    def update(self, ennemis):
         """Met à jour les éléments nécessaire du joueur."""
 
         # -- Map --
         self.map.load_chunks(self.position)
 
+        # -- Ennemie --
+        ennemis_hitboxes = [e.hitbox for e in ennemis.values() if e.hitbox]
+
         # -- Joueur --
-        self.authority_update([])
+        self.moving_intent = self.velocity.length_squared() > 0
+        self.authority_update(ennemis_hitboxes)
 
 
 class HostController(PlayerControllerBase):
@@ -227,7 +231,7 @@ class HostController(PlayerControllerBase):
         self.subnet_mask = get_netmask_for_ip(self.ip)
 
         # -- Ennemis --
-        self.ennemis_data: Dict[int, Dict[str, Any]]
+        self.ennemis_data: Dict[int, Dict[str, Any]] = {}
 
         # -- Processus --
         self.asyncio_loop: asyncio.AbstractEventLoop | None = None
@@ -419,18 +423,21 @@ class HostController(PlayerControllerBase):
         # -- Appel fonction stop --
         asyncio.run_coroutine_threadsafe(stop_server(), self.asyncio_loop)
 
-    def update(self):
+    def update(self, ennemis):
         """Met à jour les éléments nécessaire du joueur et du client."""
 
-        # -- Charge chunks --
+        # -- Map --
         self.map.load_chunks(self.position)
+
+        # -- Ennemie --
+        ennemis_hitboxes = [e.hitbox for e in ennemis.values() if e.hitbox]
 
         # -- Update Host --
         self.moving_intent = self.velocity.length_squared() > 0
-        self.authority_update([self.guest.hitbox])
+        self.authority_update(ennemis_hitboxes + [self.guest.hitbox])
 
         # -- Update Client --
-        self.guest.authority_update([self.hitbox])
+        self.guest.authority_update(ennemis_hitboxes + [self.hitbox])
 
     def display(self):
         """Affiche le joueur ainsi que l'invité"""
@@ -471,7 +478,7 @@ class GuestController(PlayerControllerBase):
         self.writer: asyncio.StreamWriter | None = None
 
         # -- Ennemis --
-        self.ennemis_data: Dict[int, Dict[str, Any]]
+        self.ennemis_data: Dict[int, Dict[str, Any]] = {}
 
         # -- Processus --
         self.loop = threading.Thread(target=self.run)
@@ -608,15 +615,18 @@ class GuestController(PlayerControllerBase):
             self.writer.close()
             print("Connexion fermé")
 
-    def update(self):
+    def update(self, ennemis):
         """Met à jour les éléments nécessaire du joueur et du client."""
 
         # -- Map --
         self.map.load_chunks(self.position)
 
+        # -- Ennemie --
+        ennemis_hitboxes = [e.hitbox for e in ennemis.values() if e.hitbox]
+
         # -- Guest --
         self.moving_intent = self.velocity.length_squared() > 0
-        self.authority_update([self.host.hitbox])
+        self.authority_update(ennemis_hitboxes + [self.host.hitbox])
 
         if self.target_pos is not None:
             delta = (self.target_pos - self.position).length()
