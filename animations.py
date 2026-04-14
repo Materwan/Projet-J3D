@@ -221,6 +221,19 @@ class Button:
         # Set the function to execute in the event
         self.clicked_function = function
 
+    def event(self, events: List[pygame.event.Event], mouse_pos: Tuple[int, int]):
+        self.hover = self.rec.collidepoint(mouse_pos)
+        clicked = False
+        for event in events:
+            if (
+                self.hover
+                and event.type == pygame.MOUSEBUTTONDOWN
+                and event.button == pygame.BUTTON_LEFT
+            ):
+                clicked = True
+        self.clicked = clicked
+        self.clicked_function() if self.clicked else None
+
     def change_state(self, hover: bool, clicked: bool):
         """Update values for hover and clicked button"""
         self.hover = hover
