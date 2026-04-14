@@ -160,7 +160,7 @@ class Ennemi:
         self.dying = data["dying"]
         if not self.dying:
             self.position = np.array(data["position"])
-            self.hitbox.topleft = data["position"]
+            self.hitbox.center = data["position"]
             self.velocity = data["velocity"]
         self.death_time = data["death_time"]
 
