@@ -88,7 +88,14 @@ class PlayerControllerBase:
         self.velocity = pygame.Vector2(0, 0)
         self.direction = "right"
         self.moving_intent = False
+
+        # -- PV --
+        self.max_pv = 10
         self.pv = 10
+
+        # -- Invincibilité --
+        self.last_hit = 0.0
+        self.hit_interval = 1.0
 
         # -- Attaque --
         self.attaque = False
@@ -101,11 +108,13 @@ class PlayerControllerBase:
 
     def update_pv(self, modif: int):
         """Met à jour les PV et tue le joueur si besoin."""
+        if self.last_hit + self.hit_interval < time.time():
 
-        self.pv += modif
+            self.pv += modif
+            self.last_hit = time.time()
 
-        if self.pv <= 0:
-            pass  # lancer le menu de mort
+            if self.pv <= 0:
+                pass
 
     def event(self, keys: Tuple[bool]):
         """
@@ -292,24 +301,13 @@ class HostController(PlayerControllerBase):
         dic = {
             "guest": {
                 "position": list(self.guest.position),
-                "attaque_rect": (
-                    list(self.guest.attaque_rect)
-                    if self.guest.attaque_rect
-                    and self.guest.animation.current_state == "attack"
-                    else None
-                ),
+                "pv": self.guest.pv,
             },
             "host": {
                 "position": list(self.position),
                 "moving_intent": self.moving_intent,
-                "velocity": list(self.velocity),
                 "direction": self.direction,
                 "attaque": self.animation.current_state == "attack",
-                "attaque_rect": (
-                    list(self.attaque_rect)
-                    if self.attaque_rect and self.animation.current_state == "attack"
-                    else None
-                ),
             },
             "ennemis": self.ennemis_data,
             "close": False,
@@ -569,17 +567,13 @@ class GuestController(PlayerControllerBase):
 
         # -- Invité --
         self.target_pos = pygame.Vector2(data["guest"]["position"])
-        raw_rect = data["guest"]["attaque_rect"]
-        self.attaque_rect = pygame.Rect(raw_rect) if raw_rect else None
+        self.pv = data["guest"]["pv"]
 
         # -- Host --
         self.host_target_pos = pygame.Vector2(data["host"]["position"])
         self.host.moving_intent = data["host"]["moving_intent"]
-        self.host.velocity = pygame.Vector2(data["host"]["velocity"])
         self.host.direction = data["host"]["direction"]
         self.host.attaque = data["host"]["attaque"]
-        raw_rect = data["host"]["attaque_rect"]
-        self.host.attaque_rect = pygame.Rect(raw_rect) if raw_rect else None
 
         # -- Ennemis --
         self.ennemis_data = data["ennemis"]
@@ -647,6 +641,7 @@ class GuestController(PlayerControllerBase):
                 lerp = 0.3 if self.moving_intent else 0.6
                 self.position += (self.target_pos - self.position) * lerp
             self.hitbox.center = self.position
+            self.hitbox_damage.midbottom = self.position
             self.target_pos = None
 
         # -- Host --
@@ -659,6 +654,7 @@ class GuestController(PlayerControllerBase):
             else:
                 self.host.position.update(self.host_target_pos)
             self.host.hitbox.center = self.host.position
+            self.host.hitbox_damage.midbottom = self.host.position
 
     def display(self):
         """Affiche le joueur ainsi que l'hôte"""

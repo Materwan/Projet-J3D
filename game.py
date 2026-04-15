@@ -192,6 +192,11 @@ class Game:
         self.camera.map_width = self.map.size[0] * self.map.tile_size[0]
         self.camera.map_height = self.map.size[1] * self.map.tile_size[1]
 
+        # -- HUD --
+        self.hud.player_controller = self.player_controller
+        self.hud.max_pv = self.player_controller.max_pv
+        self.hud.pv = self.player_controller.pv
+
     def event(self, events: List[pygame.event.Event]) -> bool:
         """Gére les entré de l'utilisateur."""
         mouse_pos = pygame.mouse.get_pos()
@@ -214,11 +219,9 @@ class Game:
                 elif event.key == pygame.K_i:  # Ouvre inventaire
                     self.ui_joueur.visible = not self.ui_joueur.visible
 
-                # TEMPORAIRE ! (perd X coeur avec HUD)
+                # TEMPORAIRE !
                 elif event.key == pygame.K_h:
-                    self.hud.take_damage = 1
-                    if self.hud.health <= 1:
-                        self.manager.change_state("DEATH_SCREEN")
+                    self.player_controller.update_pv(-1)
 
             self.drag_mgr.handle_event(event, mouse_pos, on_use=self._on_use)
 
@@ -250,6 +253,10 @@ class Game:
                         self.player_controller.hitbox,
                     )
                 )
+                if ennemi.attaque_rect is not None:
+                    self.moteur.apply_attack(
+                        ennemi.attaque_rect, self.player_controller
+                    )
                 if ennemi.dying and not ennemi.particles_spawned:
                     ennemi.particles_spawned = True
                     for _ in range(50):
@@ -266,9 +273,10 @@ class Game:
                 del self.ennemis[key]
 
             if self.player_controller.attaque_rect is not None:
-                self.moteur.apply_attaque(
-                    self.player_controller.attaque_rect, self.ennemis
-                )
+                for ennemi in self.ennemis.values():
+                    self.moteur.apply_attack(
+                        self.player_controller.attaque_rect, ennemi
+                    )
 
         elif isinstance(self.player_controller, HostController):
             # -- Host --
@@ -280,6 +288,13 @@ class Game:
                         self.player_controller.guest.hitbox,
                     )
                 )
+                if ennemi.attaque_rect is not None:
+                    self.moteur.apply_attack(
+                        ennemi.attaque_rect, self.player_controller
+                    )
+                    self.moteur.apply_attack(
+                        ennemi.attaque_rect, self.player_controller.guest
+                    )
                 if ennemi.dying and not ennemi.particles_spawned:
                     ennemi.particles_spawned = True
                     for _ in range(50):
@@ -297,14 +312,16 @@ class Game:
             self.player_controller.ennemis_data = serialize_ennemis(self.ennemis)
 
             if self.player_controller.attaque_rect is not None:
-                self.moteur.apply_attaque(
-                    self.player_controller.attaque_rect, self.ennemis
-                )
+                for ennemi in self.ennemis.values():
+                    self.moteur.apply_attack(
+                        self.player_controller.attaque_rect, ennemi
+                    )
 
             if self.player_controller.guest.attaque_rect is not None:
-                self.moteur.apply_attaque(
-                    self.player_controller.guest.attaque_rect, self.ennemis
-                )
+                for ennemi in self.ennemis.values():
+                    self.moteur.apply_attack(
+                        self.player_controller.guest.attaque_rect, ennemi
+                    )
 
         elif isinstance(self.player_controller, GuestController):
             # -- Guest --
@@ -378,6 +395,9 @@ class Game:
             )
         self.particles.update(self.manager.clock.get_time() / 1000)
 
+        # -- HUD --
+        self.hud.update(self.manager.clock.get_time() / 1000)
+
     def display(self):
         """Affiche tout les éléments."""
         # -- Reset --
@@ -405,7 +425,7 @@ class Game:
         self.drag_mgr.draw(pygame.mouse.get_pos())
 
         # -- HUD --
-        self.hud.draw(self.manager.clock.get_time() / 1000)
+        self.hud.draw()
 
     def draw_debug_hitboxes(self):
         """

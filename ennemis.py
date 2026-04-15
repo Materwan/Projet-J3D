@@ -141,8 +141,10 @@ class Ennemi:
         self.direction = "right"
 
         # -- PV --
-        self.pv = 20
-        self.last_hit = time.time()
+        self.pv = 3
+
+        # -- Invincibilité --
+        self.last_hit = 0.0
         self.hit_interval = 1.0
 
         # -- Mort --
@@ -159,6 +161,7 @@ class Ennemi:
         if not self.dying:
             self.position = np.array(data["position"])
             self.hitbox.center = data["position"]
+            self.hitbox_damage.midbottom = data["position"]
             self.velocity = data["velocity"]
         self.death_time = data["death_time"]
 

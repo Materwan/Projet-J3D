@@ -106,9 +106,7 @@ class Moteur:
 
         return pygame.Rect(position.x + dec_x, position.y + dec_y, wide, high)
 
-    def apply_attaque(
-        self, attaque_rect: pygame.Rect, ennemi_list: dict[int, "Ennemi"]
-    ):
-        for ennemi in ennemi_list.values():
-            if ennemi.hitbox_damage and attaque_rect.colliderect(ennemi.hitbox_damage):
-                ennemi.update_pv(-10)
+    def apply_attack(self, attaque_rect: pygame.Rect, ennemi):
+        # si tu vois cela Erwan : ennemi vaut soit Ennemi soit un des PlayerController
+        if ennemi.hitbox_damage and attaque_rect.colliderect(ennemi.hitbox_damage):
+            ennemi.update_pv(-1)
