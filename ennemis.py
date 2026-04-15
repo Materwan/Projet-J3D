@@ -119,7 +119,8 @@ class Ennemi:
 
         # -- State --
         self.position = np.array(position, dtype=np.float32)
-        self.hitbox = pygame.Rect(position[0], position[1], 28, 20)
+        self.hitbox = pygame.Rect(position[0], position[1], 15, 15)
+        self.hitbox_damage = pygame.Rect(position[0], position[1], 30, 80)
         self.speed = speed
         self.path: List[Tuple[int, int]] | None = []
         self.chase_range = chase_range
@@ -236,6 +237,7 @@ class Ennemi:
 
                 self.position += self.velocity * self.speed
                 self.hitbox.center = self.position
+                self.hitbox_damage.midbottom = self.position
 
     def update(self, *hitbox_joueur: pygame.Rect):
 

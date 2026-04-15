@@ -13,8 +13,8 @@ class Moteur:
 
         # Configuration : { "direction": (decalage_x, decalage_y, largeur, hauteur) }
         self.attaque_config = {
-            "right": (0, -55, 70, 60),
-            "left": (-70, -55, 70, 60),
+            "right": (0, -55, 70, 80),
+            "left": (-70, -55, 70, 80),
             # "up": (-25, -70, 80, 70),
             # "down": (-25, 0, 80, 70),
         }
@@ -110,5 +110,5 @@ class Moteur:
         self, attaque_rect: pygame.Rect, ennemi_list: dict[int, "Ennemi"]
     ):
         for ennemi in ennemi_list.values():
-            if ennemi.hitbox and attaque_rect.colliderect(ennemi.hitbox):
+            if ennemi.hitbox_damage and attaque_rect.colliderect(ennemi.hitbox_damage):
                 ennemi.update_pv(-10)

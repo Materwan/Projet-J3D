@@ -423,6 +423,9 @@ class Game:
         # Affichage des hitbox et des zones d'attaque
         for entity in entities:
             pygame.draw.rect(self.screen, "green", self.camera.apply(entity.hitbox), 2)
+            pygame.draw.rect(
+                self.screen, "green", self.camera.apply(entity.hitbox_damage), 2
+            )
 
             if entity.attaque_rect:
                 pygame.draw.rect(
@@ -436,6 +439,9 @@ class Game:
             if ennemi.hitbox:
                 pygame.draw.rect(
                     self.screen, "orange", self.camera.apply(ennemi.hitbox), 2
+                )
+                pygame.draw.rect(
+                    self.screen, "orange", self.camera.apply(ennemi.hitbox_damage), 2
                 )
                 all_hitboxes.append(ennemi.hitbox)
             if ennemi.attaque_rect:

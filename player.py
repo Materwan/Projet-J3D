@@ -81,12 +81,14 @@ class PlayerControllerBase:
         # -- Joueur --
         self.keybinds: Dict | None = None
         self.position = pygame.Vector2(start_position)
-        self.hitbox = pygame.Rect(0, 0, 28, 15)
+        self.hitbox = pygame.Rect(0, 0, 25, 15)
         self.hitbox.center = self.position
+        self.hitbox_damage = pygame.Rect(0, 0, 30, 45)
+        self.hitbox_damage.midbottom = self.position
         self.velocity = pygame.Vector2(0, 0)
         self.direction = "right"
         self.moving_intent = False
-        self.pv = 100
+        self.pv = 10
 
         # -- Attaque --
         self.attaque = False
@@ -96,6 +98,14 @@ class PlayerControllerBase:
 
         # -- Réseau --
         self.close = False
+
+    def update_pv(self, modif: int):
+        """Met à jour les PV et tue le joueur si besoin."""
+
+        self.pv += modif
+
+        if self.pv <= 0:
+            pass  # lancer le menu de mort
 
     def event(self, keys: Tuple[bool]):
         """
@@ -141,6 +151,7 @@ class PlayerControllerBase:
             self.position += self.velocity * SPEED  # Modif pos
 
             self.hitbox.center = self.position  # Place hitbox sur pos
+            self.hitbox_damage.midbottom = self.position
 
     def authority_update(self, collision_hitbox: list[pygame.Rect]):
 
