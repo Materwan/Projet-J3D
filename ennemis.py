@@ -12,13 +12,10 @@ from map import Map
 from camera_system import Camera
 from animations import AnimationController
 from moteur import Moteur
-from particule import spawn_local_particle
 
 
 RECALC_MAX = 0.5
-PARTICULES_AT_DEATH = 50
 DEATH_TIME = 1
-DUST_IMAGE_PATH = r"Ressources\particles\dust.png"
 
 
 def create_node(
@@ -150,7 +147,7 @@ class Ennemi:
         # -- Mort --
         self.dying = False
         self.death_time = float("inf")
-        self.particules = pygame.sprite.Group()
+        self.particles_spawned = False
 
     def update_variables(self, data: Dict[str, Any]):
         """Met à jour les variable."""
@@ -279,14 +276,7 @@ class Ennemi:
             return self.path
 
         else:
-
             self.attaque_rect = None
-
-            # -- Mort --
-            if self.dying:
-                for particule in self.particules:
-                    particule.update(1 / 60)
-
             return []
 
     def update_pv(self, modif: int):
@@ -305,15 +295,6 @@ class Ennemi:
                 self.death_time = time.time() + DEATH_TIME
                 self.hitbox = None
 
-                # Créer les particules
-                for _ in range(PARTICULES_AT_DEATH):
-                    spawn_local_particle(
-                        self.particules,
-                        pos=self.position.tolist(),
-                        sprite_path=DUST_IMAGE_PATH,
-                        shrink_range=(20, 50),
-                    )
-
     def display(self):
         """Affiche l'ennemis."""
 
@@ -327,11 +308,6 @@ class Ennemi:
                     self.animation.im_size[0] // 2, self.animation.im_size[1] - 15
                 )
             )
-
-        # -- Meurt --
-        else:
-            for particule in self.particules:
-                self.screen.blit(particule.image, self.camera.apply(particule.rect))
 
 
 if __name__ == "__main__":

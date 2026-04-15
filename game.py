@@ -250,6 +250,16 @@ class Game:
                         self.player_controller.hitbox,
                     )
                 )
+                if ennemi.dying and not ennemi.particles_spawned:
+                    ennemi.particles_spawned = True
+                    for _ in range(50):
+                        spawn_local_particle(
+                            self.particles,
+                            ennemi.position.tolist(),
+                            r"Ressources\particles\dust.png",
+                            speed_range=(50, 150),
+                            shrink_range=(20, 60),
+                        )
                 if time.time() > ennemi.death_time:
                     del_key.append(key)
             for key in del_key:
@@ -270,6 +280,16 @@ class Game:
                         self.player_controller.guest.hitbox,
                     )
                 )
+                if ennemi.dying and not ennemi.particles_spawned:
+                    ennemi.particles_spawned = True
+                    for _ in range(50):
+                        spawn_local_particle(
+                            self.particles,
+                            ennemi.position.tolist(),
+                            r"Ressources\particles\dust.png",
+                            speed_range=(50, 150),
+                            shrink_range=(20, 60),
+                        )
                 if time.time() > ennemi.death_time:
                     del_key.append(key)
             for key in del_key:
@@ -291,6 +311,8 @@ class Game:
             del_key = []
             for key, ennemi in self.player_controller.ennemis_data.items():
                 if not key in self.ennemis_id:
+                    if ennemi["dying"]:  # si mort ne pas le crée !
+                        continue
                     self.ennemis[key] = Ennemi(
                         self.screen,
                         ennemi["position"],
@@ -306,6 +328,16 @@ class Game:
                 else:
                     self.ennemis[key].update_variables(ennemi)
                     self.ennemis[key].update_animation()
+                if self.ennemis[key].dying and not self.ennemis[key].particles_spawned:
+                    self.ennemis[key].particles_spawned = True
+                    for _ in range(50):
+                        spawn_local_particle(
+                            self.particles,
+                            self.ennemis[key].position.tolist(),
+                            r"Ressources\particles\dust.png",
+                            speed_range=(50, 150),
+                            shrink_range=(20, 60),
+                        )
                 if time.time() > ennemi["death_time"]:
                     del_key.append(key)
                     self.ennemis_id.remove(key)
