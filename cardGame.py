@@ -277,10 +277,34 @@ class Game:
         self.running = True
         print(self.pDeck, self.pHand)
     
-    def EndOfTurn(self):
+    def GameStart(self):
+        for _ in range(5):
+            self.pHand.add2Hand(self.pDeck.rmFromTopDeck())
+            self.bHand.add2Hand(self.bDeck.rmFromTopDeck())
+    
+    def TurnEnd(self):
         self.bCard.hp -= self.pCard.ap
-        self.pCard.hp -= self.bCard.ap
-        self.bCard.mp, self.bCard.ap = self.bCard.maxMp, self.bCard.maxAp
+        if (self.bCard.hp > 0):
+            self.pCard.hp -= self.bCard.ap
+        else:
+            self.win()
+            return 0
+        if (self.pCard.hp > 0):
+                self.bCard.mp, self.bCard.ap = self.bCard.maxMp, self.bCard.maxAp
+                self.pHand.add2Hand(self.pDeck.rmFromTopDeck())
+                self.bHand.add2Hand(self.bDeck.rmFromTopDeck())
+        else:
+            self.lose()
+            return 0
+        
+    
+    def win(self):
+        print("You Win !")
+        self.running = False
+    
+    def lose(self):
+        print("You Lose !")
+        self.running = False
 
     def display(self):
         self.artworkBG = pygame.transform.scale(self.artworkBG, self.screenSize)
@@ -302,11 +326,10 @@ class Game:
             if event.type == pygame.QUIT:
                 self.running = False
             if event.type == pygame.KEYDOWN:
-                print("Begining battle phase")
-                self.EndOfTurn()
-                print("Turn Ended")
+                self.TurnEnd()
                 
     def run(self):
+        self.GameStart()
         while self.running:
             self.display()
             self.event()
@@ -323,7 +346,7 @@ if __name__ == "__main__":
         screen,
         ((screenSize[0] - (35 * 3.25)) / 2, (screenSize[1] - (47 * 3.25)) / 1.25),
     )
-    decklistP = [Card(screen, "Dmg2"), Card(screen, "HpUp3")]
+    decklistP = [Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3")]
     deckP = Deck(
         screen,
         (
@@ -348,7 +371,7 @@ if __name__ == "__main__":
         screen,
         ((screenSize[0] - (35 * 3.25)) / 2, (screenSize[1] - (47 * 3.25)) / 3.75),
     )
-    decklistB = [Card(screen, "Dmg2"), Card(screen, "HpUp3")]
+    decklistB = [Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3")]
     deckB = Deck(
         screen,
         (
