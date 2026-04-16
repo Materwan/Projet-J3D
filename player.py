@@ -110,7 +110,7 @@ class PlayerControllerBase:
         """Met à jour les PV et tue le joueur si besoin."""
         if self.last_hit + self.hit_interval < time.time():
 
-            self.pv += modif
+            self.pv = max(0, self.pv + modif)
             self.last_hit = time.time()
 
             if self.pv <= 0:

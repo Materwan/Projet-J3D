@@ -45,33 +45,33 @@ class HUD:
     def update(self, dt):
         current_time = pygame.time.get_ticks()
 
-        if self.player_controller is not None:
-            new_pv = self.player_controller.pv
+        new_pv = self.player_controller.pv
 
-            # si perte de PV alors déclencher les effets visuels
-            if new_pv < self.pv:
-                self.anim_timer = current_time
-                self.is_flashing = True
-                for _ in range(10):
-                    spawn_local_particle(
-                        group=self.particles,
-                        pos=(
-                            self.margin_x
-                            + ((self.pv - 1) * self.gap)
-                            + (self.size * 0.45),
-                            self.margin_y + (self.size * 0.23),
-                        ),
-                        sprite_path="Ressources/particles/damage.png",
-                        chaos=0,
-                        speed_range=(150, 400),
-                        rot=0,
-                        angles=(0, 360),
-                        shrink_range=(12, 40),
-                        size=7,
-                    )
+        # si perte de PV alors déclencher les effets visuels
+        if new_pv < self.pv:
+            self.anim_timer = current_time
+            self.is_flashing = True
+            for _ in range(10):
+                spawn_local_particle(
+                    group=self.particles,
+                    pos=(
+                        self.margin_x + ((self.pv - 2) * self.gap) + (self.size * 0.45),
+                        self.margin_y + (self.size * 0.23),
+                    ),
+                    sprite_path="Ressources/particles/damage.png",
+                    chaos=0,
+                    speed_range=(150, 400),
+                    rot=0,
+                    angles=(0, 360),
+                    shrink_range=(12, 40),
+                    size=7,
+                )
+            if self.pv == 1:
+                self.camera.start_shake(intensity=15, duration=30)
+            else:
                 self.camera.start_shake(intensity=8, duration=8)
 
-            self.pv = new_pv
+        self.pv = new_pv
 
         if self.is_flashing and (current_time - self.anim_timer) > 60:
             self.is_flashing = False

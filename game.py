@@ -234,13 +234,6 @@ class Game:
         self.player_controller.update(self.ennemis)
         self.camera.update(self.player_controller.hitbox)
 
-        if self.player_controller.close:
-            if isinstance(self.player_controller, HostController):
-                if self.player_controller.serveur.is_serving():
-                    self.player_controller.serveur.close()
-            self.reset()
-            self.manager.state = self.manager.states["MENU_P"]
-
         # -- Ennemis --
         self.paths = [[]]
 
@@ -397,6 +390,13 @@ class Game:
 
         # -- HUD --
         self.hud.update(self.manager.clock.get_time() / 1000)
+
+        if self.player_controller.close:
+            if isinstance(self.player_controller, HostController):
+                if self.player_controller.serveur.is_serving():
+                    self.player_controller.serveur.close()
+            self.reset()
+            self.manager.state = self.manager.states["MENU_P"]
 
     def display(self):
         """Affiche tout les éléments."""
