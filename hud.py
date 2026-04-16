@@ -51,11 +51,11 @@ class HUD:
         if new_pv < self.pv:
             self.anim_timer = current_time
             self.is_flashing = True
-            for _ in range(10):
+            for _ in range(25):
                 spawn_local_particle(
                     group=self.particles,
                     pos=(
-                        self.margin_x + ((self.pv - 2) * self.gap) + (self.size * 0.45),
+                        self.margin_x + ((new_pv - 1) * self.gap) + (self.size * 0.45),
                         self.margin_y + (self.size * 0.23),
                     ),
                     sprite_path="Ressources/particles/damage.png",
@@ -66,10 +66,10 @@ class HUD:
                     shrink_range=(12, 40),
                     size=7,
                 )
-            if self.pv == 1:
-                self.camera.start_shake(intensity=15, duration=30)
+            if new_pv == 0:
+                self.camera.start_shake(intensity=50, duration=50)
             else:
-                self.camera.start_shake(intensity=8, duration=8)
+                self.camera.start_shake(intensity=10, duration=10)
 
         self.pv = new_pv
 

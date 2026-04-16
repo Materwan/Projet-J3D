@@ -9,8 +9,8 @@ class Camera:
         self.height = height
         self.map_width = map_width
         self.map_height = map_height
-        
-        # variables pour le tremblement de caméra 
+
+        # variables pour le tremblement de caméra
         self.shake_timer = 0
         self.shake_intensity = 0
         self.offset_x = 0
@@ -18,7 +18,9 @@ class Camera:
 
     def start_shake(self, intensity, duration):
         # Démarre / initialise un effet de tremblement de la caméra
+        self.shake_intensity_initial = intensity
         self.shake_intensity = intensity
+        self.shake_duration = duration
         self.shake_timer = duration
 
     def display_map(self, map_obj):
@@ -31,7 +33,7 @@ class Camera:
 
             # Ces deux lignes doivent être DANS la boucle (indentation manquante)
             screen_x = chunk_world_x + self.camera.x + self.offset_x
-            screen_y = chunk_world_y + self.camera.y + self.offset_y 
+            screen_y = chunk_world_y + self.camera.y + self.offset_y
 
             map_obj.screen.blit(map_obj.loaded_chunks[(x, y)], (screen_x, screen_y))
 
@@ -39,7 +41,9 @@ class Camera:
         """
         Argument : Rect
         """
-        return entity_rect.move(self.camera.x + self.offset_x, self.camera.y + self.offset_y)
+        return entity_rect.move(
+            self.camera.x + self.offset_x, self.camera.y + self.offset_y
+        )
 
     def update(self, target):
         target: pygame.Rect
@@ -55,13 +59,16 @@ class Camera:
         # Tremblement de caméra
         # On applique le décalage directement sur self.camera.x/y
         if self.shake_timer > 0:
-            intensity = int(self.shake_intensity)
-            
-            self.offset_x += random.randint(-intensity, intensity)
-            self.offset_y += random.randint(-intensity, intensity)
+
+            intensity = int(
+                self.shake_intensity_initial * (self.shake_timer / self.shake_duration)
+            )
+
+            self.offset_x = random.randint(-intensity, intensity)
+            self.offset_y = random.randint(-intensity, intensity)
             self.shake_timer -= 1
-            self.shake_intensity *= 0.9 
-        else : 
+            self.shake_intensity *= 0.9
+        else:
             self.offset_x = 0
             self.offset_y = 0
 
