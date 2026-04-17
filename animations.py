@@ -1,6 +1,6 @@
 """Module pour les animations et boutons."""
 
-from typing import Tuple, List, Callable
+from typing import Tuple, List, Callable, Any
 import os
 import pygame
 
@@ -324,7 +324,12 @@ class Button:
         else:
             self.text = None
 
-    def event(self, events: List[pygame.event.Event], mouse_pos: Tuple[int, int]):
+    def event(
+        self,
+        events: List[pygame.event.Event],
+        mouse_pos: Tuple[int, int],
+        *func_args: Any,
+    ):
         self.hover = self.rec.collidepoint(mouse_pos)
         clicked = False
         for event in events:
@@ -335,7 +340,7 @@ class Button:
             ):
                 clicked = True
         self.clicked = clicked
-        self.clicked_function() if self.clicked else None
+        self.clicked_function(*func_args) if self.clicked else None
 
     def change_state(self, hover: bool, clicked: bool):
         """Update values for hover and clicked button"""
