@@ -1,4 +1,5 @@
 from typing import List, Dict, Tuple, Callable, TYPE_CHECKING
+from player import GuestController
 import threading
 import socket
 import json
@@ -763,7 +764,11 @@ class Pause_Menu(Menu):
         def quit():
             self.quit.clicked = True
             self.quit.hover = False
-            self.manager.states["GAME"].player_controller.close = True
+            game = self.manager.states["GAME"]
+            if isinstance(game.player_controller, GuestController):
+                game._send_close_and_disconnect()
+            game.close_network()
+            game.reset()
             self.manager.change_state("MENU_P")
 
         # =======================Function Button End=======================

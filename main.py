@@ -14,7 +14,6 @@ from menu import (
     Death_Screen,
 )
 from game import Game
-from player import HostController, GuestController
 from sound import SoundController
 
 pygame.init()
@@ -61,12 +60,11 @@ class Manager:
         self.state = self.states["MENU_P"]
 
         self.fps = False
-        self.font = pygame.font.SysFont(None, 24)  # fps
+        self.font = pygame.font.SysFont(None, 24)  # texte pour fps
         self.clock = pygame.time.Clock()
         SOUND["main_music"].plays_sound()
 
-    def change_state(self, name):
-        self.state.update()
+    def change_state(self, name: str):
         self.state = self.states[name]
         if name == "GAME":
             SOUND["main_music"].stop_sound()
@@ -74,6 +72,15 @@ class Manager:
         else:
             SOUND["ambiance"].stop_sound()
             SOUND["main_music"].plays_sound()
+
+    def change_volume(self, change_volume: bool):
+        """True = increase the volume of all sounds | False = decrease the volume of all sounds"""
+        if change_volume:
+            for key in SOUND.keys():
+                SOUND[key].volume_increase()
+        else:
+            for key in SOUND.keys():
+                SOUND[key].volume_decrease()
 
     def run(self):
         while self.running:
@@ -100,68 +107,17 @@ class Manager:
 
             self.clock.tick(FPS)  # à ne pas toucher
 
-        # Arrêt les processus multijoueur
-        if isinstance(
-            self.states["GAME"].player_controller, (HostController, GuestController)
-        ):
-            # Arrête les processus de communication
-            self.states["GAME"].player_controller.close = True
-            # Si c'est le serveur, arrête d'accepter les connexions
-            if (
-                isinstance(self.states["GAME"].player_controller, HostController)
-                and self.states["GAME"].player_controller.serveur.is_serving()
-            ):
-                self.states["GAME"].player_controller.stop_server()
-
-    def change_volume(self, change_volume: bool):
-        """True = increase the volume of all sounds | False = decrease the volume of all sounds"""
-        if change_volume:
-            for key in SOUND.keys():
-                SOUND[key].volume_increase()
-        else:
-            for key in SOUND.keys():
-                SOUND[key].volume_decrease()
+        self.states["GAME"].close_network()
 
 
 manager = Manager()
 
 try:
     manager.run()
-except Exception as e:
-    # Arrête le jeu en cas d'erreure
+except (Exception, KeyboardInterrupt):
     manager.running = False
     manager.states["MENU_MULTI"].udp_event.clear()
-    if isinstance(
-        manager.states["GAME"].player_controller, (HostController, GuestController)
-    ):
-        manager.states["GAME"].player_controller.close = True
-        if isinstance(manager.states["GAME"].player_controller, HostController):
-            manager.states["GAME"].player_controller.asyncio_loop.call_soon_threadsafe(
-                manager.states["GAME"].player_controller.serveur.close()
-            )
-
-    logging.error(traceback.format_exc())  # affiche quand-même l'erreure
-
-except KeyboardInterrupt:
-
-    manager.running = False
-    manager.states["MENU_MULTI"].udp_event.clear()
-    if isinstance(
-        manager.states["GAME"].player_controller, (HostController, GuestController)
-    ):
-        manager.states["GAME"].player_controller.close = True
-        if isinstance(manager.states["GAME"].player_controller, HostController):
-            manager.states["GAME"].player_controller.asyncio_loop.call_soon_threadsafe(
-                manager.states["GAME"].player_controller.serveur.close()
-            )
-
-    logging.error(traceback.format_exc())  # affiche quand-même l'erreure
-
-else:
-    if isinstance(
-        manager.states["GAME"].player_controller, (HostController, GuestController)
-    ):
-        manager.states["GAME"].player_controller.close = True
-
+    manager.states["GAME"].close_network()
+    logging.error(traceback.format_exc())
 finally:
     pygame.quit()
