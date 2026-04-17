@@ -160,6 +160,69 @@ class AnimationController:
         )
 
 
+class Text:
+
+    def __init__(
+        self,
+        to_display_text: str,
+        position: str,
+        font_name: str,
+        font_size: int,
+        font_color: Tuple[int, int, int],
+        screen: pygame.Surface = None,
+        antialias: bool = False,
+    ):
+        self.screen = screen
+        self.to_display_text = to_display_text
+        self.center_position = position
+        self.font_name = font_name
+        self.font_size = font_size
+        self.font_color = font_color
+        self.antialias = antialias
+
+        self.font = pygame.font.SysFont(self.font_name, self.font_size)
+        self.rendered = self.font.render(
+            self.to_display_text, self.antialias, self.font_color
+        )
+
+        self.text_size = self.rendered.get_size()
+        self.display_position = (
+            self.center_position[0] - self.text_size[0] // 2,
+            self.center_position[1] - self.text_size[1] // 2,
+        )
+
+    def update(
+        self,
+        text: str | None = None,
+        position: Tuple[int, int] | None = None,
+        font: str | None = None,
+        size: int | None = None,
+        color: Tuple[int, int, int] | str | None = None,
+        antialias: bool = False,
+    ):
+        self.to_display_text = text if text else self.to_display_text
+        self.position = position if position else self.position
+        self.font = font if font else self.font
+        self.font_size = size if size else self.font_size
+        self.font_color = color if color else self.font_color
+        self.antialias = antialias if antialias else self.antialias
+
+        self.font = pygame.font.SysFont(self.font_name, self.font_size)
+        self.rendered = self.font.render(
+            self.to_display_text, self.antialias, self.font_color
+        )
+
+        self.text_size = self.rendered.get_size()
+        self.display_position = (
+            self.position[0] - self.text_size[0] // 2,
+            self.position[1] - self.text_size[1] // 2,
+        )
+
+    def draw_text(self):
+        """Affiche le texte sur la surface screen."""
+        self.screen.blit(self.rendered, self.display_position)
+
+
 class Button:
     """Classe pour la gestion de boutons."""
 
@@ -170,31 +233,49 @@ class Button:
         position: Tuple | List,
         function: Callable,
         *,
-        size: Tuple | List | None = None,
-        scale: int | None = 1,
+        text: str | None = None,
+        text_position: Tuple[int, int] | None = None,
+        text_font: str | None = None,
+        text_size: int | None = None,
+        text_color: Tuple[int, int, int] | str | None = None,
+        text_antialias: bool = False,
+        button_size: Tuple | List | None = None,
+        button_scale: int | None = 1,
     ):
-        """Load and create image for the button.\n
-        Image size will be original if size is None
-        Can set size and scale"""
-        assert not (scale != 1 and size is not None)
+        """Charge et créer les images pour le bouton, ainsi que le texte si besoin
+
+        La taille de l'image sera celle de l'originale si size est None, size et scale ne peuvent pas
+        être définit en même temps.
+
+        par défaut, si text_position est None, le text sera placé au centre du bouton.
+        """
+        assert not (button_scale != 1 and button_size is not None)
         assert len(position) == 2  # Verify that position is valid
+        assert (text and text_font and text_size and text_color) or not (
+            text or text_position or text_font or text_size or text_color
+        )
+
         # Load image
         self.path = path
         self.screen = screen
         self.hover = False
         self.clicked = False
         self.image = pygame.image.load(self.path).convert_alpha()
+
         # Modify size if necessary
-        if size is not None:
-            assert len(size) == 2
-            self.image = pygame.transform.scale(self.image, size)
+        if button_size is not None:
+            assert len(button_size) == 2
+            self.image = pygame.transform.scale(self.image, button_size)
         else:
-            size = self.image.get_size()
-        if scale != 1:
-            size = (size[0] * scale, size[1] * scale)
-            self.image = pygame.transform.scale(self.image, size)
+            button_size = self.image.get_size()
+        if button_scale != 1:
+            button_size = (button_size[0] * button_scale, button_size[1] * button_scale)
+            self.image = pygame.transform.scale(self.image, button_size)
         self.rec = pygame.Rect(
-            position[0] - size[0] // 2, position[1] - size[1] // 2, size[0], size[1]
+            position[0] - button_size[0] // 2,
+            position[1] - button_size[1] // 2,
+            button_size[0],
+            button_size[1],
         )
 
         # Create darker image for hover button
@@ -206,10 +287,13 @@ class Button:
         self.clicked_image = pygame.transform.scale_by(self.clicked_image, 0.95)
 
         # Get or set size
-        size = self.image.get_size() if size is None else size
+        button_size = self.image.get_size() if button_size is None else button_size
 
         # Set display position
-        self.display_pos = (position[0] - (size[0] // 2), position[1] - (size[1] // 2))
+        self.display_pos = (
+            position[0] - (button_size[0] // 2),
+            position[1] - (button_size[1] // 2),
+        )
 
         # Set display position for clicked image
         clicked_size = self.clicked_image.get_size()
@@ -220,6 +304,25 @@ class Button:
 
         # Set the function to execute in the event
         self.clicked_function = function
+
+        # Create text
+        if not text_position:
+            text_position = (button_size[0] // 2, button_size[1] // 2)
+        if text:
+            self.text = Text(
+                text,
+                (
+                    self.display_pos[0] + text_position[0],
+                    self.display_pos[1] + text_position[1],
+                ),
+                text_font,
+                text_size,
+                text_color,
+                self.screen,
+                text_antialias,
+            )
+        else:
+            self.text = None
 
     def event(self, events: List[pygame.event.Event], mouse_pos: Tuple[int, int]):
         self.hover = self.rec.collidepoint(mouse_pos)
@@ -248,14 +351,71 @@ class Button:
             self.screen.blit(self.dark_image, self.display_pos)
         else:
             self.screen.blit(self.image, self.display_pos)
+        if self.text:
+            self.text.draw_text()
 
 
 if __name__ == "__main__":
 
-    _ = pygame.display.set_mode((10, 10))
+    screen = pygame.display.set_mode((500, 500))
+    pygame.font.init()
 
-    display_directory(r"Ressources\Animations\Ennemis\ennemy_1")
+    MENU_ASSET_DIRECTORY = "Ressources/UI_&_élements_graphiques/"
+    BACKGROUND = MENU_ASSET_DIRECTORY + "fond ecran menu.png"
+    PLAY_BUTTON = MENU_ASSET_DIRECTORY + "PLAY.png"
+    SETTING_BUTTON = MENU_ASSET_DIRECTORY + "SETTINGS.png"
+    EXIT_BUTTON = MENU_ASSET_DIRECTORY + "EXIT.png"
+    EMPTY_BUTTON = MENU_ASSET_DIRECTORY + "EMPTY.png"
+    TITLE = MENU_ASSET_DIRECTORY + "logo.png"
 
-    animations = load_animations(r"Ressources\Animations\Ennemis\ennemy_1")
+    def t():
+        pass
 
-    print(apply_back_front_exception(animations))
+    class Game:
+
+        def __init__(self):
+            self.running = True
+            self.clock = pygame.time.Clock()
+            self.screen = pygame.display.set_mode((600, 600))
+            self.button = Button(
+                EMPTY_BUTTON,
+                self.screen,
+                (250, 250),
+                t,
+                text="test",
+                text_font="Impact",
+                text_size=28,
+                text_color=(255, 255, 255),
+            )
+
+        def event(self):
+            events = pygame.event.get()
+            for event in events:
+                if event.type == pygame.QUIT:
+                    self.running = False
+
+            self.button.event(events, pygame.mouse.get_pos())
+
+        def update(self):
+            pass
+
+        def display(self):
+            self.screen.fill((0, 0, 0))
+            self.button.display()
+            pygame.display.flip()
+
+        def run(self):
+
+            while self.running == True:
+
+                self.event()
+                self.update()
+                self.display()
+
+                self.clock.tick(60)
+
+    objet = Game()
+
+    Game().run()
+
+    pygame.quit()
