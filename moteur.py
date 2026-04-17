@@ -41,10 +41,14 @@ class Moteur:
                 y_chunk = y // self.map.chunk_size_tile[1]
                 rel_x = x % self.map.chunk_size_tile[0]
                 rel_y = y % self.map.chunk_size_tile[1]
-                # Collision sur la tuile
-                if self.map.chunks[(x_chunk, y_chunk)].collision[rel_x][rel_y]:
-                    # On crée le rectangle de collision pour cette tuile
-                    nearby_obstacles.append(pygame.Rect(x * 32, y * 32, 32, 32))
+                if (
+                    0 <= x_chunk < self.map.nb_chunks[0]
+                    and 0 <= y_chunk < self.map.nb_chunks[1]
+                ):
+                    # Collision sur la tuile
+                    if self.map.chunks[(x_chunk, y_chunk)].collision[rel_x][rel_y]:
+                        # On crée le rectangle de collision pour cette tuile
+                        nearby_obstacles.append(pygame.Rect(x * 32, y * 32, 32, 32))
 
         return nearby_obstacles
 

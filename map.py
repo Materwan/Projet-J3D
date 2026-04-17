@@ -150,11 +150,12 @@ def mask_distance(val: np.ndarray, size: Tuple[int, int]) -> np.ndarray:
     est la distance entre la i-ème ligne j-ème colonne et le centre de la matrice."""
 
     center = (size[0] // 2, size[1] // 2)
-
-    # Récupère les positions de tous les d'une matrice
     points = np.ogrid[: size[0], : size[1]]
 
-    return calc_distance(points, center)
+    dist_x = np.abs(points[0] - center[0])
+    dist_y = np.abs(points[1] - center[1])
+
+    return np.maximum(dist_x, dist_y).astype(np.float32)
 
 
 def get_min_val_circle(val: np.ndarray, distance: int, size: Tuple[int, int]):
@@ -364,7 +365,7 @@ class Map:
         self.road_map = np.where(self.map < 0.5, -np.inf, self.map)
         self.structures = []
 
-        self.add_object_pos("place", 128, 128, 3)
+        self.add_object_pos("place", 128, 128, 3, occupe=True)
         self.structures.append((128, 128))
         self.add_structure("place", nb=3, z=3, distance=10)
         self.generate_paths(0.3, prop=1)
@@ -400,6 +401,9 @@ class Map:
             self.size, octaves
         )  # Récupère le bruit de perlin
         noise = normalize(noise, (0, 1))  # Normalise les valeurs sur l'interval (0, 1)
+        plt.subplot(221)
+        plt.imshow(noise)
+        plt.colorbar()
 
         # Créer le mask basique
         mask = np.zeros(self.size, dtype=np.float32)  # Créer une matrice de zeros
@@ -411,10 +415,16 @@ class Map:
             mask, minimum=minimum
         )  # Normalise sur (0, 1) mais les valeurs trop loin sont 1
         mask = invert(mask)  # Inverse les valeurs
+        plt.subplot(222)
+        plt.imshow(mask)
+        plt.colorbar()
 
         # Applique la fonction de masque et normalise
         mask = scale(mask, mask_pad_value, mask_func)  # Applique la fonction de masque
         mask = normalize(mask, mask_scale)  # Change l'interval
+        plt.subplot(223)
+        plt.imshow(mask)
+        plt.colorbar()
 
         # print(np.min(mask), np.max(mask))
         # print(np.min(noise), np.max(noise))
@@ -424,6 +434,11 @@ class Map:
             noise * (1 - mask_weight), mask * mask_weight
         )  # Additione le masque et le bruit de perlin
         noise = normalize(noise, self.map_scale)  # Change l'interval
+        plt.subplot(224)
+        plt.imshow(noise)
+        plt.colorbar()
+
+        plt.show()
 
         # print("\n", np.min(noise), np.max(noise))
 
@@ -720,14 +735,31 @@ class Map:
 
             self.screen.blit(self.loaded_chunks[(x, y)], (screen_x, screen_y))
 
+    def render_full_map(self) -> pygame.Surface:
+        """Génère une surface complète de la map en rendant tous les chunks."""
+
+        full_width = self.nb_chunks[0] * self.chunk_size_pix[0]
+        full_height = self.nb_chunks[1] * self.chunk_size_pix[1]
+        full_surface = pygame.Surface((full_width, full_height), pygame.SRCALPHA)
+
+        for x in range(self.nb_chunks[0]):
+            for y in range(self.nb_chunks[1]):
+                chunk_surface = self.chunks[(x, y)].render()
+                full_surface.blit(
+                    chunk_surface,
+                    (x * self.chunk_size_pix[0], y * self.chunk_size_pix[1]),
+                )
+
+        return full_surface
+
     def _display(self):
 
         plt.subplot(221)
-        plt.imshow(self.map)
+        plt.imshow(self.map.T)
         plt.colorbar()
 
         plt.subplot(222)
-        plt.imshow(self.road_map, origin="lower")
+        plt.imshow(self.road_map.T)
         plt.colorbar()
 
         plt.show()
@@ -798,7 +830,6 @@ if __name__ == "__main__":
             self.running = True
             self.screen = screen
             self.screen_size = pygame.Vector2(self.screen.get_size())
-            self.abs_pos = pygame.Vector2([0, 0])
             self.clock = pygame.time.Clock()
             self.map = Map(
                 (8, 8),
@@ -807,54 +838,26 @@ if __name__ == "__main__":
                 self.screen,
                 0,
             )
+            self.surf = self.map.render_full_map()
+            self.surf = pygame.transform.scale(self.surf, self.screen_size)
 
         def event(self):
 
             for event in pygame.event.get():
-
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_DOWN:
-                        self.abs_pos[1] += 100
-                    elif event.key == pygame.K_UP:
-                        self.abs_pos[1] -= 100
-                    elif event.key == pygame.K_RIGHT:
-                        self.abs_pos[0] += 100
-                    elif event.key == pygame.K_LEFT:
-                        self.abs_pos[0] -= 100
 
                 if event.type == pygame.QUIT:
                     self.running = False
 
         def update(self):
 
-            self.map.load_chunks(self.abs_pos)
+            pass
 
         def display(self):
 
             self.screen.fill((0, 0, 0))
 
-            self.map.display(self.abs_pos)
+            self.screen.blit(self.surf, (0, 0))
 
-            for x in range(self.map.nb_chunks[0]):
-                pygame.draw.line(
-                    self.screen,
-                    (255, 0, 0),
-                    (x * 32 * 32 - self.abs_pos[0], 0 - self.abs_pos[1]),
-                    (
-                        x * 32 * 32 - self.abs_pos[0],
-                        self.map.nb_chunks[1] * 32 * 32 - self.abs_pos[1],
-                    ),
-                )
-            for y in range(self.map.nb_chunks[1]):
-                pygame.draw.line(
-                    self.screen,
-                    (255, 0, 0),
-                    (0 - self.abs_pos[0], y * 32 * 32 - self.abs_pos[1]),
-                    (
-                        self.map.nb_chunks[0] * 32 * 32 - self.abs_pos[0],
-                        y * 32 * 32 - self.abs_pos[1],
-                    ),
-                )
             pygame.display.flip()
 
         def run(self):
