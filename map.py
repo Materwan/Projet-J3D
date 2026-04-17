@@ -401,9 +401,6 @@ class Map:
             self.size, octaves
         )  # Récupère le bruit de perlin
         noise = normalize(noise, (0, 1))  # Normalise les valeurs sur l'interval (0, 1)
-        plt.subplot(221)
-        plt.imshow(noise)
-        plt.colorbar()
 
         # Créer le mask basique
         mask = np.zeros(self.size, dtype=np.float32)  # Créer une matrice de zeros
@@ -415,16 +412,10 @@ class Map:
             mask, minimum=minimum
         )  # Normalise sur (0, 1) mais les valeurs trop loin sont 1
         mask = invert(mask)  # Inverse les valeurs
-        plt.subplot(222)
-        plt.imshow(mask)
-        plt.colorbar()
 
         # Applique la fonction de masque et normalise
         mask = scale(mask, mask_pad_value, mask_func)  # Applique la fonction de masque
         mask = normalize(mask, mask_scale)  # Change l'interval
-        plt.subplot(223)
-        plt.imshow(mask)
-        plt.colorbar()
 
         # print(np.min(mask), np.max(mask))
         # print(np.min(noise), np.max(noise))
@@ -434,11 +425,6 @@ class Map:
             noise * (1 - mask_weight), mask * mask_weight
         )  # Additione le masque et le bruit de perlin
         noise = normalize(noise, self.map_scale)  # Change l'interval
-        plt.subplot(224)
-        plt.imshow(noise)
-        plt.colorbar()
-
-        plt.show()
 
         # print("\n", np.min(noise), np.max(noise))
 
