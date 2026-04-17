@@ -1,29 +1,26 @@
 import pygame
 from map import Map
-from typing import TYPE_CHECKING
+from typing import List, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ennemis import Ennemi
+    from player import PlayerControllerBase
 
 
 class Moteur:
     def __init__(self):
-        self.map = None
-        self.map: Map
+        self.map: Map = None
 
         # Configuration : { "direction": (decalage_x, decalage_y, largeur, hauteur) }
         self.attaque_config = {
             "right": (0, -55, 70, 80),
             "left": (-70, -55, 70, 80),
-            # "up": (-25, -70, 80, 70),
-            # "down": (-25, 0, 80, 70),
         }
 
-    def get_nearby_obstacles(self, hitbox: pygame.Rect):
+    def get_nearby_obstacles(self, hitbox: pygame.Rect) -> List[pygame.Rect]:
         """
         Récupère la matrice de la map du jeu.
-        Analyse une zone de 3x3 tuiles autour de la position
-        centrale du joueur pour optimiser les tests de collision.
+        Analyse une zone de 3x3 tuiles autour de la position du joueur.
 
         Args:
             hitbox (pygame.Rect): La hitbox du joueur pour calculer sa position sur la grille.
@@ -106,7 +103,8 @@ class Moteur:
 
         return pygame.Rect(position.x + dec_x, position.y + dec_y, wide, high)
 
-    def apply_attack(self, attaque_rect: pygame.Rect, ennemi):
-        # si tu vois cela Erwan : ennemi vaut soit Ennemi soit un des PlayerController
+    def apply_attack(
+        self, attaque_rect: pygame.Rect, ennemi: "Ennemi | PlayerControllerBase"
+    ):
         if ennemi.hitbox_damage and attaque_rect.colliderect(ennemi.hitbox_damage):
             ennemi.update_pv(-1)
