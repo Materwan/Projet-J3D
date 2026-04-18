@@ -629,13 +629,13 @@ class Join_Multi_Menu(Menu):
                     if not sock_set:
                         sock_set = True
                         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                         sock.settimeout(0.5)
                         sock.bind(("", UDP_PORT))
                         print("[Guest] Écoute UDP démarrée")
 
                     data, addr = sock.recvfrom(1024)  # buffer size is 1024 bytes
-                    data = data.decode().strip()
-                    data = json.loads(data)
+                    data = json.loads(data.decode().strip())
                     if addr[0] not in self.serveurs:
                         self.serveurs[addr[0]] = data
                 else:
@@ -645,6 +645,15 @@ class Join_Multi_Menu(Menu):
                         print("[Guest] Écoute UDP arrêtée")
                     time.sleep(0.5)
             except socket.timeout:
+                # Enleve les serveurs expirés
+                now = time.time()
+                expired = [
+                    ip
+                    for ip, info in self.serveurs.items()
+                    if now - info.get("last", 0) > 2.0
+                ]
+                for ip in expired:
+                    del self.serveurs[ip]
                 continue
         if sock:
             if sock_set:

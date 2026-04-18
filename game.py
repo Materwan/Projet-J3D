@@ -139,7 +139,7 @@ class Game:
                 time.sleep(0.2)
 
             if self.network.is_closed():
-                self.manager.state = self.manager.states["MENU_MULTI"]
+                self.manager.change_state("MENU_MULTI")
                 return
 
             # Récupération de la map envoyée par l'hôte
@@ -385,7 +385,7 @@ class Game:
             self.update_ennemis_solo()
         elif isinstance(self.player_controller, HostController):
             self.update_ennemis_host()
-        # Guest : gerer dans update_ennemis_host() et appeler via update_variables_guest
+        # Guest : gerer dans update_ennemis_guest() et appeler via update_variables_guest
 
         # -- Particules --
         self.update_particles()

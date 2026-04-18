@@ -14,13 +14,6 @@ TCP_PORT = 8888  # (le jeu)
 NETWORK_TICK = 1 / 30  # (30 paquets/seconde)
 
 
-"""
-Probleme a corriger : 
-- tentative de connexion 3eme joueur -> plus de response car while en boucle
-- timeout fais bug un peu tout
-"""
-
-
 def get_netmask_for_ip(ip: str) -> Optional[str]:
     """Récupère le masque de sous-réseau pour une IP donnée."""
     for _, addrs in psutil.net_if_addrs().items():
@@ -52,7 +45,7 @@ def bytes_to_dict(data: bytes) -> Optional[Dict]:
 
 class HostNetwork:
     """
-    Côté hôte : serveur TCP + broadcast UDP.
+    Côté Host : serveur TCP + broadcast UDP.
 
     Deux threads dédiés, indépendants du game loop :
         - _tcp_thread  : asyncio server, accepte 1 client max
@@ -145,7 +138,10 @@ class HostNetwork:
     async def _tcp_server(self):
         self._asyncio_loop = asyncio.get_running_loop()
         self._server = await asyncio.start_server(
-            self._handle_client, host="0.0.0.0", port=self.port
+            self._handle_client,
+            host="0.0.0.0",
+            port=self.port,
+            reuse_address=True,
         )
         print(f"[Host] Serveur TCP démarré — port {self.port}")
         async with self._server:
@@ -165,7 +161,6 @@ class HostNetwork:
 
         print("[Host] Guest connecté")
         self._connected = True
-        self._server.close()  # On n'accepte plus d'autres connexions
 
         # Envoi initial : état courant (contient la map)
         writer.write(dict_to_bytes(self._initial_state))
@@ -178,6 +173,10 @@ class HostNetwork:
             while not self._stop_event.is_set():
                 raw = await asyncio.wait_for(reader.readline(), timeout=2.0)
                 if not raw:
+                    print(
+                        "[Host] Le Guest s'est déconnecté (probablement car l'Host a freeze, provoquant un timeout chez le Guest)"
+                    )
+                    self._guest_disconnected = True
                     break
 
                 data = bytes_to_dict(raw)
@@ -321,7 +320,7 @@ class GuestNetwork:
             # Réception du premier paquet (contient la map + état initial)
             raw = await self._reader.readline()
             data = bytes_to_dict(raw)
-            if data is None:
+            if data is None or data.get("close"):
                 self._stop_event.set()
                 return
 
@@ -352,13 +351,13 @@ class GuestNetwork:
 
                 raw = await asyncio.wait_for(self._reader.readline(), timeout=2.0)
                 if not raw:
-                    print("[Guest] Hôte a fermé la connexion")
+                    print("[Guest] Host a fermé la connexion")
                     self._stop_event.set()
                     break
 
                 data = bytes_to_dict(raw)
                 if data is None or data.get("close"):
-                    print("[Guest] Hôte a fermé la connexion")
+                    print("[Guest] Host a fermé la connexion")
                     self._stop_event.set()
                     break
 
@@ -366,10 +365,10 @@ class GuestNetwork:
                 await asyncio.sleep(NETWORK_TICK)
 
         except asyncio.TimeoutError:
-            print("[Guest] Timeout — hôte injoignable")
+            print("[Guest] Timeout — Host injoignable")
             self._stop_event.set()
         except ConnectionResetError:
-            print("[Guest] Connexion réinitialisée par l'hôte")
+            print("[Guest] Connexion réinitialisée par l'Host")
             self._stop_event.set()
         finally:
             self._writer.close()
