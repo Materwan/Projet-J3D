@@ -14,6 +14,13 @@ TCP_PORT = 8888  # (le jeu)
 NETWORK_TICK = 1 / 30  # (30 paquets/seconde)
 
 
+"""
+Probleme a corriger : 
+- tentative de connexion 3eme joueur -> plus de response car while en boucle
+- timeout fais bug un peu tout
+"""
+
+
 def get_netmask_for_ip(ip: str) -> Optional[str]:
     """Récupère le masque de sous-réseau pour une IP donnée."""
     for _, addrs in psutil.net_if_addrs().items():

@@ -362,7 +362,7 @@ class Game:
                 isinstance(self.network, HostNetwork)
                 and self.network.is_guest_disconnected()
             ):
-                print("[Game] Guest déconnecté — remise en écoute")
+                print("[Host] Guest déconnecté — remise en écoute")
                 self.network.restart_listening()
 
             # Si l'hôte quitte alors fermeture totale

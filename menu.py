@@ -631,7 +631,7 @@ class Join_Multi_Menu(Menu):
                         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                         sock.settimeout(0.5)
                         sock.bind(("", UDP_PORT))
-                        print("UDP recieve protocol start")
+                        print("[Guest] Écoute UDP démarrée")
 
                     data, addr = sock.recvfrom(1024)  # buffer size is 1024 bytes
                     data = data.decode().strip()
@@ -642,7 +642,7 @@ class Join_Multi_Menu(Menu):
                     if sock_set:
                         sock_set = False
                         sock.close()
-                        print("UDP recieve protocol stopped")
+                        print("[Guest] Écoute UDP arrêtée")
                     time.sleep(0.5)
             except socket.timeout:
                 continue
