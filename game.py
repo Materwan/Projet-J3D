@@ -135,6 +135,9 @@ class Game:
             self.network = GuestNetwork(self.address, self.port)
             self.network.start()
 
+            while not self.network.is_loaded():
+                time.sleep(0.2)
+
             if self.network.is_closed():
                 self.manager.state = self.manager.states["MENU_MULTI"]
                 return
