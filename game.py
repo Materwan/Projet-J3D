@@ -153,7 +153,7 @@ class Game:
             )
 
             # Récupération de la position initiale du guest
-            initial = self.network._incoming  # premier paquet déjà stocké
+            initial = self.network.get_initial_state()
             guest_start = tuple(initial.get("guest", {}).get("position", (0, 0)))
             host_start = tuple(initial.get("host", {}).get("position", (0, 0)))
 
@@ -291,15 +291,16 @@ class Game:
         self.update_ennemis_guest(data["ennemis"])
 
     def _send_close_and_disconnect(self):
-        """Envoie close:True au host puis ferme le réseau côté guest."""
-        if self.network is None:
-            return
-        with self.network._lock:
-            self.network._outgoing = {"close": True}
-        time.sleep(0.1)  # laisse le thread envoyer le paquet
+        """
+        Permet au guest l'envoie d'un paquet {"close": True} à l'host pour signaler
+        une déconnexion propre, évitant que l'host attende le timeout de 2 secondes.
+        """
+        if self.network is not None:
+            self.network.request_close()
 
     def close_network(self):
-        """Ferme proprement le réseau si actif."""
+        """
+        Coupe proprement la connexion réseau et libère la référence."""
         if self.network is not None:
             try:
                 self.network.close()

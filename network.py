@@ -11,7 +11,6 @@ from typing import Dict, Any, Optional
 # Configuration des ports
 UDP_PORT = 9999  # (découverte de parties)
 TCP_PORT = 8888  # (le jeu)
-NETWORK_TICK = 1 / 30  # (30 paquets/seconde)
 
 
 def get_netmask_for_ip(ip: str) -> Optional[str]:
@@ -62,8 +61,14 @@ class HostNetwork:
         self._connected = False
         self._guest_disconnected = False
 
-        self._incoming: Dict[str, Any] = {}
-        self._outgoing: Dict[str, Any] = {}
+        self._outgoing_back: Dict[str, Any] = {}
+        self._outgoing_front: Dict[str, Any] = {}
+        self._outgoing_dirty = False
+
+        self._incoming_back: Dict[str, Any] = {}
+        self._incoming_front: Dict[str, Any] = {}
+        self._incoming_dirty = False
+
         self._initial_state: Optional[Dict[str, Any]] = None
 
         self._server: Optional[asyncio.Server] = None
@@ -76,7 +81,8 @@ class HostNetwork:
         """Lance TCP + UDP. initial_state doit contenir les données de map."""
         if initial_state is not None:
             with self._lock:
-                self._outgoing = initial_state
+                self._outgoing_back = initial_state
+                self._outgoing_dirty = True
                 self._initial_state = initial_state
         self._tcp_thread.start()
         self._udp_thread.start()
@@ -98,6 +104,14 @@ class HostNetwork:
         self._server = None
         self._asyncio_loop = None
 
+        with self._lock:
+            self._outgoing_back = {}
+            self._outgoing_front = {}
+            self._outgoing_dirty = False
+            self._incoming_back = {}
+            self._incoming_front = {}
+            self._incoming_dirty = False
+
         self._tcp_thread = threading.Thread(target=self._run_tcp, daemon=True)
         self._udp_thread = threading.Thread(target=self._run_udp, daemon=True)
         self._tcp_thread.start()
@@ -114,21 +128,35 @@ class HostNetwork:
         return self._stop_event.is_set()
 
     def update(self, game_state: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Appelé chaque frame par game.py.
-        Dépose l'état sortant et retourne le dernier état entrant.
-        """
+        """Appelé par le game loop à 60 FPS — O(1), juste un swap de référence."""
         with self._lock:
-            self._outgoing = game_state
-            return dict(self._incoming)
+            self._outgoing_back = game_state
+            self._outgoing_dirty = True
 
-    def _set_incoming(self, data: Dict[str, Any]):
-        with self._lock:
-            self._incoming = data
+            if self._incoming_dirty:
+                self._incoming_front, self._incoming_back = (
+                    self._incoming_back,
+                    self._incoming_front,
+                )
+                self._incoming_dirty = False
+                return self._incoming_front
+
+            return {}
 
     def _get_outgoing(self) -> Dict[str, Any]:
         with self._lock:
-            return dict(self._outgoing)
+            if self._outgoing_dirty:
+                self._outgoing_front, self._outgoing_back = (
+                    self._outgoing_back,
+                    self._outgoing_front,
+                )
+                self._outgoing_dirty = False
+            return self._outgoing_front
+
+    def _set_incoming(self, data: Dict[str, Any]):
+        with self._lock:
+            self._incoming_back = data
+            self._incoming_dirty = True
 
     # ── TCP ───────────────────────────────────────────────────────────────────
 
@@ -190,8 +218,6 @@ class HostNetwork:
                 writer.write(dict_to_bytes(self._get_outgoing()))
                 await writer.drain()
 
-                await asyncio.sleep(NETWORK_TICK)
-
         except asyncio.TimeoutError:
             print("[Host] Timeout — guest injoignable")
             self._guest_disconnected = True
@@ -252,11 +278,18 @@ class GuestNetwork:
         self._connected = False
         self._loaded = False
 
-        self._incoming: Dict[str, Any] = {}
-        self._outgoing: Dict[str, Any] = {}
+        self._outgoing_back: Dict[str, Any] = {}
+        self._outgoing_front: Dict[str, Any] = {}
+        self._outgoing_dirty = False
+
+        self._incoming_back: Dict[str, Any] = {}
+        self._incoming_front: Dict[str, Any] = {}
+        self._incoming_dirty = False
+
         self._map_data: Optional[Dict[str, Any]] = None
 
         self._tcp_thread = threading.Thread(target=self._run, daemon=True)
+        self._close_sent = threading.Event()
 
         self._reader: Optional[asyncio.StreamReader] = None
         self._writer: Optional[asyncio.StreamWriter] = None
@@ -284,22 +317,48 @@ class GuestNetwork:
         return self._map_data
 
     def update(self, game_state: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Appelé chaque frame par game.py.
-        Dépose l'état sortant et retourne le dernier état entrant.
-        O(1) — simple swap sous lock.
-        """
+        """Appelé par le game loop à 60 FPS — O(1), juste un swap de référence."""
         with self._lock:
-            self._outgoing = game_state
-            return dict(self._incoming)
+            self._outgoing_back = game_state
+            self._outgoing_dirty = True
 
-    def _set_incoming(self, data: Dict[str, Any]):
-        with self._lock:
-            self._incoming = data
+            if self._incoming_dirty:
+                self._incoming_front, self._incoming_back = (
+                    self._incoming_back,
+                    self._incoming_front,
+                )
+                self._incoming_dirty = False
+                return self._incoming_front
+
+            return {}
 
     def _get_outgoing(self) -> Dict[str, Any]:
         with self._lock:
-            return dict(self._outgoing)
+            if self._outgoing_dirty:
+                self._outgoing_front, self._outgoing_back = (
+                    self._outgoing_back,
+                    self._outgoing_front,
+                )
+                self._outgoing_dirty = False
+            return self._outgoing_front
+
+    def _set_incoming(self, data: Dict[str, Any]):
+        with self._lock:
+            self._incoming_back = data
+            self._incoming_dirty = True
+
+    def get_initial_state(self) -> Dict[str, Any]:
+        """Retourne le premier paquet reçu (état initial + map)."""
+        with self._lock:
+            return dict(self._incoming_back)
+
+    def request_close(self):
+        """Demande l'envoi d'un paquet close puis coupe la connexion."""
+        with self._lock:
+            self._outgoing_back = {"close": True}
+            self._outgoing_dirty = True
+        self._close_sent.wait(timeout=0.5)
+        self.close()
 
     # ── TCP ───────────────────────────────────────────────────────────────────
 
@@ -346,8 +405,11 @@ class GuestNetwork:
     async def _handle_host(self):
         try:
             while not self._stop_event.is_set():
-                self._writer.write(dict_to_bytes(self._get_outgoing()))
+                snapshot = self._get_outgoing()
+                self._writer.write(dict_to_bytes(snapshot))
                 await self._writer.drain()
+                if snapshot.get("close"):
+                    self._close_sent.set()
 
                 raw = await asyncio.wait_for(self._reader.readline(), timeout=2.0)
                 if not raw:
@@ -362,7 +424,6 @@ class GuestNetwork:
                     break
 
                 self._set_incoming(data)
-                await asyncio.sleep(NETWORK_TICK)
 
         except asyncio.TimeoutError:
             print("[Guest] Timeout — Host injoignable")
