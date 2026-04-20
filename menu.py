@@ -27,36 +27,13 @@ SAVE_SOLO = SAVE_FILE + "solo"
 UDP_IP = "0.0.0.0"
 UDP_PORT = 9999
 
-p.font.init()
-
-
-class Text:
-
-    def __init__(
-        self,
-        name: str,
-        size: int,
-        text: str,
-        t_color: Tuple[int, int, int],
-        screen: p.Surface = None,
-        antialias: bool = False,
-    ):
-        self.screen = screen
-        self.caractere = text
-        self.font = p.font.SysFont(name, size)
-        self.text = self.font.render(text, antialias, t_color)
-        self.lenth = self.text.get_size()
-
-    def draw_text(self, coordonninate: Tuple[int, int]) -> None:
-        """draw a text"""
-        self.screen.blit(self.text, coordonninate)
-
 
 class Menu:
 
     def __init__(self, screen: p.Surface, manager: "Manager"):
         self.elttexts = []
         self.eltpages = []
+        self.list_file = []
         self.WINDOWS = screen.get_size()
         self.half = (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2)
         self.screen = screen
@@ -82,17 +59,24 @@ class Menu:
         self.nbr_file_multi = len(os.listdir(SAVE_MULTI))
 
         # =======================Function Button Start=======================
-        def retour(menu: str):
-            self.retour.clicked = True
-            self.retour.hover = False
-            self.manager.change_state(menu)
+        def retour(mode: str):
+            self.manager.change_state(mode)
 
+        def reprendre(mode: str):
+            self.manager.states["GAME"].playing_mode = mode
+            self.manager.states["GAME"].game.load(self.list_file)
+            self.manager.change_state("GAME")
+            self.manager.state.initialize()
+
+        def no_function():
+            pass
+
+        self.reprendre = reprendre
+        self.no_function = no_function
         # =======================Function Button End=======================
 
         # =======================Button Start=======================
-        self.retour, self.retour_t = create_button_with_text(
-            EMPTY_BUTTON, self.screen, (170, 67), retour, "<--"
-        )
+        self.retour = a.Button(EMPTY_BUTTON, self.screen, (170, 67), retour, text="<--")
         # =======================Button End=======================
 
     def recalculcoord(
@@ -109,7 +93,7 @@ class Menu:
         changetext: List | Text | Tuple[int, int],
         button: a.Button,
         caractere: str,
-    ) -> None:
+    ):
         """change the text in a button"""
         changetext[0].text = changetext[0].font.render(caractere, False, (0, 0, 0))
         changetext[0].lenth = changetext[0].text.get_size()
@@ -123,20 +107,14 @@ class Menu:
         direction: str,
         caractere: str,
         bool: bool,
-    ) -> None:
+    ):
         """change the texte of the button that you want to change the keybind"""
         self.change_button_text(changetext, button, caractere)
         self.key[direction] = bool
 
-    def create_list_save_and_button(
-        self, mode: str
-    ) -> List | Tuple[a.Button, List | Text | Tuple[int, int]] | List[str]:
+    def create_list_save_and_button(self, mode: str):
         list_button = []
         list_save = []
-
-        def no_function():
-            pass
-
         count = 0
         saves, files = get_all_saves(mode)
         for serveur in saves:
@@ -144,29 +122,29 @@ class Menu:
                 EMPTY_BUTTON,
                 self.screen,
                 (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 200 + count * 150),
-                no_function,
-                serveur.key(),
+                self.reprendre,
+                serveur["game_name"],
             )
             list_save.append(serveur)
             list_button.append((button, button_t))
             count += 1
         return list_button, files
 
-    def pagedisplay(self) -> None:
+    def pagedisplay(self):
         """draw the page"""
         for elt in self.eltpages:
             elt.display()
 
-    def textdisplay(self) -> None:
+    def textdisplay(self):
         """draw the text"""
         for elt in self.elttexts:
             elt[0].draw_text(elt[1])
 
-    def dehover_all(self) -> None:
+    def dehover_all(self):
         for button in self.eltpages:
             button.hover = False
 
-    def declicked_all(self) -> None:
+    def declicked_all(self):
         for button in self.eltpages:
             button.clicked = False
 
@@ -179,19 +157,13 @@ class Principal_Menu(Menu):
 
         # =======================Function Button Start=======================
         def start():
-            self.start.clicked = True
             self.manager.change_state("MENU_PLAY")
 
         def settings():
-            self.settings.clicked = True
             self.manager.change_state("MENU_SETTING")
 
         def quit():
-            self.quit.clicked = True
             self.manager.running = False
-
-        def no_function():
-            pass
 
         # =======================Function Button End=======================
 
@@ -211,42 +183,34 @@ class Principal_Menu(Menu):
             EXIT_BUTTON, self.screen, (self.half[0], self.half[1] + 200), quit
         )
         self.titre, _ = create_button_with_text(
-            TITLE, self.screen, (self.half[0], self.half[1] // 3), no_function, "", 0.6
+            TITLE,
+            self.screen,
+            (self.half[0], self.half[1] // 3),
+            self.no_function,
+            "",
+            0.6,
         )
         # =======================Button End=======================
 
         self.elttexts = []
         self.eltpages = [self.titre, self.start, self.settings, self.quit]
 
-    def event(self, events: list[p.event.Event]) -> None:
+    def event(self, events: list[p.event.Event]):
         coord = p.mouse.get_pos()
         for event in events:
             if event.type == p.QUIT:
                 self.manager.running = False
-            if event.type == p.MOUSEBUTTONDOWN and event.button == p.BUTTON_LEFT:
-                if self.quit.rec.collidepoint(coord):
-                    self.quit.clicked_function()
-                elif self.start.rec.collidepoint(coord):
-                    self.start.clicked_function()
-                elif self.settings.rec.collidepoint(coord):
-                    self.settings.clicked_function()
-            else:
-                self.dehover_all()
-                if self.quit.rec.collidepoint(coord):
-                    self.quit.hover = True
-                elif self.start.rec.collidepoint(coord):
-                    self.start.hover = True
-                elif self.settings.rec.collidepoint(coord):
-                    self.settings.hover = True
+        self.quit.event(events, coord)
+        self.start.event(events, coord)
+        self.settings.event(events, coord)
 
-    def update(self) -> None:
+    def update(self):
         pass
 
-    def display(self) -> None:
+    def display(self):
         self.screen.blit(self.bg_img, self.bg_img_coord)
         self.textdisplay()
         self.pagedisplay()
-        self.declicked_all()
 
 
 class Setting_Menu(Menu):
@@ -262,7 +226,7 @@ class Setting_Menu(Menu):
         # =======================Function Button Start=======================
         def retour(mode: str):
             self.manager.states["GAME"].keybinds = self.keybinds
-            self.retour.clicked_function(mode)
+            self.manager.change_state(mode)
 
         def changeup():
             self.interchange(self.up_t, self.changeup, "up", "...", True)
@@ -282,12 +246,10 @@ class Setting_Menu(Menu):
         def volume(choise: bool):
             self.manager.change_volume(choise)
 
-        def no_function():
-            pass
-
         # =======================Function Button End=======================
 
         # =======================Button Start=======================
+        self.retour.clicked_function = retour
         self.changeup, self.up_t = create_button_with_text(
             EMPTY_BUTTON,
             self.screen,
@@ -341,7 +303,7 @@ class Setting_Menu(Menu):
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2 + 400, self.WINDOWS[1] // 2 - 180),
-            no_function,
+            self.no_function,
             "Sounds volume",
         )
         # =======================Button End=======================
@@ -368,7 +330,7 @@ class Setting_Menu(Menu):
             self.retour,
         ]
 
-    def changekey(self, event: p.event.Event) -> None:
+    def changekey(self, event: p.event.Event):
         """take the last keybind to replace the old one"""
         for elt in self.key.keys():
             if self.key[elt]:
@@ -386,12 +348,12 @@ class Setting_Menu(Menu):
                 return False
         return True
 
-    def event(self, events: list[p.event.Event]) -> None:
+    def event(self, events: list[p.event.Event]):
         coord = p.mouse.get_pos()
         for event in events:
             if event.type == p.QUIT:
                 self.manager.running = False
-            if event.type == p.KEYDOWN or event.type == p.MOUSEBUTTONDOWN:
+            elif event.type == p.KEYDOWN or event.type == p.MOUSEBUTTONDOWN:
                 if (
                     event.type == p.KEYDOWN
                     and event.key == p.K_ESCAPE
@@ -435,53 +397,25 @@ class Setting_Menu(Menu):
                     "ATTACK: " + p.key.name(self.keybinds["attack"]),
                     False,
                 )
-            if self.checkchangekey():
-                """if a keybind is changing dont look for collidepoint"""
-                if event.type == p.MOUSEBUTTONDOWN and event.button == p.BUTTON_LEFT:
-                    if self.retour.rec.collidepoint(coord):
-                        self.manager.states["GAME"].keybinds = self.keybinds
-                        self.retour.clicked_function(self.menu_appel)
-                    elif self.changeup.rec.collidepoint(coord):
-                        self.changeup.clicked_function()
-                    elif self.changedown.rec.collidepoint(coord):
-                        self.changedown.clicked_function()
-                    elif self.changeleft.rec.collidepoint(coord):
-                        self.changeleft.clicked_function()
-                    elif self.changeright.rec.collidepoint(coord):
-                        self.changeright.clicked_function()
-                    elif self.changeattack.rec.collidepoint(coord):
-                        self.changeattack.clicked_function()
-                    elif self.volume_up.rec.collidepoint(coord):
-                        self.volume_up.clicked_function(True)
-                    elif self.volume_down.rec.collidepoint(coord):
-                        self.volume_up.clicked_function(False)
-                else:
-                    self.dehover_all()
-                    if self.retour.rec.collidepoint(coord):
-                        self.retour.hover = True
-                    elif self.changeup.rec.collidepoint(coord):
-                        self.changeup.hover = True
-                    elif self.changedown.rec.collidepoint(coord):
-                        self.changedown.hover = True
-                    elif self.changeleft.rec.collidepoint(coord):
-                        self.changeleft.hover = True
-                    elif self.changeright.rec.collidepoint(coord):
-                        self.changeright.hover = True
-                    elif self.changeattack.rec.collidepoint(coord):
-                        self.changeattack.hover = True
-                    elif self.volume_up.rec.collidepoint(coord):
-                        self.volume_up.hover = True
-                    elif self.volume_down.rec.collidepoint(coord):
-                        self.volume_down.hover = True
+        if self.checkchangekey():
+            """if a keybind is changing dont look for collidepoint"""
+            self.retour.event(events, coord, self.menu_appel)
+            self.changeup.event(events, coord)
+            self.changedown.event(events, coord)
+            self.changeleft.event(events, coord)
+            self.changeright.event(events, coord)
+            self.changeattack.event(events, coord)
+            self.volume_up.event(events, coord, True)
+            self.volume_down.event(events, coord, False)
 
-    def update(self) -> None:
+    def update(self):
         if (
             self.menu_appel != "MENU_P"
             and self.manager.states["GAME"].playing_mode != "solo"
         ):
             self.manager.states["GAME"].update()
 
-    def display(self) -> None:
+    def display(self):
         if self.menu_appel == "MENU_P":
             self.screen.blit(self.bg_img, self.bg_img_coord)
         else:
@@ -500,18 +434,12 @@ class Play_Menu(Menu):
 
         # =======================Function Button Start=======================
         def multiplayer():
-            self.multiplayer.clicked = True
-            self.multiplayer.hover = False
             self.manager.change_state("MENU_MULTIPLAYER")
 
         def solo():
-            self.solo.clicked = True
-            self.solo.hover = False
             self.manager.change_state("MENU_SOLO")
 
         def joinmultiplayer():
-            self.joinmultiplayer.clicked = True
-            self.joinmultiplayer.hover = False
             self.manager.states["MENU_MULTI"].udp_event.set()
             self.manager.change_state("MENU_MULTI")
 
@@ -549,40 +477,25 @@ class Play_Menu(Menu):
         ]
         self.eltpages = [self.retour, self.solo, self.multiplayer, self.joinmultiplayer]
 
-    def event(self, events: list[p.event.Event]) -> None:
+    def event(self, events: list[p.event.Event]):
         coord = p.mouse.get_pos()
         for event in events:
             if event.type == p.QUIT:
                 self.manager.running = False
-            if event.type == p.KEYDOWN:
+            elif event.type == p.KEYDOWN:
                 if event.key == p.K_ESCAPE:
                     self.manager.change_state("MENU_P")
-                if event.key == p.K_0:
+                elif event.key == p.K_0:
                     self.manager.states["GAME"].load_save("save.json")
-            if event.type == p.MOUSEBUTTONDOWN:
-                if self.solo.rec.collidepoint(coord):
-                    self.solo.clicked_function()
-                elif self.multiplayer.rec.collidepoint(coord):
-                    self.multiplayer.clicked_function()
-                elif self.joinmultiplayer.rec.collidepoint(coord):
-                    self.joinmultiplayer.clicked_function()
-                elif self.retour.rec.collidepoint(coord):
-                    self.retour.clicked_function("MENU_P")
-            else:
-                self.dehover_all()
-                if self.solo.rec.collidepoint(coord):
-                    self.solo.hover = True
-                elif self.multiplayer.rec.collidepoint(coord):
-                    self.multiplayer.hover = True
-                elif self.joinmultiplayer.rec.collidepoint(coord):
-                    self.joinmultiplayer.hover = True
-                elif self.retour.rec.collidepoint(coord):
-                    self.retour.hover = True
+        self.solo.event(events, coord)
+        self.multiplayer.event(events, coord)
+        self.joinmultiplayer.event(events, coord)
+        self.retour.event(events, coord, "MENU_P")
 
-    def update(self) -> None:
+    def update(self):
         pass
 
-    def display(self) -> None:
+    def display(self):
         self.screen.blit(self.bg_img, self.bg_img_coord)
         self.pagedisplay()
         self.textdisplay()
@@ -605,18 +518,27 @@ class Join_Multi_Menu(Menu):
         # =======================Function Button Start=======================
         def retour(mode: str):
             self.udp_event.clear()
-            self.retour.clicked_function(mode)
+            self.manager.change_state(mode)
 
+        def rejoindre(address: str):
+            self.udp_event.clear()
+            self.manager.states["GAME"].playing_mode = "guest"
+            self.manager.states["GAME"].address = address
+            self.manager.change_state("GAME")
+            self.manager.state.initialize()
+
+        self.rejoindre = rejoindre
+        self.retour.clicked_function = retour
         # =======================Function Button End=======================
 
         self.elttexts = [self.retour_t]
         self.eltpages = [self.retour]
 
-    def initialize_udp(self) -> None:
+    def initialize_udp(self):
 
         self.upd_func = asyncio.run(self.recieve_udp())
 
-    def recieve_udp(self) -> None:
+    def recieve_udp(self):
 
         sock_set = False
         sock = None
@@ -651,62 +573,36 @@ class Join_Multi_Menu(Menu):
                 sock.close()
                 print("UDP recieve protocol stopped")
 
-    def create_list_button(self) -> None:
+    def create_list_button(self):
         self.list_button = []
-
-        def no_function():
-            pass
-
         count = 0
         for serveur in self.serveurs.keys():
             button, button_t = create_button_with_text(
                 EMPTY_BUTTON,
                 self.screen,
                 (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 200 + count * 150),
-                no_function,
+                self.rejoindre,
                 serveur,
             )
             self.list_button.append((button, button_t))
             count += 1
 
-    def event(self, events: list[p.event.Event]) -> None:
+    def event(self, events: list[p.event.Event]):
         coord = p.mouse.get_pos()
         for event in events:
             if event.type == p.QUIT:
                 self.manager.running = False
-            if event.type == p.KEYDOWN:
-                if event.key == p.K_ESCAPE:
-                    self.udp_event.clear()
-                    self.manager.change_state("MENU_PLAY")
-            if event.type == p.MOUSEBUTTONDOWN and event.button == p.BUTTON_LEFT:
-                if self.retour.rec.collidepoint(coord):
-                    self.udp_event.clear()
-                    self.retour.clicked_function("MENU_PLAY")
-                else:
-                    for elt in self.list_button:
-                        if elt[0].rec.collidepoint(coord):
-                            elt[0].clicked = True
-                            elt[0].hover = False
-                            self.udp_event.clear()
-                            self.manager.states["GAME"].playing_mode = "guest"
-                            self.manager.states["GAME"].address = elt[1][0].caractere
-                            self.manager.change_state("GAME")
-                            self.manager.state.initialize()
-                            break
-            else:
-                self.dehover_all()
-                if self.retour.rec.collidepoint(coord):
-                    self.retour.hover = True
-                else:
-                    for elt in self.list_button:
-                        if elt[0].rec.collidepoint(coord):
-                            elt[0].hover = True
-                            break
+            elif event.type == p.KEYDOWN and event.key == p.K_ESCAPE:
+                self.udp_event.clear()
+                self.manager.change_state("MENU_PLAY")
+        self.retour.event(events, coord, "MENU_PLAY")
+        for elt in self.list_button:
+            elt[0].event(events, coord, elt[1][0].caractere)
 
-    def update(self) -> None:
+    def update(self):
         pass
 
-    def display(self) -> None:
+    def display(self):
         self.screen.blit(self.bg_img, self.bg_img_coord)
         if len(self.serveurs) != self.serveurs_save:
             self.serveurs_save = len(self.serveurs)
@@ -736,13 +632,9 @@ class Pause_Menu(Menu):
 
         # =======================Function Button Start=======================
         def resume():
-            self.resume.clicked = True
-            self.resume.hover = False
             self.manager.change_state("GAME")
 
         def save():
-            self.save.clicked = True
-            self.save.hover = False
             if self.manager.states["GAME"].playing_mode == "solo":
                 self.manager.states["GAME"].save(
                     SAVE_SOLO + "/save_" + str(self.nbr_file_solo)
@@ -753,16 +645,12 @@ class Pause_Menu(Menu):
                 )
 
         def settings():
-            self.settings.clicked = True
-            self.settings.hover = False
             self.manager.states["MENU_SETTING_PAUSE"].keybinds = self.manager.states[
                 "GAME"
             ].keybinds
             self.manager.change_state("MENU_SETTING_PAUSE")
 
         def quit():
-            self.quit.clicked = True
-            self.quit.hover = False
             self.manager.states["GAME"].player_controller.close = True
             self.manager.change_state("MENU_P")
 
@@ -795,38 +683,23 @@ class Pause_Menu(Menu):
         self.eltpages = [self.resume, self.save, self.settings, self.quit]
         self.elttexts = [self.resume_t, self.save_t]
 
-    def event(self, events: list[p.event.Event]) -> None:
+    def event(self, events: list[p.event.Event]):
         coord = p.mouse.get_pos()
         for event in events:
             if event.type == p.QUIT:
                 self.manager.running = False
-            if event.type == p.MOUSEBUTTONDOWN and event.button == p.BUTTON_LEFT:
-                if self.quit.rec.collidepoint(coord):
-                    self.quit.clicked_function()
-                elif self.resume.rec.collidepoint(coord):
-                    self.resume.clicked_function()
-                elif self.settings.rec.collidepoint(coord):
-                    self.settings.clicked_function()
-                elif self.save.rec.collidepoint(coord):
-                    self.save.clicked_function()
             elif event.type == p.KEYDOWN and event.key == p.K_ESCAPE:
                 self.resume.clicked_function()
-            else:
-                self.dehover_all()
-                if self.quit.rec.collidepoint(coord):
-                    self.quit.hover = True
-                elif self.resume.rec.collidepoint(coord):
-                    self.resume.hover = True
-                elif self.settings.rec.collidepoint(coord):
-                    self.settings.hover = True
-                elif self.save.rec.collidepoint(coord):
-                    self.save.hover = True
+        self.quit.event(events, coord)
+        self.resume.event(events, coord)
+        self.settings.event(events, coord)
+        self.save.event(events, coord)
 
-    def update(self) -> None:
+    def update(self):
         if self.manager.states["GAME"].playing_mode != "solo":
             self.manager.states["GAME"].update()
 
-    def display(self) -> None:
+    def display(self):
         self.manager.states["GAME"].display()
         self.screen.blit(self.blackscreen, (0, 0))
         self.pagedisplay()
@@ -842,15 +715,10 @@ class Solo_Menu(Menu):
 
         # =======================Function Button Start=======================
         def create():
-            self.create.clicked = True
-            self.create.hover = False
             self.nbr_file_solo += 1
             self.manager.states["GAME"].playing_mode = "solo"
             self.manager.change_state("GAME")
             self.manager.state.initialize()
-
-        def no_function():
-            pass
 
         # =======================Function Button End=======================
 
@@ -859,7 +727,7 @@ class Solo_Menu(Menu):
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 10),
-            no_function,
+            self.no_function,
             "SOLO",
             1,
             100,
@@ -881,56 +749,30 @@ class Solo_Menu(Menu):
             self.eltpages.append(elt[0])
             self.elttexts.append(elt[1])
 
-    def event(self, events: list[p.event.Event]) -> None:
+    def event(self, events: list[p.event.Event]):
         coord = p.mouse.get_pos()
         for event in events:
             if event.type == p.QUIT:
                 self.manager.running = False
-            if event.type == p.KEYDOWN:
-                if event.key == p.K_ESCAPE:
-                    self.manager.change_state("MENU_PLAY")
+            elif event.type == p.KEYDOWN and event.key == p.K_ESCAPE:
+                self.manager.change_state("MENU_PLAY")
             if event.type == p.MOUSEBUTTONDOWN:
-                if self.retour.rec.collidepoint(coord):
+                if self.retour.event(events, coord):
                     self.retour.clicked_function("MENU_PLAY")
-                    """if self.solo.rec.collidepoint(coord):
+                    """if self.solo.event(events,coord):
                     self.solo.clicked = True
                     self.solo.hover = False
                     self.manager.states["GAME"].playing_mode = "solo"
                     self.manager.change_state("GAME")
                     self.manager.state.initialize()"""
-                elif self.create.rec.collidepoint(coord):
-                    self.create.clicked_function()
-                    """self.multiplayer.clicked = True
-                    self.multiplayer.hover = False
-                    self.manager.states["GAME"].playing_mode = "host"
-                    self.manager.change_state("GAME")
-                    self.manager.state.initialize()"""
-                else:
-                    for ind in range(self.len_list):
-                        if self.list_button[ind][0].rec.collidepoint(coord):
-                            self.list_button[ind][0].clicked = True
-                            self.list_button[ind][0].hover = False
-                            self.manager.states["GAME"].playing_mode = "solo"
-                            self.manager.states["GAME"].game.load(self.list_file)
-                            self.manager.change_state("GAME")
-                            self.manager.state.initialize()
-                            break
-            else:
-                self.dehover_all()
-                if self.retour.rec.collidepoint(coord):
-                    self.retour.hover = True
-                elif self.create.rec.collidepoint(coord):
-                    self.create.hover = True
-                else:
-                    for elt in self.list_button:
-                        if elt[0].rec.collidepoint(coord):
-                            elt[0].hover = True
-                            break
+        self.create.event(events, coord)
+        for ind in range(self.len_list):
+            self.list_button[ind][0].event(events, coord, "solo")
 
-    def update(self) -> None:
+    def update(self):
         pass
 
-    def display(self) -> None:
+    def display(self):
         self.screen.blit(self.bg_img, self.bg_img_coord)
         self.pagedisplay()
         self.textdisplay()
@@ -952,9 +794,6 @@ class Multiplayer_Menu(Menu):
             self.manager.change_state("GAME")
             self.manager.state.initialize()
 
-        def no_function():
-            pass
-
         # =======================Function Button End=======================
 
         # =======================Button Start=======================
@@ -962,7 +801,7 @@ class Multiplayer_Menu(Menu):
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 10),
-            no_function,
+            self.no_function,
             "MULTIPLAYER",
             1,
             100,
@@ -986,56 +825,22 @@ class Multiplayer_Menu(Menu):
             self.eltpages.append(elt[0])
             self.elttexts.append(elt[1])
 
-    def event(self, events: list[p.event.Event]) -> None:
+    def event(self, events: list[p.event.Event]):
         coord = p.mouse.get_pos()
         for event in events:
             if event.type == p.QUIT:
                 self.manager.running = False
-            if event.type == p.KEYDOWN:
-                if event.key == p.K_ESCAPE:
-                    self.manager.change_state("MENU_PLAY")
-            if event.type == p.MOUSEBUTTONDOWN and event.button == p.BUTTON_LEFT:
-                if self.retour.rec.collidepoint(coord):
-                    self.retour.clicked_function("MENU_PLAY")
-                elif self.create.rec.collidepoint(coord):
-                    self.create.clicked_function()
-                    """elif self.mode_jeu.rec.collidepoint(coord):
-                    self.mode_jeu.clicked = True
-                    self.mode_jeu.hover = False
-                    if self.mode_jeu_t[0].caractere == "SOLO":
-                        self.change_button_text(
-                            self.mode_jeu_t, self.mode_jeu, "MULTIPLAYER"
-                        )
-                    else:
-                        self.change_button_text(
-                            self.mode_jeu_t, self.mode_jeu, "SOLO"
-                        )"""
-                else:
-                    for ind in range(self.len_list):
-                        if self.list_button[ind][0].rec.collidepoint(coord):
-                            self.list_button[ind][0].clicked = True
-                            self.list_button[ind][0].hover = False
-                            self.manager.states["GAME"].playing_mode = "multiplayer"
-                            self.manager.states["GAME"].game.load(self.list_file)
-                            self.manager.change_state("GAME")
-                            self.manager.state.initialize()
-                            break
-            else:
-                self.dehover_all()
-                if self.retour.rec.collidepoint(coord):
-                    self.retour.hover = True
-                elif self.create.rec.collidepoint(coord):
-                    self.create.hover = True
-                else:
-                    for elt in self.list_button:
-                        if elt[0].rec.collidepoint(coord):
-                            elt[0].hover = True
-                            break
+            elif event.type == p.KEYDOWN and event.key == p.K_ESCAPE:
+                self.manager.change_state("MENU_PLAY")
+        self.retour.event(events, coord, "MENU_PLAY")
+        self.create.event(events, coord)
+        for ind in range(self.len_list):
+            self.list_button[ind][0].event(events, coord, "multiplayer")
 
-    def update(self) -> None:
+    def update(self):
         pass
 
-    def display(self) -> None:
+    def display(self):
         self.screen.blit(self.bg_img, self.bg_img_coord)
         self.pagedisplay()
         self.textdisplay()
@@ -1049,9 +854,6 @@ class Death_Screen(Menu):
         self.manager.running = True
 
         # =======================Function Button Start=======================
-        def no_function():
-            pass
-
         # =======================Function Button End=======================
 
         # =======================Button Start=======================
@@ -1059,7 +861,7 @@ class Death_Screen(Menu):
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2),
-            no_function,
+            self.no_function,
             "Game Over",
             1,
             150,
@@ -1068,7 +870,7 @@ class Death_Screen(Menu):
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 200),
-            no_function,
+            self.no_function,
             "Press any keybind to continu",
             1,
             50,
@@ -1078,38 +880,20 @@ class Death_Screen(Menu):
         self.elttexts = [self.death_t, self.death2_t]
         self.eltpages = []
 
-    def event(self, events: list[p.event.Event]) -> None:
+    def event(self, events: list[p.event.Event]):
         for event in events:
             if event.type == p.QUIT:
                 self.manager.running = False
             if event.type == p.KEYDOWN or event.type == p.MOUSEBUTTONDOWN:
                 self.manager.change_state("MENU_P")
 
-    def update(self) -> None:
+    def update(self):
         pass
 
-    def display(self) -> None:
+    def display(self):
         self.manager.states["GAME"].display()
         self.screen.blit(self.blackscreen, (0, 0))
         self.textdisplay()
-
-
-def create_button_with_text(
-    image: str,
-    screen: p.Surface,
-    pos: Tuple | List,
-    function_event,
-    text_str: str | None = "",
-    scale: int | None = 1,
-    text_size: int | None = 30,
-) -> Tuple[a.Button, List | Text | Tuple[int, int]]:
-    button = a.Button(image, screen, pos, function_event, scale=scale)
-    text = Text("Impact", text_size, text_str, (0, 0, 0), screen)
-    coord = (
-        (button.rec.width - text.lenth[0]) // 2 + button.rec.left,
-        (button.rec.height - text.lenth[1]) // 2 + button.rec.top,
-    )
-    return button, [text, coord]
 
 
 def get_all_saves(mode: str) -> List[Dict[str, str]] | List[str]:
@@ -1120,7 +904,7 @@ def get_all_saves(mode: str) -> List[Dict[str, str]] | List[str]:
 
     for file in os.listdir(folder):
         list_file.append(file)
-        with open(file, "r") as reader:
+        with open(os.path.join(folder, file), "r", encoding="utf-8") as reader:
             data = json.loads(reader.read())
             L.append({"game_name": data["game_name"], "last_save": data["last_save"]})
     return L, list_file
