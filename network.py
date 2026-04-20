@@ -11,6 +11,7 @@ from typing import Dict, Any, Optional
 # Configuration des ports
 UDP_PORT = 9999  # (découverte de parties)
 TCP_PORT = 8888  # (le jeu)
+NETWORK_TICK = 1 / 60  # tick du réseau
 
 
 def get_netmask_for_ip(ip: str) -> Optional[str]:
@@ -424,6 +425,8 @@ class GuestNetwork:
                     break
 
                 self._set_incoming(data)
+
+                await asyncio.sleep(NETWORK_TICK)
 
         except asyncio.TimeoutError:
             print("[Guest] Timeout — Host injoignable")
