@@ -235,9 +235,9 @@ class Button:
         *,
         text: str | None = None,
         text_position: Tuple[int, int] | None = None,
-        text_font: str | None = None,
-        text_size: int | None = None,
-        text_color: Tuple[int, int, int] | str | None = None,
+        text_font: str | None = "Impact",
+        text_size: int | None = 30,
+        text_color: Tuple[int, int, int] | str | None = (0, 0, 0),
         text_antialias: bool = False,
         button_size: Tuple | List | None = None,
         button_scale: int | None = 1,
@@ -251,9 +251,7 @@ class Button:
         """
         assert not (button_scale != 1 and button_size is not None)
         assert len(position) == 2  # Verify that position is valid
-        assert (text and text_font and text_size and text_color) or not (
-            text or text_position or text_font or text_size or text_color
-        )
+        assert (text and text_font and text_size and text_color) or not text
 
         # Load image
         self.path = path
