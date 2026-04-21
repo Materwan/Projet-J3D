@@ -1,5 +1,10 @@
-import pygame
 import random
+import os
+import json
+
+import pygame
+
+INVENTORY_ASSET_DIRECTORY = r"Ressources\InventoryAsset"
 
 """
 item_dic c'est la base de données des Items du jeu
@@ -16,452 +21,22 @@ Price :
     Le prix d'ACHAT chez un marchand = prix_vente * price_multiplier
     (entre 1.2 et 1.6, tiré aléatoirement pour chaque PNJ marchand).
 """
-item_dic: dict[str, dict] = {
-    # =========================================================================
-    # CONSOMMABLE — path : Ressources/inv_assets/edible/
-    # =========================================================================
-    "Champignon": {
-        "description": "Un petit champignon des bois comestible.",
-        "item_type": "Consommable",
-        "max_stack": 50,
-        "icon_path": "Ressources/inv_assets/edible/Mushroom.png",
-        "price": 12,
-        "effect": 2,
-    },
-    "Pomme": {
-        "description": "Une pomme rouge bien sucrée.",
-        "item_type": "Consommable",
-        "max_stack": 20,
-        "icon_path": "Ressources/inv_assets/edible/Apple.png",
-        "price": 15,
-        "effect": 3,
-    },
-    "Pomme verte": {
-        "description": "Légèrement acide mais très rafraîchissante.",
-        "item_type": "Consommable",
-        "max_stack": 20,
-        "icon_path": "Ressources/inv_assets/edible/Green Apple.png",
-        "price": 15,
-        "effect": 3,
-    },
-    "Fromage": {
-        "description": "Un morceau de fromage qui a du caractère.",
-        "item_type": "Consommable",
-        "max_stack": 20,
-        "icon_path": "Ressources/inv_assets/edible/Cheese.png",
-        "price": 18,
-        "effect": 4,
-    },
-    "Vin blanc": {
-        "description": "Un vin blanc sec et fruité.",
-        "item_type": "Consommable",
-        "max_stack": 5,
-        "icon_path": "Ressources/inv_assets/edible/Wine.png",
-        "price": 22,
-        "effect": 4,
-    },
-    "Pain": {
-        "description": "Un pain artisanal tout juste sorti du four.",
-        "item_type": "Consommable",
-        "max_stack": 15,
-        "icon_path": "Ressources/inv_assets/edible/Bread.png",
-        "price": 18,
-        "effect": 5,
-    },
-    "Vin rouge": {
-        "description": "Une bouteille de grand cru.",
-        "item_type": "Consommable",
-        "max_stack": 5,
-        "icon_path": "Ressources/inv_assets/edible/Wine 2.png",
-        "price": 25,
-        "effect": 5,
-    },
-    "Viande": {
-        "description": "Un morceau de viande crue de qualité.",
-        "item_type": "Consommable",
-        "max_stack": 10,
-        "icon_path": "Ressources/inv_assets/edible/Meat.png",
-        "price": 22,
-        "effect": 7,
-    },
-    "Jambon": {
-        "description": "Un jambon entier bien cuit.",
-        "item_type": "Consommable",
-        "max_stack": 5,
-        "icon_path": "Ressources/inv_assets/edible/Ham.png",
-        "price": 28,
-        "effect": 8,
-    },
-    "Petite Potion Rouge": {
-        "description": "Une petite fiole qui referme les plaies légères.",
-        "item_type": "Consommable",
-        "max_stack": 10,
-        "icon_path": "Ressources/inv_assets/edible/Red Potion 2.png",
-        "price": 35,
-        "effect": 10,
-    },
-    "Potion Rouge": {
-        "description": "La potion de soin classique des aventuriers.",
-        "item_type": "Consommable",
-        "max_stack": 10,
-        "icon_path": "Ressources/inv_assets/edible/Red Potion.png",
-        "price": 50,
-        "effect": 15,
-    },
-    "Grande Potion Rouge": {
-        "description": "Un flacon de soin majeur, très efficace.",
-        "item_type": "Consommable",
-        "max_stack": 5,
-        "icon_path": "Ressources/inv_assets/edible/Red Potion 3.png",
-        "price": 60,
-        "effect": 20,
-    },
-    "Viande de monstre": {
-        "description": "De la viande à l'odeur suspecte.",
-        "item_type": "Consommable",
-        "max_stack": 20,
-        "icon_path": "Ressources/inv_assets/edible/Monster Meat.png",
-        "price": 12,
-        "effect": -10,
-    },
-    # =========================================================================
-    # BRIC-À-BRAC — path : Ressources/inv_assets/junk/
-    # =========================================================================
-    "Os": {
-        "description": "Un vieil os blanchi par le soleil.",
-        "item_type": "Bric-à-brac",
-        "max_stack": 50,
-        "icon_path": "Ressources/inv_assets/junk/Bone.png",
-        "price": 5,
-        "effect": None,
-    },
-    "Livre": {
-        "description": "Un vieux livre aux pages jaunies.",
-        "item_type": "Bric-à-brac",
-        "max_stack": 5,
-        "icon_path": "Ressources/inv_assets/junk/Book.png",
-        "price": 20,
-        "effect": None,
-    },
-    "Bougie": {
-        "description": "Une simple bougie pour s'éclairer dans le noir.",
-        "item_type": "Bric-à-brac",
-        "max_stack": 20,
-        "icon_path": "Ressources/inv_assets/junk/Candle.png",
-        "price": 8,
-        "effect": None,
-    },
-    "Charbon": {
-        "description": "Un morceau de charbon noir, utile pour le feu.",
-        "item_type": "Bric-à-brac",
-        "max_stack": 99,
-        "icon_path": "Ressources/inv_assets/junk/Coal.png",
-        "price": 6,
-        "effect": None,
-    },
-    "Pièce de cuivre": {
-        "description": "La monnaie de base du royaume.",
-        "item_type": "Bric-à-brac",
-        "max_stack": 999,
-        "icon_path": "Ressources/inv_assets/junk/Copper Coin.png",
-        "price": 1,
-        "effect": None,
-    },
-    "Œuf": {
-        "description": "Un œuf mystérieux, peut-être comestible ?",
-        "item_type": "Bric-à-brac",
-        "max_stack": 20,
-        "icon_path": "Ressources/inv_assets/junk/Egg.png",
-        "price": 8,
-        "effect": None,
-    },
-    "Enveloppe": {
-        "description": "Une lettre scellée. Qui en est le destinataire ?",
-        "item_type": "Bric-à-brac",
-        "max_stack": 1,
-        "icon_path": "Ressources/inv_assets/junk/Envelop.png",
-        "price": 15,
-        "effect": None,
-    },
-    "Tissu": {
-        "description": "Un rouleau de tissu blanc, utile pour la couture.",
-        "item_type": "Bric-à-brac",
-        "max_stack": 99,
-        "icon_path": "Ressources/inv_assets/junk/Fabric.png",
-        "price": 8,
-        "effect": None,
-    },
-    "Plume": {
-        "description": "Une plume légère et résistante.",
-        "item_type": "Bric-à-brac",
-        "max_stack": 50,
-        "icon_path": "Ressources/inv_assets/junk/Feather.png",
-        "price": 7,
-        "effect": None,
-    },
-    "Engrenage": {
-        "description": "Une pièce mécanique complexe.",
-        "item_type": "Bric-à-brac",
-        "max_stack": 50,
-        "icon_path": "Ressources/inv_assets/junk/Gear.png",
-        "price": 15,
-        "effect": None,
-    },
-    "Pièce d'or": {
-        "description": "Une pièce brillante de grande valeur.",
-        "item_type": "Bric-à-brac",
-        "max_stack": 999,
-        "icon_path": "Ressources/inv_assets/junk/Golden Coin.png",
-        "price": 10,
-        "effect": None,
-    },
-    "Marteau": {
-        "description": "Un lourd marteau de forge.",
-        "item_type": "Bric-à-brac",
-        "max_stack": 1,
-        "icon_path": "Ressources/inv_assets/junk/Hammer.png",
-        "price": 25,
-        "effect": None,
-    },
-    "Lanterne": {
-        "description": "Une lanterne en métal qui éclaire bien dans le noir.",
-        "item_type": "Bric-à-brac",
-        "max_stack": 5,
-        "icon_path": "Ressources/inv_assets/junk/Lantern.png",
-        "price": 20,
-        "effect": None,
-    },
-    "Cuir": {
-        "description": "Une peau tannée souple et résistante.",
-        "item_type": "Bric-à-brac",
-        "max_stack": 99,
-        "icon_path": "Ressources/inv_assets/junk/Leather.png",
-        "price": 10,
-        "effect": None,
-    },
-    "Papier": {
-        "description": "Un parchemin vierge prêt à être écrit.",
-        "item_type": "Bric-à-brac",
-        "max_stack": 99,
-        "icon_path": "Ressources/inv_assets/junk/Paper.png",
-        "price": 5,
-        "effect": None,
-    },
-    "Pioche": {
-        "description": "L'outil indispensable de tout mineur.",
-        "item_type": "Bric-à-brac",
-        "max_stack": 1,
-        "icon_path": "Ressources/inv_assets/junk/Pickaxe.png",
-        "price": 22,
-        "effect": None,
-    },
-    "Corde": {
-        "description": "Une corde solide faite de fibres tressées.",
-        "item_type": "Bric-à-brac",
-        "max_stack": 99,
-        "icon_path": "Ressources/inv_assets/junk/Rope.png",
-        "price": 8,
-        "effect": None,
-    },
-    "Pelle": {
-        "description": "Utile pour creuser des trous ou déterrer des trésors.",
-        "item_type": "Bric-à-brac",
-        "max_stack": 1,
-        "icon_path": "Ressources/inv_assets/junk/Shovel.png",
-        "price": 18,
-        "effect": None,
-    },
-    "Pièce d'argent": {
-        "description": "Une pièce d'argent du royaume.",
-        "item_type": "Bric-à-brac",
-        "max_stack": 999,
-        "icon_path": "Ressources/inv_assets/junk/Silver Coin.png",
-        "price": 5,
-        "effect": None,
-    },
-    "Gel de Slime": {
-        "description": "Une substance gluante et verdâtre.",
-        "item_type": "Bric-à-brac",
-        "max_stack": 99,
-        "icon_path": "Ressources/inv_assets/junk/Slime Gel.png",
-        "price": 10,
-        "effect": None,
-    },
-    "Ficelle": {
-        "description": "Une bobine de fil résistant.",
-        "item_type": "Bric-à-brac",
-        "max_stack": 99,
-        "icon_path": "Ressources/inv_assets/junk/String.png",
-        "price": 4,
-        "effect": None,
-    },
-    "Bûche": {
-        "description": "Un morceau de bois brut fraîchement coupé.",
-        "item_type": "Bric-à-brac",
-        "max_stack": 99,
-        "icon_path": "Ressources/inv_assets/junk/Wood Log.png",
-        "price": 5,
-        "effect": None,
-    },
-    "Planche en bois": {
-        "description": "Du bois taillé prêt pour la construction.",
-        "item_type": "Bric-à-brac",
-        "max_stack": 99,
-        "icon_path": "Ressources/inv_assets/junk/Wooden Plank.png",
-        "price": 7,
-        "effect": None,
-    },
-    "Laine": {
-        "description": "Une boule de laine douce et chaude.",
-        "item_type": "Bric-à-brac",
-        "max_stack": 99,
-        "icon_path": "Ressources/inv_assets/junk/Wool.png",
-        "price": 8,
-        "effect": None,
-    },
-    # =========================================================================
-    # CURIOSITÉS — path : Ressources/inv_assets/curiosities/
-    # =========================================================================
-    "Livre Mystérieux": {
-        "description": "Un grimoire millénaire contenant des sorts oubliés.",
-        "item_type": "Curiosités",
-        "max_stack": 1,
-        "icon_path": "Ressources/inv_assets/curiosities/Book 3.png",
-        "price": 130,
-        "effect": None,
-    },
-    "Cristal": {
-        "description": "Un cristal translucide qui reflète la lumière.",
-        "item_type": "Curiosités",
-        "max_stack": 99,
-        "icon_path": "Ressources/inv_assets/curiosities/Crystal.png",
-        "price": 120,
-        "effect": None,
-    },
-    "Émeraude": {
-        "description": "Une émeraude brute extraite de la roche.",
-        "item_type": "Curiosités",
-        "max_stack": 99,
-        "icon_path": "Ressources/inv_assets/curiosities/Emerald.png",
-        "price": 100,
-        "effect": None,
-    },
-    "Carte Ancienne": {
-        "description": "Une carte aux contours usés qui mènerait à un trésor oublié.",
-        "item_type": "Curiosités",
-        "max_stack": 1,
-        "icon_path": "Ressources/inv_assets/curiosities/Map.png",
-        "price": 150,
-        "effect": None,
-    },
-    "Obsidienne": {
-        "description": "Une roche volcanique noire et tranchante.",
-        "item_type": "Curiosités",
-        "max_stack": 99,
-        "icon_path": "Ressources/inv_assets/curiosities/Obsidian.png",
-        "price": 80,
-        "effect": None,
-    },
-    "Perle": {
-        "description": "Une perle nacrée provenant des profondeurs.",
-        "item_type": "Curiosités",
-        "max_stack": 99,
-        "icon_path": "Ressources/inv_assets/curiosities/Pearl.png",
-        "price": 150,
-        "effect": None,
-    },
-    "Rubis": {
-        "description": "Un rubis brut à l'éclat rouge sombre.",
-        "item_type": "Curiosités",
-        "max_stack": 99,
-        "icon_path": "Ressources/inv_assets/curiosities/Ruby.png",
-        "price": 100,
-        "effect": None,
-    },
-    "Saphir": {
-        "description": "Un saphir brut d'un bleu profond.",
-        "item_type": "Curiosités",
-        "max_stack": 99,
-        "icon_path": "Ressources/inv_assets/curiosities/Sapphire.png",
-        "price": 95,
-        "effect": None,
-    },
-    "Parchemin": {
-        "description": "Un parchemin couvert de runes mystérieuses.",
-        "item_type": "Curiosités",
-        "max_stack": 5,
-        "icon_path": "Ressources/inv_assets/curiosities/Scroll.png",
-        "price": 120,
-        "effect": None,
-    },
-    "Crâne": {
-        "description": "Un crâne qui pourrait servir de trophée.",
-        "item_type": "Curiosités",
-        "max_stack": 10,
-        "icon_path": "Ressources/inv_assets/curiosities/Skull.png",
-        "price": 80,
-        "effect": None,
-    },
-    "Chapeau de Sorcier": {
-        "description": "Un chapeau pointu imprégné d'une légère aura magique.",
-        "item_type": "Curiosités",
-        "max_stack": 1,
-        "icon_path": "Ressources/inv_assets/curiosities/Wizard Hat.png",
-        "price": 180,
-        "effect": None,
-    },
-    "Bâton Magique": {
-        "description": "Un vieux bâton en bois qui semble canaliser une énergie mystérieuse.",
-        "item_type": "Curiosités",
-        "max_stack": 1,
-        "icon_path": "Ressources/inv_assets/curiosities/Wooden Staff.png",
-        "price": 160,
-        "effect": None,
-    },
-    # =========================================================================
-    # LÉGENDES — path : Ressources/inv_assets/legends/
-    # =========================================================================
-    "Diamant": {
-        "description": "La plus dure et la plus précieuse des gemmes.",
-        "item_type": "Légendes",
-        "max_stack": 99,
-        "icon_path": "Ressources/inv_assets/legends/Diamond.png",
-        "price": 500,
-        "effect": None,
-    },
-    "Œuf de Monstre": {
-        "description": "Un œuf orné de motifs étranges, il semble vibrer.",
-        "item_type": "Légendes",
-        "max_stack": 10,
-        "icon_path": "Ressources/inv_assets/legends/Monster Egg.png",
-        "price": 280,
-        "effect": None,
-    },
-    "Œil de Monstre": {
-        "description": "Une pupille verticale qui semble encore vous fixer.",
-        "item_type": "Légendes",
-        "max_stack": 30,
-        "icon_path": "Ressources/inv_assets/legends/Monster Eye.png",
-        "price": 320,
-        "effect": None,
-    },
-    "Bâton de Rubis": {
-        "description": "Canalise le pouvoir destructeur du feu. Un artefact rare.",
-        "item_type": "Légendes",
-        "max_stack": 1,
-        "icon_path": "Ressources/inv_assets/legends/Ruby Staff.png",
-        "price": 550,
-        "effect": None,
-    },
-    "Pierre Runique": {
-        "description": "Une pierre gravée de runes ancestrales qui émane une énergie mystérieuse.",
-        "item_type": "Légendes",
-        "max_stack": 5,
-        "icon_path": "Ressources/inv_assets/legends/Rune Stone.png",
-        "price": 400,
-        "effect": None,
-    },
-}
+with open(
+    os.path.join(INVENTORY_ASSET_DIRECTORY, "item_data.json"), "r", encoding="utf-8"
+) as file:
+    data: dict[str, dict] = json.loads(file.read())
+    item_dic: dict[str, dict] = {}
+    for type in data.keys():
+        for item in data[type].keys():
+            item_dic[item] = {}
+            item_dic[item]["description"] = data[type][item]["description"]
+            item_dic[item]["item_type"] = data[type][item]["item_type"]
+            item_dic[item]["max_stack"] = data[type][item]["max_stack"]
+            item_dic[item]["price"] = data[type][item]["price"]
+            item_dic[item]["effect"] = data[type][item]["effect"]
+            item_dic[item]["icon_path"] = os.path.join(
+                INVENTORY_ASSET_DIRECTORY, type, data[type][item]["file_name"]
+            )
 
 
 class Item:
@@ -523,7 +98,7 @@ class Item:
         except (FileNotFoundError, pygame.error):
             print(f"\nImage de '{name}' introuvable : '{data['icon_path']}'.\n")
             icon_surface = pygame.image.load(
-                "Ressources/inv_assets/not_found.png"
+                os.path.join(INVENTORY_ASSET_DIRECTORY, "not_found.png")
             ).convert_alpha()
 
         icon_surface = pygame.transform.scale(icon_surface, (32, 32))
@@ -667,7 +242,7 @@ class InventaireUI:
             name         = "Sac du joueur",
             inv          = mon_inventaire,
             pos          = (50, 100),
-            image_path   = "Ressources/inv_assets/chest.png",
+            image_path   = "Ressources/InventoryAsset/chest.png",
             slot_size    = 52,
             slot_margin  = 4,
             padding      = 21,
@@ -1158,7 +733,7 @@ if __name__ == "__main__":
         name="Sac du joueur",
         inv=inv_joueur,
         pos=(30, 80),
-        image_path="Ressources/inv_assets/chest.png",
+        image_path=os.path.join(INVENTORY_ASSET_DIRECTORY, "chest.png"),
         slot_size=52,
         slot_margin=4,
         padding=21,
@@ -1171,7 +746,7 @@ if __name__ == "__main__":
         name="Coffre",
         inv=inv_coffre,
         pos=(30, 400),
-        image_path="Ressources/inv_assets/chest.png",
+        image_path=os.path.join(INVENTORY_ASSET_DIRECTORY, "chest.png"),
         slot_size=52,
         slot_margin=4,
         padding=21,

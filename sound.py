@@ -1,7 +1,5 @@
 import pygame as p
 
-p.mixer.init()
-
 
 class SoundController:
     """classe pour gerer tout un son"""

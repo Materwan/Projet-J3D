@@ -6,6 +6,7 @@ import datetime
 import json
 from random import randint
 from typing import Dict, List, Any, Tuple, TYPE_CHECKING
+import os
 
 from player import SoloPlayerController, HostController, GuestController
 from network import HostNetwork, GuestNetwork
@@ -19,6 +20,8 @@ from particule import spawn_local_particle
 
 if TYPE_CHECKING:
     from main import Manager
+
+INVENTORY_ASSET_DIRECTORY = r"Ressources\InventoryAsset"
 
 
 def serialize_ennemis(ennemis: Dict[int, Ennemi]) -> Dict[int, Any]:
@@ -101,7 +104,7 @@ class Game:
             name="Sac du joueur",
             inv=self.inv_joueur,
             pos=((largeur - 486) // 2, hauteur - 293),
-            image_path="Ressources/inv_assets/chest.png",
+            image_path=os.path.join(INVENTORY_ASSET_DIRECTORY, "chest.png"),
             slot_size=52,
             slot_margin=4,
             padding=21,
@@ -494,7 +497,7 @@ class Game:
                 spawn_local_particle(
                     self.particles,
                     ennemi.position.tolist(),
-                    r"Ressources\particles\dust.png",
+                    r"Ressources\Particles\dust.png",
                     speed_range=(50, 150),
                     shrink_range=(20, 60),
                 )
@@ -523,7 +526,7 @@ class Game:
             )
             spawn_local_particle(
                 self.particles,
-                sprite_path="Ressources/particles/dust.png",
+                sprite_path="Ressources/Particles/dust.png",
                 pos=(spawn_x, spawn_y),
                 size=10,
                 speed_range=(25, 45),
