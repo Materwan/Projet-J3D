@@ -13,7 +13,7 @@ import animations as a
 if TYPE_CHECKING:
     from main import Manager
 
-MENU_ASSET_DIRECTORY = "Ressources/UI_&_élements_graphiques/"
+MENU_ASSET_DIRECTORY = "Ressources/UIAsset/"
 BACKGROUND = MENU_ASSET_DIRECTORY + "fond ecran menu.png"
 PLAY_BUTTON = MENU_ASSET_DIRECTORY + "PLAY.png"
 SETTING_BUTTON = MENU_ASSET_DIRECTORY + "SETTINGS.png"

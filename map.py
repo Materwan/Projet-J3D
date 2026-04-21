@@ -17,7 +17,7 @@ import pygame
 
 REPLACE_VALUE = 0.3
 TILE_SIZE = (32, 32)
-ASSET_DIRECTORY = r"Ressources\Pixel Art Top Down - Basic v1.2.3"
+ASSET_DIRECTORY = r"Ressources\TileSet"
 TILESET_DIRECTORY = r"Ressources\tileset"
 
 
