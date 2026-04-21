@@ -19,6 +19,7 @@ REPLACE_VALUE = 0.3
 TILE_SIZE = (32, 32)
 ASSET_DIRECTORY = r"Ressources\Pixel Art Top Down - Basic v1.2.3"
 TILESET_DIRECTORY = r"Ressources\tileset"
+HUB_PATH = r"Ressources\HUB.png"
 
 
 def load_assets(file: str, asset_folder: str, tile_size: Tuple[int, int]):
@@ -758,17 +759,42 @@ class Hub:
         self.screen = screen
 
         with open(path.join(TILESET_DIRECTORY, "tileset_data.json"), "r") as file:
+
             data = json.loads(file.read())
 
-        self.image = pygame.image.load(
-            path.join(TILESET_DIRECTORY, data["hub"]["file"])
-        )
-        self.image = pygame.transform.scale_by(self.image, 2)
+            self.tile_size = np.array(TILE_SIZE, dtype=np.int32)
+            self.size = np.array(
+                (data["hub"]["width"], data["hub"]["height"]), dtype=np.int32
+            )
+            self.size_in_tile = self.size // self.tile_size
+
+            self.collision_tiles = np.zeros(shape=(self.size // self.tile_size))
+            rows, cols = zip(*data["hub"]["collision_tiles"])
+            self.collision_tiles[rows, cols] = 1
+
+            self.occupied_tiles = np.zeros(shape=(self.size // self.tile_size))
+            rows, cols = zip(*data["hub"]["occupied_tiles"])
+            self.occupied_tiles[rows, cols] = 1
+
+        self.image = pygame.image.load(HUB_PATH)
         self.size = (data["hub"]["width"] * 2, data["hub"]["height"] * 2)
 
     def get_nearby_obstacles(self, hitbox: pygame.Rect):
 
-        return []
+        nearby_obstacles = []
+
+        grid_x = hitbox.centerx // self.tile_size[0]
+        grid_y = hitbox.centery // self.tile_size[1]
+
+        for x in range(grid_x - 1, grid_x + 2):
+            for y in range(grid_y - 1, grid_y + 2):
+
+                if 0 <= x < self.size_in_tile[0] and 0 <= y < self.size_in_tile[1]:
+                    if self.collision_tiles[x][y]:
+                        # On crée le rectangle de collision pour cette tuile
+                        nearby_obstacles.append(pygame.Rect(x * 32, y * 32, 32, 32))
+
+        return nearby_obstacles
 
     def update(self, absolute_position: Tuple[int, int]):
 
@@ -789,7 +815,10 @@ class MapManager:
             "Principale": principal_map,
             "Hub": hub,
         }
+        self.map_name = "Hub"
         self.map = self.maps["Hub"]
+        self.size = self.map.size
+        self.tile_size = self.map.tile_size
 
     def get_nearby_obstacles(self, hitbox: pygame.Rect):
 

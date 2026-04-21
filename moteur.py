@@ -17,41 +17,6 @@ class Moteur:
             "left": (-70, -55, 70, 80),
         }
 
-    def get_nearby_obstacles(self, hitbox: pygame.Rect) -> List[pygame.Rect]:
-        """
-        Récupère la matrice de la map du jeu.
-        Analyse une zone de 3x3 tuiles autour de la position du joueur.
-
-        Args:
-            hitbox (pygame.Rect): La hitbox du joueur pour calculer sa position sur la grille.
-        Returns:
-            list[pygame.Rect]: Liste des obstacles à proximité immédiate.
-        """
-        nearby_obstacles = []
-
-        # Trouver la position du joueur dans la grille
-        grid_x = hitbox.centerx // self.map.tile_size[0]
-        grid_y = hitbox.centery // self.map.tile_size[1]
-
-        # Vérifier un carré de 3x3 tuiles autour du joueur
-        for x in range(grid_x - 1, grid_x + 2):
-            for y in range(grid_y - 1, grid_y + 2):
-
-                x_chunk = x // self.map.chunk_size_tile[0]
-                y_chunk = y // self.map.chunk_size_tile[1]
-                rel_x = x % self.map.chunk_size_tile[0]
-                rel_y = y % self.map.chunk_size_tile[1]
-                if (
-                    0 <= x_chunk < self.map.nb_chunks[0]
-                    and 0 <= y_chunk < self.map.nb_chunks[1]
-                ):
-                    # Collision sur la tuile
-                    if self.map.chunks[(x_chunk, y_chunk)].collision[rel_x][rel_y]:
-                        # On crée le rectangle de collision pour cette tuile
-                        nearby_obstacles.append(pygame.Rect(x * 32, y * 32, 32, 32))
-
-        return nearby_obstacles
-
     def collision(
         self,
         hitbox: pygame.Rect,
@@ -70,7 +35,7 @@ class Moteur:
             velocity (pygame.Vector2): Vecteur de déplacement souhaité (modifié sur place).
             other_hitbox (pygame.Rect|None): La boîte de collision actuelle de l'autre joueur.
         """
-        nearby_obstacles = self.get_nearby_obstacles(hitbox)
+        nearby_obstacles = self.map.get_nearby_obstacles(hitbox)
 
         for elt in other_hitbox:
             nearby_obstacles.append(elt)

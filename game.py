@@ -10,7 +10,7 @@ from typing import Dict, List, Any, Tuple, TYPE_CHECKING
 from player import SoloPlayerController, HostController, GuestController
 from network import HostNetwork, GuestNetwork
 from moteur import Moteur
-from map import Map
+from map import Map, Hub, MapManager
 from camera_system import Camera
 from hud import HUD
 from inventory import Item, Inventaire, InventaireUI, InventaireManager
@@ -144,13 +144,15 @@ class Game:
 
             # Récupération de la map envoyée par l'hôte
             map_data = self.network.get_map_data()
-            self.map = Map(
+            principal_map = Map(
                 map_data["nb_chunks"],
                 map_data["chunk_size"],
                 map_data["octaves"],
                 self.screen,
                 map_data["seed"],
             )
+            hub = Hub(self.screen)
+            self.map = MapManager(principal_map, hub)
 
             # Récupération de la position initiale du guest
             initial = self.network.get_initial_state()
@@ -170,18 +172,20 @@ class Game:
         else:
 
             # -- Map --
-            self.map = Map(
+            principal_map = Map(
                 self.nb_chunks,
                 self.chunk_size,
                 self.octaves,
                 self.screen,
                 self.seed,
             )
+            hub = Hub(self.screen)
+            self.map = MapManager(principal_map, hub)
 
             # -- Controlleur --
             if self.playing_mode == "solo":
                 self.player_controller = SoloPlayerController(
-                    self.screen, self.camera, self.moteur, (4096, 4096)
+                    self.screen, self.camera, self.moteur, (100, 100)
                 )
 
             elif self.playing_mode == "host":
@@ -374,7 +378,7 @@ class Game:
                 return
 
         # -- Map --
-        self.map.load_chunks(self.player_controller.position)
+        self.map.update(self.player_controller.position)
 
         # -- Joueur --
         self.player_controller.update(self.ennemis)
@@ -535,7 +539,7 @@ class Game:
         self.screen.fill((100, 100, 100))
 
         # -- Map --
-        self.camera.display_map(self.map)
+        self.map.display(self.camera)
 
         # -- Joueur --
         self.player_controller.display()
@@ -602,7 +606,7 @@ class Game:
 
         # Affichage des obstacles du jeu
         for hitbox in all_hitboxes:
-            for obs in self.moteur.get_nearby_obstacles(hitbox):
+            for obs in self.map.get_nearby_obstacles(hitbox):
                 pygame.draw.rect(self.screen, "red", self.camera.apply(obs), 2)
 
         # Affichage du chemin jusqu'a l'ennemie
