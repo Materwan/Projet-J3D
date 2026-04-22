@@ -31,7 +31,6 @@ UDP_PORT = 9999
 class Menu:
 
     def __init__(self, screen: p.Surface, manager: "Manager"):
-        self.elttexts = []
         self.eltpages = []
         self.list_file = []
         self.WINDOWS = screen.get_size()
@@ -79,37 +78,23 @@ class Menu:
         self.retour = a.Button(EMPTY_BUTTON, self.screen, (170, 67), retour, text="<--")
         # =======================Button End=======================
 
-    def recalculcoord(
-        self, text: List | Text | Tuple[int, int], button: a.Button
-    ) -> Tuple[int, int]:
-        """recalcul the coordonnee"""
-        return (
-            (button.rec.width - text[0].lenth[0]) // 2 + button.rec.left,
-            (button.rec.height - text[0].lenth[1]) // 2 + button.rec.top,
-        )
-
     def change_button_text(
         self,
-        changetext: List | Text | Tuple[int, int],
+        changetext: str,
         button: a.Button,
-        caractere: str,
     ):
         """change the text in a button"""
-        changetext[0].text = changetext[0].font.render(caractere, False, (0, 0, 0))
-        changetext[0].lenth = changetext[0].text.get_size()
-        changetext[0].caractere = caractere
-        changetext[1] = self.recalculcoord(changetext, button)
+        button.text.update(changetext)
 
     def interchange(
         self,
-        changetext: List | Text | Tuple[int, int],
+        changetext: str,
         button: a.Button,
         direction: str,
-        caractere: str,
         bool: bool,
     ):
         """change the texte of the button that you want to change the keybind"""
-        self.change_button_text(changetext, button, caractere)
+        self.change_button_text(changetext, button)
         self.key[direction] = bool
 
     def create_list_save_and_button(self, mode: str):
@@ -118,27 +103,21 @@ class Menu:
         count = 0
         saves, files = get_all_saves(mode)
         for serveur in saves:
-            button, button_t = create_button_with_text(
+            button = a.Button(
                 EMPTY_BUTTON,
                 self.screen,
                 (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 200 + count * 150),
                 self.reprendre,
-                serveur["game_name"],
+                text=serveur["game_name"],
             )
             list_save.append(serveur)
-            list_button.append((button, button_t))
+            list_button.append(button)
             count += 1
         return list_button, files
 
     def pagedisplay(self):
-        """draw the page"""
         for elt in self.eltpages:
             elt.display()
-
-    def textdisplay(self):
-        """draw the text"""
-        for elt in self.elttexts:
-            elt[0].draw_text(elt[1])
 
     def dehover_all(self):
         for button in self.eltpages:
@@ -168,31 +147,31 @@ class Principal_Menu(Menu):
         # =======================Function Button End=======================
 
         # =======================Button Start=======================
-        self.start, _ = create_button_with_text(
+        self.start = a.Button(
             PLAY_BUTTON, self.screen, (self.half[0], self.half[1] - 100), start
         )
-        self.settings, _ = create_button_with_text(
+        self.settings = a.Button(
             SETTING_BUTTON,
             self.screen,
             (self.half[0], self.half[1] + 50),
             settings,
-            "",
-            0.8,
+            button_scale=0.8,
         )
-        self.quit, _ = create_button_with_text(
-            EXIT_BUTTON, self.screen, (self.half[0], self.half[1] + 200), quit
+        self.quit = a.Button(
+            EXIT_BUTTON,
+            self.screen,
+            (self.half[0], self.half[1] + 200),
+            quit,
         )
-        self.titre, _ = create_button_with_text(
+        self.titre = a.Button(
             TITLE,
             self.screen,
             (self.half[0], self.half[1] // 3),
             self.no_function,
-            "",
-            0.6,
+            button_scale=0.6,
         )
         # =======================Button End=======================
 
-        self.elttexts = []
         self.eltpages = [self.titre, self.start, self.settings, self.quit]
 
     def event(self, events: list[p.event.Event]):
@@ -209,7 +188,6 @@ class Principal_Menu(Menu):
 
     def display(self):
         self.screen.blit(self.bg_img, self.bg_img_coord)
-        self.textdisplay()
         self.pagedisplay()
 
 
@@ -229,19 +207,19 @@ class Setting_Menu(Menu):
             self.manager.change_state(mode)
 
         def changeup():
-            self.interchange(self.up_t, self.changeup, "up", "...", True)
+            self.interchange("...", self.changeup, "up", True)
 
         def changedown():
-            self.interchange(self.down_t, self.changedown, "down", "...", True)
+            self.interchange("...", self.changedown, "down", True)
 
         def changeleft():
-            self.interchange(self.left_t, self.changeleft, "left", "...", True)
+            self.interchange("...", self.changeleft, "left", True)
 
         def changeright():
-            self.interchange(self.right_t, self.changeright, "right", "...", True)
+            self.interchange("...", self.changeright, "right", True)
 
         def changeattack():
-            self.interchange(self.attack_t, self.changeattack, "attack", "...", True)
+            self.interchange("...", self.changeattack, "attack", True)
 
         def volume(choise: bool):
             self.manager.change_volume(choise)
@@ -250,75 +228,64 @@ class Setting_Menu(Menu):
 
         # =======================Button Start=======================
         self.retour.clicked_function = retour
-        self.changeup, self.up_t = create_button_with_text(
+        self.changeup = a.Button(
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2 - 400, self.WINDOWS[1] // 2 - 70),
             changeup,
-            "UP: " + p.key.name(self.keybinds["up"]),
+            text="UP: " + p.key.name(self.keybinds["up"]),
         )
-        self.changedown, self.down_t = create_button_with_text(
+        self.changedown = a.Button(
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2 - 400, self.WINDOWS[1] // 2 + 70),
             changedown,
-            "DOWN: " + p.key.name(self.keybinds["down"]),
+            text="DOWN: " + p.key.name(self.keybinds["down"]),
         )
-        self.changeleft, self.left_t = create_button_with_text(
+        self.changeleft = a.Button(
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 70),
             changeleft,
-            "LEFT: " + p.key.name(self.keybinds["left"]),
+            text="LEFT: " + p.key.name(self.keybinds["left"]),
         )
-        self.changeright, self.right_t = create_button_with_text(
+        self.changeright = a.Button(
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 70),
             changeright,
-            "RIGHT: " + p.key.name(self.keybinds["right"]),
+            text="RIGHT: " + p.key.name(self.keybinds["right"]),
         )
-        self.changeattack, self.attack_t = create_button_with_text(
+        self.changeattack = a.Button(
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2 - 200, self.WINDOWS[1] // 2 + 200),
             changeattack,
-            "ATTACK: " + p.key.name(self.keybinds["attack"]),
+            text="ATTACK: " + p.key.name(self.keybinds["attack"]),
         )
-        self.volume_up, self.volume_up_t = create_button_with_text(
+        self.volume_up = a.Button(
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2 + 400, self.WINDOWS[1] // 2 - 70),
             volume,
-            "+",
+            text="+",
         )
-        self.volume_down, self.volume_down_t = create_button_with_text(
+        self.volume_down = a.Button(
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2 + 400, self.WINDOWS[1] // 2 + 70),
             volume,
-            "-",
+            text="-",
         )
-        _, self.volume_t = create_button_with_text(
+        self.volume = a.Button(
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2 + 400, self.WINDOWS[1] // 2 - 180),
             self.no_function,
-            "Sounds volume",
+            text="Sounds volume",
         )
         # =======================Button End=======================
 
-        self.elttexts = [
-            self.up_t,
-            self.down_t,
-            self.left_t,
-            self.right_t,
-            self.attack_t,
-            self.volume_up_t,
-            self.volume_down_t,
-            self.volume_t,
-            self.retour_t,
-        ]
         self.eltpages = [
             self.changeup,
             self.changedown,
@@ -327,6 +294,7 @@ class Setting_Menu(Menu):
             self.changeattack,
             self.volume_up,
             self.volume_down,
+            self.volume,
             self.retour,
         ]
 
@@ -334,11 +302,8 @@ class Setting_Menu(Menu):
         """take the last keybind to replace the old one"""
         for elt in self.key.keys():
             if self.key[elt]:
-                if event.type == p.KEYDOWN:
-                    if event.key != p.K_ESCAPE:
-                        self.keybinds[elt] = event.key
-                else:
-                    self.keybinds[elt] = event.button
+                if event.type == p.KEYDOWN and event.key != p.K_ESCAPE:
+                    self.keybinds[elt] = event.key
                 self.key[elt] = False
 
     def checkchangekey(self) -> bool:
@@ -353,50 +318,42 @@ class Setting_Menu(Menu):
         for event in events:
             if event.type == p.QUIT:
                 self.manager.running = False
-            elif event.type == p.KEYDOWN or event.type == p.MOUSEBUTTONDOWN:
-                if (
-                    event.type == p.KEYDOWN
-                    and event.key == p.K_ESCAPE
-                    and self.checkchangekey()
-                ):
+            elif event.type == p.KEYDOWN:
+                if event.key == p.K_ESCAPE and self.checkchangekey():
                     self.manager.states["GAME"].keybinds = self.keybinds
                     self.manager.change_state(self.menu_appel)
-                self.changekey(event)  # try to change the keybind
-                self.interchange(
-                    self.up_t,
-                    self.changeup,
-                    "up",
-                    "UP: " + p.key.name(self.keybinds["up"]),
-                    False,
-                )
-                self.interchange(
-                    self.down_t,
-                    self.changedown,
-                    "down",
-                    "DOWN: " + p.key.name(self.keybinds["down"]),
-                    False,
-                )
-                self.interchange(
-                    self.left_t,
-                    self.changeleft,
-                    "left",
-                    "LEFT: " + p.key.name(self.keybinds["left"]),
-                    False,
-                )
-                self.interchange(
-                    self.right_t,
-                    self.changeright,
-                    "right",
-                    "RIGHT: " + p.key.name(self.keybinds["right"]),
-                    False,
-                )
-                self.interchange(
-                    self.attack_t,
-                    self.changeattack,
-                    "attack",
-                    "ATTACK: " + p.key.name(self.keybinds["attack"]),
-                    False,
-                )
+                else:
+                    self.changekey(event)  # try to change the keybind
+                    self.interchange(
+                        "UP: " + p.key.name(self.keybinds["up"]),
+                        self.changeup,
+                        "up",
+                        False,
+                    )
+                    self.interchange(
+                        "DOWN: " + p.key.name(self.keybinds["down"]),
+                        self.changedown,
+                        "down",
+                        False,
+                    )
+                    self.interchange(
+                        "LEFT: " + p.key.name(self.keybinds["left"]),
+                        self.changeleft,
+                        "left",
+                        False,
+                    )
+                    self.interchange(
+                        "RIGHT: " + p.key.name(self.keybinds["right"]),
+                        self.changeright,
+                        "right",
+                        False,
+                    )
+                    self.interchange(
+                        "ATTACK: " + p.key.name(self.keybinds["attack"]),
+                        self.changeattack,
+                        "attack",
+                        False,
+                    )
         if self.checkchangekey():
             """if a keybind is changing dont look for collidepoint"""
             self.retour.event(events, coord, self.menu_appel)
@@ -422,7 +379,6 @@ class Setting_Menu(Menu):
             self.manager.states["GAME"].display()
             self.screen.blit(self.blackscreen, (0, 0))
         self.pagedisplay()
-        self.textdisplay()
         self.declicked_all()
 
 
@@ -446,35 +402,29 @@ class Play_Menu(Menu):
         # =======================Function Button End=======================
 
         # =======================Button Start=======================
-        self.multiplayer, self.multiplayer_t = create_button_with_text(
+        self.multiplayer = a.Button(
             EMPTY_BUTTON,
             self.screen,
             self.half,
             multiplayer,
-            "MULTIPLAYER",
+            text="MULTIPLAYER",
         )
-        self.solo, self.solo_t = create_button_with_text(
+        self.solo = a.Button(
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 150),
             solo,
-            "SOLO",
+            text="SOLO",
         )
-        self.joinmultiplayer, self.joinmultiplayer_t = create_button_with_text(
+        self.joinmultiplayer = a.Button(
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 150),
             joinmultiplayer,
-            "JOIN MULTIPLAYER",
+            text="JOIN MULTIPLAYER",
         )
         # =======================Button End=======================
 
-        self.elttexts = [
-            self.solo_t,
-            self.multiplayer_t,
-            self.joinmultiplayer_t,
-            self.retour_t,
-        ]
         self.eltpages = [self.retour, self.solo, self.multiplayer, self.joinmultiplayer]
 
     def event(self, events: list[p.event.Event]):
@@ -498,7 +448,6 @@ class Play_Menu(Menu):
     def display(self):
         self.screen.blit(self.bg_img, self.bg_img_coord)
         self.pagedisplay()
-        self.textdisplay()
         self.declicked_all()
 
 
@@ -531,7 +480,6 @@ class Join_Multi_Menu(Menu):
         self.retour.clicked_function = retour
         # =======================Function Button End=======================
 
-        self.elttexts = [self.retour_t]
         self.eltpages = [self.retour]
 
     def initialize_udp(self):
@@ -577,14 +525,14 @@ class Join_Multi_Menu(Menu):
         self.list_button = []
         count = 0
         for serveur in self.serveurs.keys():
-            button, button_t = create_button_with_text(
+            button = a.Button(
                 EMPTY_BUTTON,
                 self.screen,
                 (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 200 + count * 150),
                 self.rejoindre,
-                serveur,
+                text=serveur.keys(),
             )
-            self.list_button.append((button, button_t))
+            self.list_button.append(button)
             count += 1
 
     def event(self, events: list[p.event.Event]):
@@ -597,7 +545,7 @@ class Join_Multi_Menu(Menu):
                 self.manager.change_state("MENU_PLAY")
         self.retour.event(events, coord, "MENU_PLAY")
         for elt in self.list_button:
-            elt[0].event(events, coord, elt[1][0].caractere)
+            elt.event(events, coord, elt.text)
 
     def update(self):
         pass
@@ -606,14 +554,10 @@ class Join_Multi_Menu(Menu):
         self.screen.blit(self.bg_img, self.bg_img_coord)
         if len(self.serveurs) != self.serveurs_save:
             self.serveurs_save = len(self.serveurs)
-            self.eltpages = [self.retour]
-            self.elttexts = [self.retour_t]
             self.create_list_button()
-            for elt in self.list_button:
-                self.eltpages.append(elt[0])
-                self.elttexts.append(elt[1])
+            self.eltpages = self.list_button
+            self.eltpages.append(self.retour)
         self.pagedisplay()
-        self.textdisplay()
         self.declicked_all()
 
 
@@ -657,31 +601,33 @@ class Pause_Menu(Menu):
         # =======================Function Button End=======================
 
         # =======================Button Start=======================
-        self.resume, self.resume_t = create_button_with_text(
+        self.resume = a.Button(
             EMPTY_BUTTON,
             self.screen,
             (self.half[0], self.half[1] - 220),
             resume,
-            "RESUME",
+            text="RESUME",
         )
-        self.save, self.save_t = create_button_with_text(
-            EMPTY_BUTTON, self.screen, (self.half[0], self.half[1] - 70), save, "SAVE"
+        self.save = a.Button(
+            EMPTY_BUTTON,
+            self.screen,
+            (self.half[0], self.half[1] - 70),
+            save,
+            text="SAVE",
         )
-        self.settings, _ = create_button_with_text(
+        self.settings = a.Button(
             SETTING_BUTTON,
             self.screen,
             (self.half[0], self.half[1] + 70),
             settings,
-            "",
-            0.8,
+            button_scale=0.8,
         )
-        self.quit, _ = create_button_with_text(
-            EXIT_BUTTON, self.screen, (self.half[0], self.half[1] + 220), quit
+        self.quit = a.Button(
+            EXIT_BUTTON, self.screen, (self.half[0], self.half[1] + 220), quit, text=""
         )
         # =======================Button End=======================
 
         self.eltpages = [self.resume, self.save, self.settings, self.quit]
-        self.elttexts = [self.resume_t, self.save_t]
 
     def event(self, events: list[p.event.Event]):
         coord = p.mouse.get_pos()
@@ -703,7 +649,6 @@ class Pause_Menu(Menu):
         self.manager.states["GAME"].display()
         self.screen.blit(self.blackscreen, (0, 0))
         self.pagedisplay()
-        self.textdisplay()
         self.declicked_all()
 
 
@@ -723,31 +668,27 @@ class Solo_Menu(Menu):
         # =======================Function Button End=======================
 
         # =======================Button Start=======================
-        _, self.solo_t = create_button_with_text(
+        self.solo = a.Button(
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 10),
             self.no_function,
-            "SOLO",
-            1,
-            100,
+            text="SOLO",
+            text_size=100,
         )
-        self.create, self.create_t = create_button_with_text(
+        self.create = a.Button(
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 70),
             create,
-            "CREATE",
+            text="CREATE",
         )
         self.list_button, self.list_file = self.create_list_save_and_button("solo")
-        self.len_list = len(self.list_button)
         # =======================Button End=======================
 
-        self.eltpages = [self.retour, self.create]
-        self.elttexts = [self.retour_t, self.solo_t, self.create_t]
+        self.eltpages = [self.retour, self.solo, self.create]
         for elt in self.list_button:
-            self.eltpages.append(elt[0])
-            self.elttexts.append(elt[1])
+            self.eltpages.append(elt)
 
     def event(self, events: list[p.event.Event]):
         coord = p.mouse.get_pos()
@@ -756,18 +697,10 @@ class Solo_Menu(Menu):
                 self.manager.running = False
             elif event.type == p.KEYDOWN and event.key == p.K_ESCAPE:
                 self.manager.change_state("MENU_PLAY")
-            if event.type == p.MOUSEBUTTONDOWN:
-                if self.retour.event(events, coord):
-                    self.retour.clicked_function("MENU_PLAY")
-                    """if self.solo.event(events,coord):
-                    self.solo.clicked = True
-                    self.solo.hover = False
-                    self.manager.states["GAME"].playing_mode = "solo"
-                    self.manager.change_state("GAME")
-                    self.manager.state.initialize()"""
+        self.retour.event(events, coord, "MENU_PLAY")
         self.create.event(events, coord)
-        for ind in range(self.len_list):
-            self.list_button[ind][0].event(events, coord, "solo")
+        for elt in self.list_button:
+            elt.event(events, coord, "solo")
 
     def update(self):
         pass
@@ -775,7 +708,6 @@ class Solo_Menu(Menu):
     def display(self):
         self.screen.blit(self.bg_img, self.bg_img_coord)
         self.pagedisplay()
-        self.textdisplay()
         self.declicked_all()
 
 
@@ -787,8 +719,6 @@ class Multiplayer_Menu(Menu):
 
         # =======================Function Button Start=======================
         def create():
-            self.create.clicked = True
-            self.create.hover = False
             self.nbr_file_multi += 1
             self.manager.states["GAME"].playing_mode = "host"
             self.manager.change_state("GAME")
@@ -797,33 +727,29 @@ class Multiplayer_Menu(Menu):
         # =======================Function Button End=======================
 
         # =======================Button Start=======================
-        _, self.multiplayer_t = create_button_with_text(
+        self.multiplayer = a.Button(
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 10),
             self.no_function,
-            "MULTIPLAYER",
-            1,
-            100,
+            text="MULTIPLAYER",
+            text_size=100,
         )
-        self.create, self.create_t = create_button_with_text(
+        self.create = a.Button(
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 70),
             create,
-            "CREATE",
+            text="CREATE",
         )
         self.list_button, self.list_file = self.create_list_save_and_button(
             "multiplayer"
         )
-        self.len_list = len(self.list_button)
         # =======================Button End=======================
 
-        self.eltpages = [self.retour, self.create]
-        self.elttexts = [self.retour_t, self.multiplayer_t, self.create_t]
+        self.eltpages = [self.retour, self.multiplayer, self.create]
         for elt in self.list_button:
-            self.eltpages.append(elt[0])
-            self.elttexts.append(elt[1])
+            self.eltpages.append(elt)
 
     def event(self, events: list[p.event.Event]):
         coord = p.mouse.get_pos()
@@ -834,8 +760,8 @@ class Multiplayer_Menu(Menu):
                 self.manager.change_state("MENU_PLAY")
         self.retour.event(events, coord, "MENU_PLAY")
         self.create.event(events, coord)
-        for ind in range(self.len_list):
-            self.list_button[ind][0].event(events, coord, "multiplayer")
+        for elt in self.list_button:
+            elt.event(events, coord, "multiplayer")
 
     def update(self):
         pass
@@ -843,7 +769,6 @@ class Multiplayer_Menu(Menu):
     def display(self):
         self.screen.blit(self.bg_img, self.bg_img_coord)
         self.pagedisplay()
-        self.textdisplay()
         self.declicked_all()
 
 
@@ -857,28 +782,25 @@ class Death_Screen(Menu):
         # =======================Function Button End=======================
 
         # =======================Button Start=======================
-        _, self.death_t = create_button_with_text(
+        self.death = a.Button(
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2),
             self.no_function,
-            "Game Over",
-            1,
-            150,
+            text="Game Over",
+            text_size=150,
         )
-        _, self.death2_t = create_button_with_text(
+        self.death2 = a.Button(
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 200),
             self.no_function,
-            "Press any keybind to continu",
-            1,
-            50,
+            text="Press any keybind to continu",
+            text_size=50,
         )
         # =======================Button End=======================
 
-        self.elttexts = [self.death_t, self.death2_t]
-        self.eltpages = []
+        self.eltpages = [self.death, self.death2]
 
     def event(self, events: list[p.event.Event]):
         for event in events:
@@ -893,7 +815,7 @@ class Death_Screen(Menu):
     def display(self):
         self.manager.states["GAME"].display()
         self.screen.blit(self.blackscreen, (0, 0))
-        self.textdisplay()
+        self.pagedisplay()
 
 
 def get_all_saves(mode: str) -> List[Dict[str, str]] | List[str]:
