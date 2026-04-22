@@ -1,12 +1,13 @@
 """Module pour la gestion du jeu."""
 
-import pygame
 import time
 import datetime
 import json
 from random import randint
 from typing import Dict, List, Any, Tuple, TYPE_CHECKING
 import os
+
+import pygame
 
 from player import SoloPlayerController, HostController, GuestController
 from network import HostNetwork, GuestNetwork
@@ -155,7 +156,7 @@ class Game:
                 map_data["seed"],
             )
             hub = Hub(self.screen)
-            self.map = MapManager(principal_map, hub)
+            self.map = MapManager(hub=hub, principal_map=principal_map)
 
             # Récupération de la position initiale du guest
             initial = self.network.get_initial_state()
@@ -183,7 +184,7 @@ class Game:
                 self.seed,
             )
             hub = Hub(self.screen)
-            self.map = MapManager(principal_map, hub)
+            self.map = MapManager(hub=hub, principal_map=principal_map)
 
             # -- Controlleur --
             if self.playing_mode == "solo":

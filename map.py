@@ -1,9 +1,11 @@
 "Module pour la carte"
 
-from typing import Tuple, List, Dict
+from typing import Tuple, List, Dict, TYPE_CHECKING
+from abc import ABC, abstractmethod
 from collections.abc import Callable
 from itertools import combinations
 from os import path
+import time
 import math
 import json
 import heapq
@@ -14,6 +16,9 @@ from camera_system import Camera
 import matplotlib.pyplot as plt
 import pygame
 
+if TYPE_CHECKING:
+    from ennemis import Ennemi
+    from moteur import Moteur
 
 REPLACE_VALUE = 0.3
 TILE_SIZE = (32, 32)
@@ -333,7 +338,60 @@ class Chunk:
         return ground_sur
 
 
-class Map:
+class BaseMap(ABC):
+    size: np.ndarray
+    tile_size: np.ndarray
+    screen: pygame.Surface
+    ennemis: Dict[int, Ennemi]
+
+    @abstractmethod
+    def get_nearby_obstacles(self, hitbox: pygame.Rect):
+        """
+        Récupère la matrice de la map du jeu.
+        Analyse une zone de 3x3 tuiles autour de la position
+        centrale du joueur pour optimiser les tests de collision.
+
+        Args:
+            hitbox (pygame.Rect): La hitbox du joueur pour calculer sa position sur la grille.
+        Returns:
+            list[pygame.Rect]: Liste des obstacles à proximité immédiate.
+        """
+        pass
+
+    @abstractmethod
+    def update(self, absolute_position: Tuple[int, int]):
+        """
+        Met à jour les différents éléments d'une carte, charge les chunks
+        si besoin, met à jour les ennemis...
+
+        Args:
+            absolute_position (Tuple[int, int]): La position du joueursur la carte.
+        """
+        pass
+
+    @abstractmethod
+    def get_ennemis(self) -> Dict[int, Ennemi]:
+        """Retourne les ennemis actifs de cette map."""
+        pass
+
+    @abstractmethod
+    def update_ennemis(self, player_hitboxes: List[pygame.Rect], moteur: Moteur):
+        """Met à jour les ennemis et retourne les paths (pour le debug)."""
+        pass
+
+    @abstractmethod
+    def display(self, camera: Camera):
+        """
+        Affiche une les différents éléments appartenant à une carte,
+        et les ennemis...
+
+        Args:
+            camera (Camera): La camera du jeu.
+        """
+        pass
+
+
+class Map(BaseMap):
 
     def __init__(
         self,
@@ -343,6 +401,7 @@ class Map:
         screen: pygame.Surface,
         seed: int | None,
     ):
+        # -- Valeurs initiales --
         self.nb_chunks = np.array(nb_chunks, dtype=np.int32)
         self.chunk_size_tile = np.array(chunk_size, dtype=np.int32)
         self.size = self.nb_chunks * self.chunk_size_tile
@@ -360,12 +419,15 @@ class Map:
         else:
             self.seed = seed
 
+        # -- Création variables spécifique --
         self.map_scale = (0, 1)
         self.map = self.create_map(octaves)
         self.chunks = self.create_chunks()
         self.road_map = np.where(self.map < 0.5, -np.inf, self.map)
         self.structures = []
+        self.loaded_chunks = {}
 
+        # -- Ajout éléments --
         self.add_object_pos("place", 128, 128, 3, occupe=True)
         self.structures.append((128, 128))
         self.add_structure("place", nb=3, z=3, distance=10)
@@ -376,7 +438,8 @@ class Map:
         self.add_objects("bush", prob=0.1, z=0)
         self.add_objects("rock", prob=0.01, z=1)
 
-        self.loaded_chunks = {}
+        # -- Ennemis --
+        self.ennemis = {}
 
     def create_map(
         self,
@@ -671,21 +734,25 @@ class Map:
             if key not in valid:
                 del self.loaded_chunks[key]
 
+    def get_ennemis(self) -> Dict[int, Ennemi]:
+        return self.ennemis
+
+    def update_ennemis(self, player_hitboxes: List[pygame.Rect], moteur: Moteur):
+        # Tout ce qui est actuellement dans Game.update() concernant les ennemis
+        del_key = []
+        for key, ennemi in self.ennemis.items():
+            ennemi.update(*player_hitboxes)
+            if time.time() > ennemi.death_time:
+                del_key.append(key)
+        for key in del_key:
+            del self.ennemis[key]
+
     def update(self, absolute_position: Tuple[int, int]):
 
         self.load_chunks(absolute_position)
 
     def get_nearby_obstacles(self, hitbox: pygame.Rect):
-        """
-        Récupère la matrice de la map du jeu.
-        Analyse une zone de 3x3 tuiles autour de la position
-        centrale du joueur pour optimiser les tests de collision.
 
-        Args:
-            hitbox (pygame.Rect): La hitbox du joueur pour calculer sa position sur la grille.
-        Returns:
-            list[pygame.Rect]: Liste des obstacles à proximité immédiate.
-        """
         nearby_obstacles = []
 
         # Trouver la position du joueur dans la grille
@@ -722,7 +789,7 @@ class Map:
 
             self.screen.blit(self.loaded_chunks[(x, y)], (screen_x, screen_y))
 
-    def render_full_map(self) -> pygame.Surface:
+    def _render_full_map(self) -> pygame.Surface:
         """Génère une surface complète de la map en rendant tous les chunks."""
 
         full_width = self.nb_chunks[0] * self.chunk_size_pix[0]
@@ -752,7 +819,7 @@ class Map:
         plt.show()
 
 
-class Hub:
+class Hub(BaseMap):
 
     def __init__(self, screen: pygame.Surface):
 
@@ -777,7 +844,6 @@ class Hub:
             self.occupied_tiles[rows, cols] = 1
 
         self.image = pygame.image.load(HUB_PATH)
-        self.size = (data["hub"]["width"] * 2, data["hub"]["height"] * 2)
 
     def get_nearby_obstacles(self, hitbox: pygame.Rect):
 
@@ -796,6 +862,12 @@ class Hub:
 
         return nearby_obstacles
 
+    def get_ennemis(self) -> Dict[int, Ennemi]:
+        return {}
+
+    def update_ennemis(self, player_hitboxes: List[pygame.Rect], moteur: Moteur):
+        pass
+
     def update(self, absolute_position: Tuple[int, int]):
 
         pass
@@ -808,21 +880,40 @@ class Hub:
         self.screen.blit(self.image, (screen_x, screen_y))
 
 
-class MapManager:
+class MapManager(BaseMap):
 
-    def __init__(self, principal_map: Map, hub: Hub):
-        self.maps = {
-            "Principale": principal_map,
-            "Hub": hub,
-        }
-        self.map_name = "Hub"
-        self.map = self.maps["Hub"]
-        self.size = self.map.size
-        self.tile_size = self.map.tile_size
+    def __init__(self, **kwarg: BaseMap):
+
+        self.maps = kwarg
+        self.map_name = list(self.maps.keys())[0]
+        self.inizialize_var()
 
     def get_nearby_obstacles(self, hitbox: pygame.Rect):
 
         return self.map.get_nearby_obstacles(hitbox)
+
+    def inizialize_var(self):
+        """
+        Initialise les différentes variables liée à une carte.
+        """
+        self.map = self.maps[self.map_name]
+        self.size = self.map.size
+        self.tile_size = self.map.tile_size
+
+    def change_map(self, name: str):
+        """
+        Change de map en précisant son nom et en vérifant
+        que cette carte existe bien.
+        """
+        assert name in self.maps
+        self.map_name = name
+        self.inizialize_var()
+
+    def get_ennemis(self) -> Dict[int, Ennemi]:
+        return self.map.get_ennemis()
+
+    def update_ennemis(self, player_hitboxes: List[pygame.Rect], moteur: Moteur):
+        self.map.update_ennemis(player_hitboxes, moteur)
 
     def update(self, absolute_position: Tuple[int, int]):
 
