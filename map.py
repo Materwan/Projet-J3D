@@ -342,7 +342,7 @@ class BaseMap(ABC):
     size: np.ndarray
     tile_size: np.ndarray
     screen: pygame.Surface
-    ennemis: Dict[int, Ennemi]
+    ennemis: Dict[int, "Ennemi"]
 
     @abstractmethod
     def get_nearby_obstacles(self, hitbox: pygame.Rect):
@@ -370,12 +370,12 @@ class BaseMap(ABC):
         pass
 
     @abstractmethod
-    def get_ennemis(self) -> Dict[int, Ennemi]:
+    def get_ennemis(self) -> Dict[int, "Ennemi"]:
         """Retourne les ennemis actifs de cette map."""
         pass
 
     @abstractmethod
-    def update_ennemis(self, player_hitboxes: List[pygame.Rect], moteur: Moteur):
+    def update_ennemis(self, player_hitboxes: List[pygame.Rect], moteur: "Moteur"):
         """Met à jour les ennemis et retourne les paths (pour le debug)."""
         pass
 
@@ -734,10 +734,10 @@ class Map(BaseMap):
             if key not in valid:
                 del self.loaded_chunks[key]
 
-    def get_ennemis(self) -> Dict[int, Ennemi]:
+    def get_ennemis(self) -> Dict[int, "Ennemi"]:
         return self.ennemis
 
-    def update_ennemis(self, player_hitboxes: List[pygame.Rect], moteur: Moteur):
+    def update_ennemis(self, player_hitboxes: List[pygame.Rect], moteur: "Moteur"):
         # Tout ce qui est actuellement dans Game.update() concernant les ennemis
         del_key = []
         for key, ennemi in self.ennemis.items():
@@ -862,10 +862,10 @@ class Hub(BaseMap):
 
         return nearby_obstacles
 
-    def get_ennemis(self) -> Dict[int, Ennemi]:
+    def get_ennemis(self) -> Dict[int, "Ennemi"]:
         return {}
 
-    def update_ennemis(self, player_hitboxes: List[pygame.Rect], moteur: Moteur):
+    def update_ennemis(self, player_hitboxes: List[pygame.Rect], moteur: "Moteur"):
         pass
 
     def update(self, absolute_position: Tuple[int, int]):
@@ -909,10 +909,10 @@ class MapManager(BaseMap):
         self.map_name = name
         self.inizialize_var()
 
-    def get_ennemis(self) -> Dict[int, Ennemi]:
+    def get_ennemis(self) -> Dict[int, "Ennemi"]:
         return self.map.get_ennemis()
 
-    def update_ennemis(self, player_hitboxes: List[pygame.Rect], moteur: Moteur):
+    def update_ennemis(self, player_hitboxes: List[pygame.Rect], moteur: "Moteur"):
         self.map.update_ennemis(player_hitboxes, moteur)
 
     def update(self, absolute_position: Tuple[int, int]):
