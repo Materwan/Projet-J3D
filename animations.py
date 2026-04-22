@@ -214,8 +214,8 @@ class Text:
 
         self.text_size = self.rendered.get_size()
         self.display_position = (
-            self.position[0] - self.text_size[0] // 2,
-            self.position[1] - self.text_size[1] // 2,
+            self.center_position[0] - self.text_size[0] // 2,
+            self.center_position[1] - self.text_size[1] // 2,
         )
 
     def draw_text(self):
