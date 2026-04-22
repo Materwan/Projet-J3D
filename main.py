@@ -15,6 +15,7 @@ from menu import (
 )
 from game import Game
 from sound import SoundController
+from cardGame import Game as CardGame
 
 pygame.init()
 pygame.mixer.init()
@@ -56,6 +57,7 @@ class Manager:
             "MENU_SOLO": Solo_Menu(self.screen, self),
             "MENU_MULTIPLAYER": Multiplayer_Menu(self.screen, self),
             "DEATH_SCREEN": Death_Screen(self.screen, self),
+            "CARD_GAME": CardGame(),
         }
         self.state = self.states["MENU_P"]
 

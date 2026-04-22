@@ -97,6 +97,9 @@ class Game:
         self.address = "0.0.0.0"
         self.port = 8888
 
+        # -- Jeu Carte --
+        self._start_card_game = False
+
         # -- Inventaire -- : touche I pour ouvrir et fermer l'inventaire
         largeur, hauteur = self.screen.get_size()
         self.inv_joueur = Inventaire(rows=4, cols=8)
@@ -340,6 +343,8 @@ class Game:
                     self.show_hitbox = not self.show_hitbox
                 elif event.key == pygame.K_i:  # Ouvre inventaire
                     self.ui_joueur.visible = not self.ui_joueur.visible
+                elif event.key == pygame.K_s:
+                    self._start_card_game = True
 
                 # TEMPORAIRE !
                 elif event.key == pygame.K_h:
@@ -401,6 +406,12 @@ class Game:
 
         # -- HUD --
         self.hud.update(self.manager.clock.get_time() / 1000)
+
+        # -- Jeu Carte --
+        if self._start_card_game:
+            self.manager.change_state("CARD_GAME")
+            self.manager.state.network = self.network
+            self._start_card_game = False
 
     def update_ennemis_solo(self):
         del_key = []
