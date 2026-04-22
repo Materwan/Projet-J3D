@@ -22,6 +22,9 @@ if TYPE_CHECKING:
     from main import Manager
 
 INVENTORY_ASSET_DIRECTORY = r"Ressources\InventoryAsset"
+RESPAWN_PV = 2
+SPECTATE_DURATION = 15
+RESPAWN_OFFSET = 50  # l'autre joueur respawn 50 pixel a droite de l'autre
 
 
 def serialize_ennemis(ennemis: Dict[int, Ennemi]) -> Dict[int, Any]:
@@ -95,6 +98,9 @@ class Game:
         # -- Réseau --
         self.address = "0.0.0.0"
         self.port = 8888
+
+        # -- Mort / Spectateur --
+        self.spectate_start: float | None = None
 
         # -- Inventaire -- : touche I pour ouvrir et fermer l'inventaire
         largeur, hauteur = self.screen.get_size()
@@ -219,6 +225,57 @@ class Game:
         # -- Map -- Ne pas oublier de passer la map au moteur !
         self.moteur.map = self.map
 
+    def get_camera_target(self) -> pygame.Rect:
+        """Renvoie la hitbox cible pour la caméra."""
+        if self.player_controller.is_dead:
+            if isinstance(self.player_controller, HostController):
+                return self.player_controller.guest.hitbox
+            if isinstance(self.player_controller, GuestController):
+                return self.player_controller.host.hitbox
+        return self.player_controller.hitbox
+
+    def get_position_target(self) -> pygame.Rect:
+        """Renvoie la position cible pour la map."""
+        if self.player_controller.is_dead:
+            if isinstance(self.player_controller, HostController):
+                return self.player_controller.guest.position
+            if isinstance(self.player_controller, GuestController):
+                return self.player_controller.host.position
+        return self.player_controller.position
+
+    def _handle_death(self):
+        """Gère la mort des joueurs : spectateur 30 s puis respawn, ou écran de mort."""
+        pc = self.player_controller
+
+        if isinstance(pc, SoloPlayerController):
+            if pc.is_dead:
+                self.manager.change_state("DEATH_SCREEN")
+
+        elif isinstance(pc, HostController):
+
+            if pc.is_dead and pc.guest.is_dead:
+                self.spectate_start = None
+                self.manager.change_state("DEATH_SCREEN")
+
+            elif pc.is_dead or pc.guest.is_dead:
+                if self.spectate_start is None:
+                    self.spectate_start = time.time()
+                elif time.time() - self.spectate_start >= SPECTATE_DURATION:
+                    if pc.is_dead:
+                        pc.respawn(
+                            (pc.guest.position.x + RESPAWN_OFFSET, pc.guest.position.y),
+                            RESPAWN_PV,
+                        )
+                    else:
+                        pc.guest.respawn(
+                            (pc.position.x + RESPAWN_OFFSET, pc.position.y), RESPAWN_PV
+                        )
+                    self.spectate_start = None
+
+        elif isinstance(pc, GuestController):
+            if pc.is_dead and pc.host.is_dead:
+                self.manager.change_state("DEATH_SCREEN")
+
     # Réseau
 
     def get_to_send_data_host(self, include_map: bool = False) -> Dict[str, Any]:
@@ -231,10 +288,12 @@ class Game:
                 "moving_intent": hc.moving_intent,
                 "direction": hc.direction,
                 "attaque": hc.animation.current_state == "attack",
+                "is_dead": hc.is_dead,
             },
             "guest": {
                 "position": list(hc.guest.position),
                 "pv": hc.guest.pv,
+                "is_dead": hc.guest.is_dead,
             },
             "ennemis": serialize_ennemis(self.ennemis),
             "close": False,
@@ -283,12 +342,14 @@ class Game:
         if "guest" in data:
             gc.target_pos = pygame.Vector2(data["guest"]["position"])
             gc.pv = data["guest"]["pv"]
+            gc.is_dead = data["guest"]["is_dead"]
 
         if "host" in data:
             gc.host_target_pos = pygame.Vector2(data["host"]["position"])
             gc.host.moving_intent = data["host"]["moving_intent"]
             gc.host.direction = data["host"]["direction"]
             gc.host.attaque = data["host"]["attaque"]
+            gc.host.is_dead = data["host"]["is_dead"]
 
         # Ennemis
         self.update_ennemis_guest(data["ennemis"])
@@ -327,7 +388,10 @@ class Game:
                         self.ui_joueur.visible = False
                     else:  # Pause
                         self.manager.change_state("MENU_PAUSE")
-                elif event.key == self.keybinds["attack"]:  # Attaque
+                elif (
+                    event.key == self.keybinds["attack"]
+                    and not self.player_controller.is_dead
+                ):
                     self.player_controller.attaque = True
                 elif event.key == pygame.K_0:
                     self.save()
@@ -377,11 +441,11 @@ class Game:
                 return
 
         # -- Map --
-        self.map.load_chunks(self.player_controller.position)
+        self.map.load_chunks(self.get_position_target())
 
         # -- Joueur --
         self.player_controller.update(self.ennemis)
-        self.camera.update(self.player_controller.hitbox)
+        self.camera.update(self.get_camera_target())
 
         # -- Ennemis --
         self.paths = [[]]
@@ -397,11 +461,14 @@ class Game:
         # -- HUD --
         self.hud.update(self.manager.clock.get_time() / 1000)
 
+        # -- Mort / Spectateur --
+        self._handle_death()
+
     def update_ennemis_solo(self):
         del_key = []
 
         for key, ennemi in self.ennemis.items():
-            self.paths.append(ennemi.update(self.player_controller.hitbox))
+            self.paths.append(ennemi.update(self.player_controller))
 
             if ennemi.attaque_rect is not None:
                 self.moteur.apply_attack(ennemi.attaque_rect, self.player_controller)
@@ -423,16 +490,18 @@ class Game:
 
         for key, ennemi in self.ennemis.items():
             self.paths.append(
-                ennemi.update(
-                    self.player_controller.hitbox, self.player_controller.guest.hitbox
-                )
+                ennemi.update(self.player_controller, self.player_controller.guest)
             )
 
             if ennemi.attaque_rect is not None:
-                self.moteur.apply_attack(ennemi.attaque_rect, self.player_controller)
-                self.moteur.apply_attack(
-                    ennemi.attaque_rect, self.player_controller.guest
-                )
+                if not self.player_controller.is_dead:
+                    self.moteur.apply_attack(
+                        ennemi.attaque_rect, self.player_controller
+                    )
+                if not self.player_controller.guest.is_dead:
+                    self.moteur.apply_attack(
+                        ennemi.attaque_rect, self.player_controller.guest
+                    )
 
             self.spawn_death_particles(ennemi)
 
@@ -610,32 +679,33 @@ class Game:
 
         # Affichage du chemin jusqu'a l'ennemie
         for path in self.paths:
-            for i in range(len(path) - 1):
-                # print(self.path[i], self.path[i + 1])
-                pygame.draw.line(
-                    self.screen,
-                    (255, 0, 128),
-                    (
-                        path[i][0] * 32
-                        + 16
-                        + self.camera.camera.x
-                        + self.camera.offset_x,
-                        path[i][1] * 32
-                        + 16
-                        + self.camera.camera.y
-                        + self.camera.offset_y,
-                    ),
-                    (
-                        path[i + 1][0] * 32
-                        + 16
-                        + self.camera.camera.x
-                        + self.camera.offset_x,
-                        path[i + 1][1] * 32
-                        + 16
-                        + self.camera.camera.y
-                        + self.camera.offset_y,
-                    ),
-                )
+            if path != None:
+                for i in range(len(path) - 1):
+                    # print(self.path[i], self.path[i + 1])
+                    pygame.draw.line(
+                        self.screen,
+                        (255, 0, 128),
+                        (
+                            path[i][0] * 32
+                            + 16
+                            + self.camera.camera.x
+                            + self.camera.offset_x,
+                            path[i][1] * 32
+                            + 16
+                            + self.camera.camera.y
+                            + self.camera.offset_y,
+                        ),
+                        (
+                            path[i + 1][0] * 32
+                            + 16
+                            + self.camera.camera.x
+                            + self.camera.offset_x,
+                            path[i + 1][1] * 32
+                            + 16
+                            + self.camera.camera.y
+                            + self.camera.offset_y,
+                        ),
+                    )
 
     # Sauvegarde et reset
 

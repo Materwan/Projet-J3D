@@ -9,6 +9,8 @@ from animations import AnimationController
 
 
 SPEED = 3
+MAX_PV = 10
+PV = 3
 
 
 class PlayerControllerBase:
@@ -48,8 +50,8 @@ class PlayerControllerBase:
         self.moving_intent = False
 
         # -- PV --
-        self.max_pv = 10
-        self.pv = 10
+        self.max_pv = MAX_PV
+        self.pv = PV
 
         # -- Invincibilité --
         self.last_hit = 0.0
@@ -57,7 +59,6 @@ class PlayerControllerBase:
 
         # -- Mort --
         self.is_dead = False
-        self.death_time: float | None = None
 
         # -- Attaque --
         self.attaque = False
@@ -74,14 +75,14 @@ class PlayerControllerBase:
 
             if self.pv <= 0 and not self.is_dead:
                 self.is_dead = True
-                self.death_time = time.time()
 
     def respawn(self, position: Tuple[int, int], pv: int):
         """Réinitialise le joueur à une position donnée avec des PV réduits."""
         self.is_dead = False
-        self.death_time = None
         self.pv = pv
         self.position.update(position)
+        self.hitbox.center = self.position
+        self.hitbox_damage.midbottom = self.position
 
     def event(self, keys: Tuple[bool]):
         """Détermine le vecteur de mouvement à partir des entrées clavier."""

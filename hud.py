@@ -67,7 +67,7 @@ class HUD:
                     size=7,
                 )
             if new_pv == 0:
-                self.camera.start_shake(intensity=50, duration=50)
+                self.camera.start_shake(intensity=30, duration=100)
             else:
                 self.camera.start_shake(intensity=10, duration=10)
 

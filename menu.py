@@ -1097,10 +1097,17 @@ class Death_Screen(Menu):
             if event.type == p.QUIT:
                 self.manager.running = False
             if event.type == p.KEYDOWN or event.type == p.MOUSEBUTTONDOWN:
+                # TEMPO car il faudra envoyer vers le HUB
+                if isinstance(
+                    self.manager.states["GAME"].player_controller, GuestController
+                ):
+                    self.manager.states["GAME"]._send_close_and_disconnect()
+                self.manager.states["GAME"].close_network()
+                self.manager.states["GAME"].reset()
                 self.manager.change_state("MENU_P")
 
     def update(self) -> None:
-        pass
+        self.manager.states["GAME"].update()
 
     def display(self) -> None:
         self.manager.states["GAME"].display()
