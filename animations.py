@@ -166,7 +166,7 @@ class Text:
         self,
         to_display_text: str,
         screen: pygame.Surface,
-        position: str,
+        position: Tuple[int, int],
         font_name: str | None = "Impact",
         font_size: int | None = 30,
         font_color: Tuple[int, int, int] | str | None = (0, 0, 0),
