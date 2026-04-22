@@ -1,6 +1,6 @@
 "Module pour la carte"
 
-from typing import Tuple, List, Dict, TYPE_CHECKING
+from typing import Tuple, List, Dict, Any, TYPE_CHECKING
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from itertools import combinations
@@ -22,9 +22,8 @@ if TYPE_CHECKING:
 
 REPLACE_VALUE = 0.3
 TILE_SIZE = (32, 32)
-ASSET_DIRECTORY = r"Ressources\TileSet"
-TILESET_DIRECTORY = r"Ressources\tileset"
-HUB_PATH = r"Ressources\HUB.png"
+TILESET_DIRECTORY = r"Ressources\TileSet"
+TILEMAP_DIRECTORY = r"Ressources\TileMap"
 
 
 def load_assets(file: str, asset_folder: str, tile_size: Tuple[int, int]):
@@ -341,8 +340,10 @@ class Chunk:
 class BaseMap(ABC):
     size: np.ndarray
     tile_size: np.ndarray
+    action_tiles: List[Dict[str, Any]]
     screen: pygame.Surface
     ennemis: Dict[int, "Ennemi"]
+    _action_registry: Dict[str, Callable]
 
     @abstractmethod
     def get_nearby_obstacles(self, hitbox: pygame.Rect):
@@ -359,6 +360,21 @@ class BaseMap(ABC):
         pass
 
     @abstractmethod
+    def _register_actions(self):
+        """Chaque sous-classe enregistre ses actions ici."""
+        pass
+
+    def register(self, name: str, func: Callable):
+        """
+        Définit une fonction associé à un nom.
+
+        Args:
+            name (str): le nom associé à la fonction.
+            func (Callable): la fonction associé.
+        """
+        self._action_registry[name] = func
+
+    @abstractmethod
     def update(self, absolute_position: Tuple[int, int]):
         """
         Met à jour les différents éléments d'une carte, charge les chunks
@@ -373,6 +389,18 @@ class BaseMap(ABC):
     def get_ennemis(self) -> Dict[int, "Ennemi"]:
         """Retourne les ennemis actifs de cette map."""
         pass
+
+    def check_action_tiles(self, absolute_position: Tuple[int, int]) -> str | None:
+        tile_x = absolute_position[0] // self.tile_size[0]
+        tile_y = absolute_position[1] // self.tile_size[1]
+
+        for tile in self.action_tiles:
+            if tile["x"] == tile_x and tile["y"] == tile_y:
+                action = self._action_registry.get(tile["action"])
+                if action:
+                    print(tile.get("params", {}))
+                    return action(**tile.get("params", {}))
+        return None
 
     @abstractmethod
     def update_ennemis(self, player_hitboxes: List[pygame.Rect], moteur: "Moteur"):
@@ -409,8 +437,8 @@ class Map(BaseMap):
         self.tile_size = np.array(TILE_SIZE, dtype=np.int32)
         self.chunk_size_pix = self.chunk_size_tile * self.tile_size
         self.asset = load_assets(
-            path.join(ASSET_DIRECTORY, "tile_data.json"),
-            ASSET_DIRECTORY,
+            path.join(TILESET_DIRECTORY, "tile_data.json"),
+            TILESET_DIRECTORY,
             self.tile_size,
         )
         self.screen = screen
@@ -440,6 +468,9 @@ class Map(BaseMap):
 
         # -- Ennemis --
         self.ennemis = {}
+
+    def _register_actions(self):
+        pass
 
     def create_map(
         self,
@@ -825,7 +856,7 @@ class Hub(BaseMap):
 
         self.screen = screen
 
-        with open(path.join(TILESET_DIRECTORY, "tileset_data.json"), "r") as file:
+        with open(path.join(TILEMAP_DIRECTORY, "tilemap_data.json"), "r") as file:
 
             data = json.loads(file.read())
 
@@ -843,7 +874,18 @@ class Hub(BaseMap):
             rows, cols = zip(*data["hub"]["occupied_tiles"])
             self.occupied_tiles[rows, cols] = 1
 
-        self.image = pygame.image.load(HUB_PATH)
+            self.action_tiles: List[Dict[str, Any]] = data["hub"]["action_tiles"]
+
+        self.image = pygame.image.load(path.join(TILEMAP_DIRECTORY, "hub.png"))
+
+        self._register_actions()
+
+    def change_map(self, map_name: str):
+        return map_name
+
+    def _register_actions(self):
+        self._action_registry = {}
+        self.register("change_map", self.change_map)
 
     def get_nearby_obstacles(self, hitbox: pygame.Rect):
 
@@ -870,7 +912,27 @@ class Hub(BaseMap):
 
     def update(self, absolute_position: Tuple[int, int]):
 
-        pass
+        return self.check_action_tiles(absolute_position)
+
+    def display_tiles(self, camera: Camera):
+
+        screen_x = camera.camera.x + camera.offset_x
+        screen_y = camera.camera.y + camera.offset_y
+
+        for x in range((self.size // self.tile_size)[0]):
+            pygame.draw.line(
+                self.screen,
+                (255, 0, 0),
+                (x * self.tile_size[0] + screen_x, screen_y),
+                (x * self.tile_size[0] + screen_x, self.size[1] + screen_y),
+            )
+        for y in range((self.size // self.tile_size)[1]):
+            pygame.draw.line(
+                self.screen,
+                (255, 0, 0),
+                (screen_x, y * self.tile_size[1] + screen_y),
+                (self.size[0] + screen_x, y * self.tile_size[1] + screen_y),
+            )
 
     def display(self, camera: Camera):
 
@@ -887,6 +949,9 @@ class MapManager(BaseMap):
         self.maps = kwarg
         self.map_name = list(self.maps.keys())[0]
         self.inizialize_var()
+
+    def _register_actions(self):
+        pass
 
     def get_nearby_obstacles(self, hitbox: pygame.Rect):
 
@@ -917,11 +982,16 @@ class MapManager(BaseMap):
 
     def update(self, absolute_position: Tuple[int, int]):
 
-        self.map.update(absolute_position)
+        new_map = self.map.update(absolute_position)
+
+        if new_map:
+            self.change_map(new_map)
 
     def display(self, camera: Camera):
 
         self.map.display(camera)
+        if isinstance(self.map, Hub):
+            self.map.display_tiles(camera)
 
 
 if __name__ == "__main__":
