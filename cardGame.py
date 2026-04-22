@@ -3,13 +3,6 @@ from typing import Tuple, List
 from menu import Text
 from random import shuffle
 
-# Name : (Type, Artwork)
-CARD_LIST = {
-    "Dmg2": ("Spell", "Ressources/Cartes/PlaceHolderSpell.png"),
-    "HpUp3": ("Equip", "Ressources/Cartes/PlaceHolderEquip.png"),
-}
-
-
 class Card:
     def __init__(self, screen: pygame.surface.Surface, name: str):
         self.name = name
@@ -168,12 +161,47 @@ class SpellZone:
         self.cards = []
         self.size = 0
 
+    def add2SZ(self, card: Card):
+        if card:
+            print("add2Hand")
+            print(card)
+            print(type(card))
+            print(self)
+            self.cards.append(card)
+            self.size += 1
+            print(self, "\n")
+        else:
+            print("No card")
+
+    def rmFromSZ(self, index: int):
+        if 0 <= index < self.size:
+            self.size -= 1
+            return self.cards.pop(index)
+        return None
+    
 
 class EquipZone:
     def __init__(self):
         self.cards = []
         self.size = 0
+    
+    def add2EZ(self, card: Card):
+        if card:
+            print("add2Hand")
+            print(card)
+            print(type(card))
+            print(self)
+            self.cards.append(card)
+            self.size += 1
+            print(self, "\n")
+        else:
+            print("No card")
 
+    def rmFromEZ(self, index: int):
+        if 0 <= index < self.size:
+            self.size -= 1
+            return self.cards.pop(index)
+        return None
 class PlayerCard:
     def __init__(
         self,
@@ -247,6 +275,28 @@ class PlayerCard:
             self.screen.blit(
                 self.bigArtWork, (self.screenSize[0] / 1.55, self.screenSize[0] / 8)
             )
+
+
+def dealDamage(receiver : PlayerCard, dmg : int):
+    receiver.hp -= dmg
+
+def healDamage(receiver : PlayerCard, heal : int):
+    receiver.hp += heal
+    if (receiver.hp > receiver.maxHp):
+        receiver.hp = receiver.maxHp
+
+def increasemaxHP(receiver : PlayerCard, increase : int):
+    receiver.maxHp += increase
+    healDamage(receiver, increase)
+
+# Name : (Type, Artwork, Effect, Value)
+CARD_LIST = {
+    "Dmg2": {"Type" : "Spell", "Artwork" : "Ressources/Cartes/PlaceHolderSpell.png", "Effect" : dealDamage, "Value" : 2},
+    "HpUp3": {"Type" : "Equip", "Artwork" : "Ressources/Cartes/PlaceHolderEquip.png", "Effect" : increasemaxHP, "Value" : 3},
+}
+
+
+
 
 class Game:
     def __init__(
