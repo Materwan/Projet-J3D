@@ -693,7 +693,7 @@ class Game:
             name="Sac du joueur",
             inv=self.inv_joueur,
             pos=((largeur - 486) // 2, hauteur - 293),
-            image_path="Ressources/inv_assets/chest.png",
+            image_path=os.path.join(INVENTORY_ASSET_DIRECTORY, "chest.png"),
             slot_size=52,
             slot_margin=4,
             padding=21,
