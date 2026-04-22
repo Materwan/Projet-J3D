@@ -179,7 +179,7 @@ class Text:
         self.font_size = font_size
         self.font_color = font_color
         self.antialias = antialias
-
+        print(self.font_name, self.font_size)
         self.font = pygame.font.SysFont(self.font_name, self.font_size)
         self.rendered = self.font.render(
             self.to_display_text, self.antialias, self.font_color
@@ -202,7 +202,7 @@ class Text:
     ):
         self.to_display_text = text if text else self.to_display_text
         self.center_position = position if position else self.center_position
-        self.font = font if font else self.font
+        self.font_name = font if font else self.font_name
         self.font_size = size if size else self.font_size
         self.font_color = color if color else self.font_color
         self.antialias = antialias if antialias else self.antialias
@@ -309,6 +309,7 @@ class Button:
         if text:
             self.text = Text(
                 text,
+                self.screen,
                 (
                     self.display_pos[0] + text_position[0],
                     self.display_pos[1] + text_position[1],
@@ -316,7 +317,6 @@ class Button:
                 text_font,
                 text_size,
                 text_color,
-                self.screen,
                 text_antialias,
             )
         else:
