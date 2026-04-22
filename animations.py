@@ -165,11 +165,11 @@ class Text:
     def __init__(
         self,
         to_display_text: str,
+        screen: pygame.Surface,
         position: str,
         font_name: str | None = "Impact",
         font_size: int | None = 30,
         font_color: Tuple[int, int, int] | str | None = (0, 0, 0),
-        screen: pygame.Surface = None,
         antialias: bool = False,
     ):
         self.screen = screen
