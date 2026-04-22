@@ -179,7 +179,7 @@ class Text:
         self.font_size = font_size
         self.font_color = font_color
         self.antialias = antialias
-        print(self.font_name, self.font_size)
+
         self.font = pygame.font.SysFont(self.font_name, self.font_size)
         self.rendered = self.font.render(
             self.to_display_text, self.antialias, self.font_color
