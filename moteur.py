@@ -1,5 +1,5 @@
 import pygame
-from map import Map
+from map import MapManager
 from typing import List, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 class Moteur:
     def __init__(self):
-        self.map: Map = None
+        self.map: MapManager = None
 
         # Configuration : { "direction": (decalage_x, decalage_y, largeur, hauteur) }
         self.attaque_config = {

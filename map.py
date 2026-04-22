@@ -19,6 +19,7 @@ import pygame
 if TYPE_CHECKING:
     from ennemis import Ennemi
     from moteur import Moteur
+    from game import Game
 
 REPLACE_VALUE = 0.3
 TILE_SIZE = (32, 32)
@@ -339,6 +340,7 @@ class Chunk:
 
 class BaseMap(ABC):
     size: np.ndarray
+    start_position: Tuple[int, int] | None
     tile_size: np.ndarray
     action_tiles: List[Dict[str, Any]]
     screen: pygame.Surface
@@ -375,7 +377,7 @@ class BaseMap(ABC):
         self._action_registry[name] = func
 
     @abstractmethod
-    def update(self, absolute_position: Tuple[int, int]):
+    def update(self, absolute_position: Tuple[int, int]) -> Any | str:
         """
         Met à jour les différents éléments d'une carte, charge les chunks
         si besoin, met à jour les ennemis...
@@ -390,7 +392,7 @@ class BaseMap(ABC):
         """Retourne les ennemis actifs de cette map."""
         pass
 
-    def check_action_tiles(self, absolute_position: Tuple[int, int]) -> str | None:
+    def check_action_tiles(self, absolute_position: Tuple[int, int]) -> Any | None:
         tile_x = absolute_position[0] // self.tile_size[0]
         tile_y = absolute_position[1] // self.tile_size[1]
 
@@ -398,7 +400,6 @@ class BaseMap(ABC):
             if tile["x"] == tile_x and tile["y"] == tile_y:
                 action = self._action_registry.get(tile["action"])
                 if action:
-                    print(tile.get("params", {}))
                     return action(**tile.get("params", {}))
         return None
 
@@ -435,6 +436,7 @@ class Map(BaseMap):
         self.size = self.nb_chunks * self.chunk_size_tile
         self.octaves = octaves
         self.tile_size = np.array(TILE_SIZE, dtype=np.int32)
+        self.start_position = (self.size * self.tile_size // 2).tolist()
         self.chunk_size_pix = self.chunk_size_tile * self.tile_size
         self.asset = load_assets(
             path.join(TILESET_DIRECTORY, "tile_data.json"),
@@ -778,7 +780,7 @@ class Map(BaseMap):
         for key in del_key:
             del self.ennemis[key]
 
-    def update(self, absolute_position: Tuple[int, int]):
+    def update(self, absolute_position: Tuple[int, int]) -> None:
 
         self.load_chunks(absolute_position)
 
@@ -864,6 +866,7 @@ class Hub(BaseMap):
             self.size = np.array(
                 (data["hub"]["width"], data["hub"]["height"]), dtype=np.int32
             )
+            self.start_position = (self.size // 2).tolist()
             self.size_in_tile = self.size // self.tile_size
 
             self.collision_tiles = np.zeros(shape=(self.size // self.tile_size))
@@ -880,12 +883,12 @@ class Hub(BaseMap):
 
         self._register_actions()
 
-    def change_map(self, map_name: str):
-        return map_name
+    def _change_map(self, **map_name: str):
+        return map_name["target"]
 
     def _register_actions(self):
         self._action_registry = {}
-        self.register("change_map", self.change_map)
+        self.register("change_map", self._change_map)
 
     def get_nearby_obstacles(self, hitbox: pygame.Rect):
 
@@ -910,7 +913,7 @@ class Hub(BaseMap):
     def update_ennemis(self, player_hitboxes: List[pygame.Rect], moteur: "Moteur"):
         pass
 
-    def update(self, absolute_position: Tuple[int, int]):
+    def update(self, absolute_position: Tuple[int, int]) -> str | None:
 
         return self.check_action_tiles(absolute_position)
 
@@ -944,11 +947,13 @@ class Hub(BaseMap):
 
 class MapManager(BaseMap):
 
-    def __init__(self, **kwarg: BaseMap):
+    def __init__(self, game: "Game", **kwarg: BaseMap):
 
         self.maps = kwarg
         self.map_name = list(self.maps.keys())[0]
         self.inizialize_var()
+
+        self.game = game
 
     def _register_actions(self):
         pass
@@ -970,9 +975,13 @@ class MapManager(BaseMap):
         Change de map en précisant son nom et en vérifant
         que cette carte existe bien.
         """
-        assert name in self.maps
+        if name not in self.maps:
+            raise AttributeError(
+                f"La map '{name}' n'est pas dans la liste des map : {list(self.maps.keys())}"
+            )
         self.map_name = name
         self.inizialize_var()
+        self.game._change_map(self.map.start_position)
 
     def get_ennemis(self) -> Dict[int, "Ennemi"]:
         return self.map.get_ennemis()

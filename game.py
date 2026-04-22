@@ -79,7 +79,7 @@ class Game:
         self.show_hitbox = False
 
         # -- Map --
-        self.map: Map = None
+        self.map: MapManager = None
         self.nb_chunks = (8, 8)
         self.chunk_size = (32, 32)
         self.octaves = (8, 8)
@@ -156,7 +156,7 @@ class Game:
                 map_data["seed"],
             )
             hub = Hub(self.screen)
-            self.map = MapManager(hub=hub, principal_map=principal_map)
+            self.map = MapManager(self, hub=hub, principal_map=principal_map)
 
             # Récupération de la position initiale du guest
             initial = self.network.get_initial_state()
@@ -184,7 +184,7 @@ class Game:
                 self.seed,
             )
             hub = Hub(self.screen)
-            self.map = MapManager(hub=hub, principal_map=principal_map)
+            self.map = MapManager(self, hub=hub, principal_map=principal_map)
 
             # -- Controlleur --
             if self.playing_mode == "solo":
@@ -401,6 +401,10 @@ class Game:
 
         # -- HUD --
         self.hud.update(self.manager.clock.get_time() / 1000)
+
+    def _change_map(self, new_position: Tuple[int, int]):
+        self.player_controller.position = new_position
+        self.player_controller.hitbox.center = new_position
 
     def update_ennemis_solo(self):
         del_key = []
@@ -672,7 +676,7 @@ class Game:
         self.show_hitbox = False
 
         # -- Map --
-        self.map: Map = None
+        self.map: MapManager = None
         self.nb_chunks = (8, 8)
         self.chunk_size = (32, 32)
         self.octaves = (8, 8)
