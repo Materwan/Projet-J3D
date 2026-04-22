@@ -1,14 +1,15 @@
 """Module pour la gestion du jeu."""
 
+import pygame
 import time
+import datetime
+import json
 from random import randint
 from typing import Dict, List, Any, Tuple, TYPE_CHECKING
-import json
-import datetime
-
-import pygame
+import os
 
 from player import SoloPlayerController, HostController, GuestController
+from network import HostNetwork, GuestNetwork
 from moteur import Moteur
 from map import Map
 from camera_system import Camera
@@ -19,6 +20,8 @@ from particule import spawn_local_particle
 
 if TYPE_CHECKING:
     from main import Manager
+
+INVENTORY_ASSET_DIRECTORY = r"Ressources\InventoryAsset"
 
 
 def serialize_ennemis(ennemis: Dict[int, Ennemi]) -> Dict[int, Any]:
@@ -45,8 +48,11 @@ class Game:
         self.clock = pygame.time.Clock()
         self.screen = screen
         self.manager = manager
-        self.playing_mode = None
-        self.player_controller = None
+        self.playing_mode: str = None
+        self.player_controller: (
+            SoloPlayerController | HostController | GuestController | None
+        ) = None
+        self.network: HostNetwork | GuestNetwork | None = None
         self.game_name = "tt"
 
         # -- Raccourcis --
@@ -98,7 +104,7 @@ class Game:
             name="Sac du joueur",
             inv=self.inv_joueur,
             pos=((largeur - 486) // 2, hauteur - 293),
-            image_path="Ressources/inv_assets/chest.png",
+            image_path=os.path.join(INVENTORY_ASSET_DIRECTORY, "chest.png"),
             slot_size=52,
             slot_margin=4,
             padding=21,
@@ -112,15 +118,15 @@ class Game:
         self.inv_joueur.add_item(Item.create("Potion Rouge", 3))
 
     def _on_use(self, item: Item, slot: Tuple[int, int], ui: InventaireUI):
-        """Appelé au clic droit sur un consommable."""
+        """Inventaire : Appelé au clic droit sur un consommable."""
 
         if item.item_type == "Consommable" and item.effect is not None:
             ui.inv.remove_item(slot[0], slot[1], 1)
             print(f"You've suck dry your potion : {item.effect:+d} PV")
-            # self.player_controller.player.hp += item.effect par exemple
+            # self.player_controller.pv += item.effect par exemple
 
     def initialize(self):
-        """Initialise le moteur, le controlleur à utiliser, les keybinds et la camera."""
+        """Initialise le moteur, la map, le contrôleur et le réseau."""
 
         # -- Moteur --
         self.moteur = Moteur()
@@ -128,29 +134,42 @@ class Game:
         # -- Client --
         if self.playing_mode == "guest":
 
-            # -- Controlleur --
-            self.player_controller = GuestController(
-                self.screen, self.moteur, self.map, self.address, self.port
+            # Réseau : connexion à l'hôte
+            self.network = GuestNetwork(self.address, self.port)
+            self.network.start()
+
+            while not self.network.is_loaded():
+                time.sleep(0.2)
+
+            if self.network.is_closed():
+                self.manager.change_state("MENU_MULTI")
+                return
+
+            # Récupération de la map envoyée par l'hôte
+            map_data = self.network.get_map_data()
+            self.map = Map(
+                map_data["nb_chunks"],
+                map_data["chunk_size"],
+                map_data["octaves"],
+                self.screen,
+                map_data["seed"],
             )
 
-            # -- Camera --
-            self.player_controller.camera = self.camera
-            self.player_controller.host.camera = self.camera
+            # Récupération de la position initiale du guest
+            initial = self.network.get_initial_state()
+            guest_start = tuple(initial.get("guest", {}).get("position", (0, 0)))
+            host_start = tuple(initial.get("host", {}).get("position", (0, 0)))
 
-            # -- Connexion host --
-            while not self.player_controller.loaded:
-                time.sleep(0.2)
-            if self.player_controller.close:
-                self.manager.state = self.manager.states["MENU_MULTI"]
-            else:
+            self.player_controller = GuestController(
+                self.screen, self.camera, self.moteur, guest_start
+            )
 
-                # -- Map --
-                self.map = self.player_controller.map  # recupere la map de client
-                self.moteur.map = (
-                    self.map
-                )  # donner à moteur pour Client-side prediction
+            # Position initiale du host répliqué
+            self.player_controller.host.position.update(host_start)
+            self.player_controller.host.hitbox.center = host_start
+            self.player_controller.host.hitbox_damage.midbottom = host_start
 
-        # -- Hote / Solo --
+        # ── Solo / Host ────────────────────────────────────────────────
         else:
 
             # -- Map --
@@ -165,20 +184,20 @@ class Game:
             # -- Controlleur --
             if self.playing_mode == "solo":
                 self.player_controller = SoloPlayerController(
-                    self.screen, self.moteur, self.map, (4096, 4096)
+                    self.screen, self.camera, self.moteur, (4096, 4096)
                 )
-                # -- Camera --
-                self.player_controller.camera = self.camera
 
             elif self.playing_mode == "host":
                 self.player_controller = HostController(
-                    self.screen, self.moteur, self.map, (4000, 4096)
+                    self.screen, self.camera, self.moteur, (4000, 4096)
                 )
-                # -- Camera --
-                self.player_controller.camera = self.camera
-                self.player_controller.guest.camera = self.camera
 
-            # -- Ennemis --
+                # Réseau : construction de l'état initial avec la map
+                initial_state = self.get_to_send_data_host(include_map=True)
+                self.network = HostNetwork(self.port)
+                self.network.start(initial_state)
+
+            # -- Ennemis (pour test) --
             ennemi = Ennemi(
                 self.screen, (3500, 3500), 1, 32, self.map, self.camera, self.moteur
             )
@@ -196,6 +215,104 @@ class Game:
         self.hud.player_controller = self.player_controller
         self.hud.max_pv = self.player_controller.max_pv
         self.hud.pv = self.player_controller.pv
+
+        # -- Map -- Ne pas oublier de passer la map au moteur !
+        self.moteur.map = self.map
+
+    # Réseau
+
+    def get_to_send_data_host(self, include_map: bool = False) -> Dict[str, Any]:
+        """Construit le dictionnaire d'état envoyé par l'hôte au guest."""
+        hc = self.player_controller  # hc pour HostController
+
+        dic: Dict[str, Any] = {
+            "host": {
+                "position": list(hc.position),
+                "moving_intent": hc.moving_intent,
+                "direction": hc.direction,
+                "attaque": hc.animation.current_state == "attack",
+            },
+            "guest": {
+                "position": list(hc.guest.position),
+                "pv": hc.guest.pv,
+            },
+            "ennemis": serialize_ennemis(self.ennemis),
+            "close": False,
+        }
+
+        if include_map:
+            dic["map"] = {
+                "nb_chunks": self.map.nb_chunks.tolist(),
+                "chunk_size": self.map.chunk_size_tile.tolist(),
+                "octaves": self.map.octaves,
+                "seed": self.map.seed,
+            }
+
+        return dic
+
+    def get_to_send_data_guest(self) -> Dict[str, Any]:
+        """Construit le dictionnaire d'état envoyé par le guest à l'hôte."""
+        gc = self.player_controller  # gc pour GuestController
+
+        return {
+            "guest": {
+                "velocity": list(gc.velocity),
+                "moving_intent": gc.moving_intent,
+                "attaque": gc.animation.current_state == "attack",
+            },
+            "close": False,
+        }
+
+    def update_variables_host(self, data: Dict[str, Any]):
+        """Applique les données reçues du guest sur le HostController."""
+        if not data:
+            return
+        hc = self.player_controller  # hc pour HostController
+
+        if "guest" in data:
+            hc.guest.velocity = self.moteur.verif_velocity(data["guest"]["velocity"])
+            hc.guest.moving_intent = data["guest"]["moving_intent"]
+            hc.guest.attaque = data["guest"]["attaque"]
+
+    def update_variables_guest(self, data: Dict[str, Any]):
+        """Applique les données reçues de l'hôte sur le GuestController."""
+        if not data:
+            return
+        gc = self.player_controller  # gc pour GuestController
+
+        if "guest" in data:
+            gc.target_pos = pygame.Vector2(data["guest"]["position"])
+            gc.pv = data["guest"]["pv"]
+
+        if "host" in data:
+            gc.host_target_pos = pygame.Vector2(data["host"]["position"])
+            gc.host.moving_intent = data["host"]["moving_intent"]
+            gc.host.direction = data["host"]["direction"]
+            gc.host.attaque = data["host"]["attaque"]
+
+        # Ennemis
+        self.update_ennemis_guest(data["ennemis"])
+
+    def _send_close_and_disconnect(self):
+        """
+        Permet au guest l'envoie d'un paquet {"close": True} à l'host pour signaler
+        une déconnexion propre, évitant que l'host attende le timeout de 2 secondes.
+        """
+        if self.network is not None:
+            self.network.request_close()
+
+    def close_network(self):
+        """
+        Coupe proprement la connexion réseau et libère la référence."""
+        if self.network is not None:
+            try:
+                self.network.close()
+            except Exception:
+                pass
+            finally:
+                self.network = None
+
+    # Game basic
 
     def event(self, events: List[pygame.event.Event]) -> bool:
         """Gére les entré de l'utilisateur."""
@@ -230,131 +347,158 @@ class Game:
     def update(self):
         """Met à jour le jeu."""
 
+        # -- Réseau --
+        if self.network is not None:
+
+            if isinstance(self.player_controller, HostController):
+
+                self.update_variables_host(
+                    self.network.update(self.get_to_send_data_host())
+                )
+
+            elif isinstance(self.player_controller, GuestController):
+                self.update_variables_guest(
+                    self.network.update(self.get_to_send_data_guest())
+                )
+
+            # Host : si le guest s'est déconnecté on remet en écoute
+            if (
+                isinstance(self.network, HostNetwork)
+                and self.network.is_guest_disconnected()
+            ):
+                print("[Host] Guest déconnecté — remise en écoute")
+                self.network.restart_listening()
+
+            # Si l'hôte quitte alors fermeture totale
+            elif self.network.is_closed():
+                self.close_network()
+                self.reset()
+                self.manager.change_state("MENU_P")
+                return
+
+        # -- Map --
+        self.map.load_chunks(self.player_controller.position)
+
         # -- Joueur --
         self.player_controller.update(self.ennemis)
         self.camera.update(self.player_controller.hitbox)
 
         # -- Ennemis --
         self.paths = [[]]
-
         if isinstance(self.player_controller, SoloPlayerController):
-            # -- Solo --
-            del_key = []
-            for key, ennemi in self.ennemis.items():
-                self.paths.append(
-                    ennemi.update(
-                        self.player_controller.hitbox,
-                    )
-                )
-                if ennemi.attaque_rect is not None:
-                    self.moteur.apply_attack(
-                        ennemi.attaque_rect, self.player_controller
-                    )
-                if ennemi.dying and not ennemi.particles_spawned:
-                    ennemi.particles_spawned = True
-                    for _ in range(50):
-                        spawn_local_particle(
-                            self.particles,
-                            ennemi.position.tolist(),
-                            r"Ressources\particles\dust.png",
-                            speed_range=(50, 150),
-                            shrink_range=(20, 60),
-                        )
-                if time.time() > ennemi.death_time:
-                    del_key.append(key)
-            for key in del_key:
-                del self.ennemis[key]
-
-            if self.player_controller.attaque_rect is not None:
-                for ennemi in self.ennemis.values():
-                    self.moteur.apply_attack(
-                        self.player_controller.attaque_rect, ennemi
-                    )
-
+            self.update_ennemis_solo()
         elif isinstance(self.player_controller, HostController):
-            # -- Host --
-            del_key = []
-            for key, ennemi in self.ennemis.items():
-                self.paths.append(
-                    ennemi.update(
-                        self.player_controller.hitbox,
-                        self.player_controller.guest.hitbox,
-                    )
-                )
-                if ennemi.attaque_rect is not None:
-                    self.moteur.apply_attack(
-                        ennemi.attaque_rect, self.player_controller
-                    )
-                    self.moteur.apply_attack(
-                        ennemi.attaque_rect, self.player_controller.guest
-                    )
-                if ennemi.dying and not ennemi.particles_spawned:
-                    ennemi.particles_spawned = True
-                    for _ in range(50):
-                        spawn_local_particle(
-                            self.particles,
-                            ennemi.position.tolist(),
-                            r"Ressources\particles\dust.png",
-                            speed_range=(50, 150),
-                            shrink_range=(20, 60),
-                        )
-                if time.time() > ennemi.death_time:
-                    del_key.append(key)
-            for key in del_key:
-                del self.ennemis[key]
-            self.player_controller.ennemis_data = serialize_ennemis(self.ennemis)
-
-            if self.player_controller.attaque_rect is not None:
-                for ennemi in self.ennemis.values():
-                    self.moteur.apply_attack(
-                        self.player_controller.attaque_rect, ennemi
-                    )
-
-            if self.player_controller.guest.attaque_rect is not None:
-                for ennemi in self.ennemis.values():
-                    self.moteur.apply_attack(
-                        self.player_controller.guest.attaque_rect, ennemi
-                    )
-
-        elif isinstance(self.player_controller, GuestController):
-            # -- Guest --
-            del_key = []
-            for key, ennemi in self.player_controller.ennemis_data.items():
-                if not key in self.ennemis_id:
-                    if ennemi["dying"]:  # si mort ne pas le crée !
-                        continue
-                    self.ennemis[key] = Ennemi(
-                        self.screen,
-                        ennemi["position"],
-                        -1,
-                        -1,
-                        None,
-                        self.camera,
-                        None,
-                    )
-                    self.ennemis[key].update_variables(ennemi)
-                    self.ennemis_id.append(key)
-                    self.ennemis[key].update_animation()
-                else:
-                    self.ennemis[key].update_variables(ennemi)
-                    self.ennemis[key].update_animation()
-                if self.ennemis[key].dying and not self.ennemis[key].particles_spawned:
-                    self.ennemis[key].particles_spawned = True
-                    for _ in range(50):
-                        spawn_local_particle(
-                            self.particles,
-                            self.ennemis[key].position.tolist(),
-                            r"Ressources\particles\dust.png",
-                            speed_range=(50, 150),
-                            shrink_range=(20, 60),
-                        )
-                if time.time() > ennemi["death_time"]:
-                    del_key.append(key)
-                    self.ennemis_id.remove(key)
-            for key in del_key:
-                del self.ennemis[key]
+            self.update_ennemis_host()
+        # Guest : gerer dans update_ennemis_guest() et appeler via update_variables_guest
 
         # -- Particules --
+        self.update_particles()
+
+        # -- HUD --
+        self.hud.update(self.manager.clock.get_time() / 1000)
+
+    def update_ennemis_solo(self):
+        del_key = []
+
+        for key, ennemi in self.ennemis.items():
+            self.paths.append(ennemi.update(self.player_controller.hitbox))
+
+            if ennemi.attaque_rect is not None:
+                self.moteur.apply_attack(ennemi.attaque_rect, self.player_controller)
+
+            self.spawn_death_particles(ennemi)
+
+            if time.time() > ennemi.death_time:
+                del_key.append(key)
+
+        for key in del_key:
+            del self.ennemis[key]
+
+        if self.player_controller.attaque_rect is not None:
+            for ennemi in self.ennemis.values():
+                self.moteur.apply_attack(self.player_controller.attaque_rect, ennemi)
+
+    def update_ennemis_host(self):
+        del_key = []
+
+        for key, ennemi in self.ennemis.items():
+            self.paths.append(
+                ennemi.update(
+                    self.player_controller.hitbox, self.player_controller.guest.hitbox
+                )
+            )
+
+            if ennemi.attaque_rect is not None:
+                self.moteur.apply_attack(ennemi.attaque_rect, self.player_controller)
+                self.moteur.apply_attack(
+                    ennemi.attaque_rect, self.player_controller.guest
+                )
+
+            self.spawn_death_particles(ennemi)
+
+            if time.time() > ennemi.death_time:
+                del_key.append(key)
+
+        for key in del_key:
+            del self.ennemis[key]
+
+        if self.player_controller.attaque_rect is not None:
+            for ennemi in self.ennemis.values():
+                self.moteur.apply_attack(self.player_controller.attaque_rect, ennemi)
+
+        if self.player_controller.guest.attaque_rect is not None:
+            for ennemi in self.ennemis.values():
+                self.moteur.apply_attack(
+                    self.player_controller.guest.attaque_rect, ennemi
+                )
+
+    def update_ennemis_guest(self, ennemis_data: Dict[str, Any]):
+        """Côté guest : les ennemis sont pilotés par les données réseau."""
+        del_key = []
+
+        for key, ennemi_data in ennemis_data.items():
+
+            if key not in self.ennemis_id:
+                if ennemi_data["dying"]:
+                    continue
+                self.ennemis[key] = Ennemi(
+                    self.screen,
+                    ennemi_data["position"],
+                    -1,
+                    -1,
+                    None,
+                    self.camera,
+                    None,
+                )
+                self.ennemis_id.append(key)
+
+            self.ennemis[key].update_variables(ennemi_data)
+            self.ennemis[key].update_animation()
+
+            self.spawn_death_particles(self.ennemis[key])
+
+            if time.time() > ennemi_data["death_time"]:
+                del_key.append(key)
+
+        for key in del_key:
+            del self.ennemis[key]
+            if key in self.ennemis_id:
+                self.ennemis_id.remove(key)
+
+    def spawn_death_particles(self, ennemi: Ennemi):
+        """Fait spawn des particules de mort si ennemi est mort"""
+        if ennemi.dying and not ennemi.particles_spawned:
+            ennemi.particles_spawned = True
+            for _ in range(50):
+                spawn_local_particle(
+                    self.particles,
+                    ennemi.position.tolist(),
+                    r"Ressources\Particles\dust.png",
+                    speed_range=(50, 150),
+                    shrink_range=(20, 60),
+                )
+
+    def update_particles(self):
         if len(self.particles) < 50:  # Limite pour les performances
 
             # On récupère les coordonnées du monde actuellement à l'écran
@@ -378,7 +522,7 @@ class Game:
             )
             spawn_local_particle(
                 self.particles,
-                sprite_path="Ressources/particles/dust.png",
+                sprite_path="Ressources/Particles/dust.png",
                 pos=(spawn_x, spawn_y),
                 size=10,
                 speed_range=(25, 45),
@@ -387,16 +531,6 @@ class Game:
                 rot=10,
             )
         self.particles.update(self.manager.clock.get_time() / 1000)
-
-        # -- HUD --
-        self.hud.update(self.manager.clock.get_time() / 1000)
-
-        if self.player_controller.close:
-            if isinstance(self.player_controller, HostController):
-                if self.player_controller.serveur.is_serving():
-                    self.player_controller.serveur.close()
-            self.reset()
-            self.manager.state = self.manager.states["MENU_P"]
 
     def display(self):
         """Affiche tout les éléments."""
@@ -503,6 +637,8 @@ class Game:
                     ),
                 )
 
+    # Sauvegarde et reset
+
     def reset(self):
         self.playing_mode = None
         self.player_controller = None
@@ -606,15 +742,13 @@ class Game:
 
         with open(file, "w") as f:
 
-            raw = json.dumps(data, indent="\t")
-            f.write(raw)
+            f.write(json.dumps(data, indent="\t"))
 
     def load_save(self, file: str):
 
         with open(file, "r") as f:
 
-            raw = f.read()
-            data = json.loads(raw)
+            data = json.loads(f.read())
 
         self.game_name = data["game_name"]
         self.nb_chunks = data["map"]["nb_chunks"]

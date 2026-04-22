@@ -1,4 +1,5 @@
 from typing import List, Dict, Tuple, Callable, TYPE_CHECKING
+from player import GuestController
 import threading
 import socket
 import json
@@ -12,7 +13,7 @@ import animations as a
 if TYPE_CHECKING:
     from main import Manager
 
-MENU_ASSET_DIRECTORY = "Ressources/UI_&_élements_graphiques/"
+MENU_ASSET_DIRECTORY = "Ressources/UIAsset/"
 BACKGROUND = MENU_ASSET_DIRECTORY + "fond ecran menu.png"
 PLAY_BUTTON = MENU_ASSET_DIRECTORY + "PLAY.png"
 SETTING_BUTTON = MENU_ASSET_DIRECTORY + "SETTINGS.png"
@@ -498,22 +499,31 @@ class Join_Multi_Menu(Menu):
                     if not sock_set:
                         sock_set = True
                         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                         sock.settimeout(0.5)
                         sock.bind(("", UDP_PORT))
-                        print("UDP recieve protocol start")
+                        print("[Guest] Écoute UDP démarrée")
 
                     data, addr = sock.recvfrom(1024)  # buffer size is 1024 bytes
-                    data = data.decode().strip()
-                    data = json.loads(data)
+                    data = json.loads(data.decode().strip())
                     if addr[0] not in self.serveurs:
                         self.serveurs[addr[0]] = data
                 else:
                     if sock_set:
                         sock_set = False
                         sock.close()
-                        print("UDP recieve protocol stopped")
+                        print("[Guest] Écoute UDP arrêtée")
                     time.sleep(0.5)
             except socket.timeout:
+                # Enleve les serveurs expirés
+                now = time.time()
+                expired = [
+                    ip
+                    for ip, info in self.serveurs.items()
+                    if now - info.get("last", 0) > 2.0
+                ]
+                for ip in expired:
+                    del self.serveurs[ip]
                 continue
         if sock:
             if sock_set:
@@ -595,7 +605,11 @@ class Pause_Menu(Menu):
             self.manager.change_state("MENU_SETTING_PAUSE")
 
         def quit():
-            self.manager.states["GAME"].player_controller.close = True
+            game = self.manager.states["GAME"]
+            if isinstance(game.player_controller, GuestController):
+                game._send_close_and_disconnect()
+            game.close_network()
+            game.reset()
             self.manager.change_state("MENU_P")
 
         # =======================Function Button End=======================
