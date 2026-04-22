@@ -201,7 +201,7 @@ class Text:
         antialias: bool = False,
     ):
         self.to_display_text = text if text else self.to_display_text
-        self.position = position if position else self.position
+        self.center_position = position if position else self.center_position
         self.font = font if font else self.font
         self.font_size = size if size else self.font_size
         self.font_color = color if color else self.font_color
