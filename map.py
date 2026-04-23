@@ -265,6 +265,22 @@ def a_star(
 
 
 class Chunk:
+    """
+    Classe pour le stockage de protion de carte.
+
+    Attributes:
+        chunk_size (np.ndarray): la taille d'un chunk en tuile en largeur/longueur.
+        position (np.ndarray): la position du chunk sur la carte en chunk en largeur/longueure.
+        tile_size (np.ndarray): la taille des tuile en largeur/longueure.
+        asset: liste des différents assets disponibles.
+        ground (np.ndarray): matrice des tuile sol.
+        occupied (np.ndarray): matrice des positions libres.
+        collision (np.ndarra): matrice des position inacessibles.
+        object (List[Dict]): liste des objets sur la carte.
+
+    Méthodes publiques:
+        get_ground(map): renvoie un matrice des positions libre grace à la carte.
+        render(): renvoie une image su chunk pour l'afficher."""
 
     def __init__(
         self,
@@ -339,6 +355,34 @@ class Chunk:
 
 
 class BaseMap(ABC):
+    """
+    Structure générale du carte.
+
+    Attributs:
+        size (np.ndarray): la taille de la map
+        start_position (Tuple[int, int]): la position d'arrivé d'un joueur sur la carte.
+        tile_size (np.ndarray): la taille des tuiles de la carte.
+        action_tiles (List[Dict[str, Any]]): liste des tuiles avec lequel un joueur peut intéragir.
+        screen (pygame.Surface): l'écran.
+        ennemis (Dict[int, Ennemi]): un dictionnaire avec tous les ennemis associé à leur id.
+        _action_registry (Dict[str, Callable]): liste des action activable via les action_tiles, relié à une fonction.
+        update_ennemis: fonction qui met à jour les ennemis et renvoie les chemin (debug).
+
+    Méthodes publiques:
+        get_nearby_obstacles(hitbox): renvoie les obstacle à proximité de la hitbox.
+        register(name, func): associé un nom à une fonction et le met dans _action_registry.
+        update(absolute_position): met à jour les différents éléments d'une carte.
+        get_ennemis(): renvoie la liste des ennemis.
+        check_action_tiles(absolute_position): actionne les fonction lié au tuiles activés.
+        display(camera): affiche une carte.
+
+    Méthodes privées:
+        _create_map(screen, game, map_data): méthode alternative de création de carte, dédié au clients.
+        _get_to_send_data(): donne les données relative à une carte pour le réseau.
+        _register_actions(): appelé uen fois, relie les fonction au nom des action des action_tiles.
+        _get_update_ennemis(): renvoie la fonction pour mettre à jour les ennemis.
+    """
+
     size: np.ndarray
     start_position: Tuple[int, int] | None
     tile_size: np.ndarray
@@ -366,7 +410,16 @@ class BaseMap(ABC):
     def _create_map(
         screen: pygame.Surface, game: "Game", map_data: Dict[str, Any]
     ) -> "BaseMap":
-        """Créé une carte."""
+        """Méthode alternative pour créer une carte, destiné au clients.
+
+        Args:
+            screen (pygame.Surface): l'écran.
+            game (Game): le controlleur du jeu.
+            map_dict (Dict[str, Any]): un dictionnaire qui contient toutes les variable pour la création de la carte.
+
+        Returns:
+            BaseMap: une carte en accord avec le type dans map_data.
+        """
         pass
 
     @abstractmethod
@@ -407,6 +460,13 @@ class BaseMap(ABC):
         pass
 
     def check_action_tiles(self, absolute_position: Tuple[int, int]) -> Any | None:
+        """Appel la fonction activé par le joueur sur une tuile si besoin.
+
+        Args:
+            absolute_position (Tuple[int, int]): la position absolue d'un joueur.
+
+        Returns:
+            Any | None : le retour de la fonction appelé, ou None si aucune fonction."""
         tile_x = absolute_position[0] // self.tile_size[0]
         tile_y = absolute_position[1] // self.tile_size[1]
 
@@ -435,6 +495,37 @@ class BaseMap(ABC):
 
 
 class Map(BaseMap):
+    """
+    Classe pour la carte principale avec génération procédurale.
+
+    Attributs:
+        nb_chunks (np.ndarray): le nombre de chunk en largeur/longeur.
+        chunk_size_tile (np.ndarray): le nombre de tuile par chunk en largeur/longeur.
+        chunk_size_pix (np.ndarray): le nombre de pixel par chunk en largeur/longeur.
+        asset (Dict): liste de tout les assets disponibles.
+        map_scale (Tuple[int, int]): intervale des valeur de la carte finale.
+        map (np.ndarray): matrice de valeur dans l'interval map_scale.
+        chunks (List[Chunk]): liste de tout les chunk.
+        road_map (np.ndarray): matrice avec les routes créées.
+        structures (List[Dict]): liste des différentes structures sur la carte.
+        loaded_chunk (Dict[Tuple[int, int], Chunk]): liste des chunks chargé en méméoire associé à leur position.
+
+    Méthodes publiques:
+        create_map(octaves,...): créer une matrice de valeur dans l'interval map_scale.
+        create_chunks(): créer l'ensemble des chunks de la carte.
+
+    Méthodes privés:
+        _is_occupied(x, y, dx, dy): vérifie sur les tuiles autour d'une position sont occupées.
+        _add_object_pos(obj_type, x, y,...): ajoute un élément à la position x, y, et renvoie si il a réussi.
+        _add_objects(obj_type,...,nb, prob): ajoute nb éléments, ou proba.
+        _add_structure(obj_type,...,nb, prob): ajoute nb structure, ou proba.
+        _generate_paths(randomness): créer des chemin entre les différentes structures, avec randomness le facteur de randomisation.
+        _add_road(): ajoute les tuiles des chemins au objets.
+        _load_chunks(absolute_position): charge les chunk à proximité, si pas déjà en mémoire.
+        _update_ennemis_...(): fonction d'update des ennemis, choisi à la création de la carte.
+        _render_full_map(): génére la carte entièrement, et renvoie sa surface (pour debug).
+        _display(): affiche différents éléments de la carte, avec pyplot (pour debug).
+    """
 
     def __init__(
         self,
@@ -445,6 +536,17 @@ class Map(BaseMap):
         screen: pygame.Surface,
         seed: int | None,
     ):
+        """
+        Initialize et créer une carte procédurale.
+
+        Args:
+            game (Game): le controlleur du jeu.
+            nb_chunks (Tuple[int, int]): le nombre de chunk à généré en largeur/longeur.
+            chunk_size (Tuple[int, int]): la taille de chaque chunk en largeur/longeur.
+            octaves (Tuple[int, int]): l'espace entre 2 vecteur lors du bruit de perlin, abruptité du terain.
+            screen (pygame.Surface): l'écran.
+            seed (int): la graine du monde.
+        """
         # -- Valeurs initiales --
         self.nb_chunks = np.array(nb_chunks, dtype=np.int32)
         self.chunk_size_tile = np.array(chunk_size, dtype=np.int32)
@@ -475,15 +577,15 @@ class Map(BaseMap):
         self.loaded_chunks = {}
 
         # -- Ajout éléments --
-        self.add_object_pos("place", 128, 128, 3, occupe=True)
+        self._add_object_pos("place", 128, 128, 3, occupe=True)
         self.structures.append((128, 128))
-        self.add_structure("place", nb=3, z=3, distance=10)
-        self.generate_paths(0.3, prop=1)
-        self.add_road(0, 2)
-        self.add_objects("grass", prob=0.1, z=-1, occupe=True)
-        self.add_objects("tree", prob=0.01, z=2)
-        self.add_objects("bush", prob=0.1, z=0)
-        self.add_objects("rock", prob=0.01, z=1)
+        self._add_structure("place", nb=3, z=3, distance=10)
+        self._generate_paths(0.3, prop=1)
+        self._add_road(0, 2)
+        self._add_objects("grass", prob=0.1, z=-1, occupe=True)
+        self._add_objects("tree", prob=0.01, z=2)
+        self._add_objects("bush", prob=0.1, z=0)
+        self._add_objects("rock", prob=0.01, z=1)
 
         # -- Ennemis --
         self.ennemis = {}
@@ -522,15 +624,18 @@ class Map(BaseMap):
         mask_pad_value: float | int | None = math.e,
         mask_scale: Tuple[float, float] | None = (0, 1),
     ) -> np.ndarray:
-        """Créer une map aléatoire où :
-        - self.size est la taille de la map
-        - self.map_scale est l'interval des valeur de la map
-        - self.seed est la graine utilisé pour créer la map
-        - octave est la distance entre chaque vecteur pendant la création du bruit de perlin
-        - mask_weight is the importance of the mask (between 0 and 1)
-        - mask_func est la fonction utilisé pour le mask
-        - mask_pad_value est la valeur ajouté durant le calcule du mask
-        - mask_scale est l'interval pour le mask"""
+        """Créer une carte procédurale, à partir d'un bruit de Perlin.
+
+        Args:
+            octave (Tuple[int, int]): la distance entre chaque vecteur pendant la création du bruit de perlin.
+            mask_weight (float): le poids du mask lors de la fusion (entre 0 et 1).
+            mask_func (Callable): la fonction utilisé pour le mask.
+            mask_pad_value (float): la valeur ajouté durant le calcule du mask.
+            mask_scale (Tuple[float, float]): l'interval des valeur pour le mask.
+
+        Returns:
+            np.ndarray : une matrice de valeur dans l'interval map_scale.
+        """
 
         # Génère le bruit de perlin
         np.random.seed(self.seed)  # Donne la graine à numpy
@@ -577,7 +682,7 @@ class Map(BaseMap):
             for y in range(self.nb_chunks[1])
         }
 
-    def is_occupied(self, x, y, dx, dy) -> bool:
+    def _is_occupied(self, x, y, dx, dy) -> bool:
         """Renvoie si une tuile en xy + dxdy est occupé."""
 
         tx, ty = x + dx, y + dy
@@ -590,7 +695,7 @@ class Map(BaseMap):
             or self.chunks[(x_chunk, y_chunk)].occupied[rel_x][rel_y]
         )
 
-    def add_object_pos(
+    def _add_object_pos(
         self, obj_type: str, x: int, y: int, z: int, occupe: bool | None = False
     ) -> bool:
         """Essaye d'ajouter un élément obj à la position x, y. Renvoie si il a réussi."""
@@ -600,7 +705,7 @@ class Map(BaseMap):
 
         for dx, dy in self.asset[obj_type]["occupied_tiles"]:
 
-            if self.is_occupied(x, y, dx, dy):
+            if self._is_occupied(x, y, dx, dy):
                 occupied = True
                 break
 
@@ -633,7 +738,7 @@ class Map(BaseMap):
             return True
         return False
 
-    def add_objects(
+    def _add_objects(
         self,
         obj_type: str,
         *,
@@ -643,8 +748,10 @@ class Map(BaseMap):
         z: int | None = 0,
     ) -> List[Tuple[int, int]]:
         """Ajoute des éléments "obj" sur la carte. Soit en créer un nombre nb ou utilise
-        prob pour déterminer le nombre à créer.\n
-        Met à jour occupied et collisions et ajoute l'élément dans objects de chaques chunks.\n
+        prob pour déterminer le nombre à créer.
+
+        Met à jour occupied et collisions et ajoute l'élément dans objects de chaques chunks.
+
         Ici z définit la priotité d'un élément, plus elle est haute, plus il sera affiché en dernier.
         """
         assert (nb is not None or prob is not None) and (nb is None or prob is None)
@@ -667,7 +774,7 @@ class Map(BaseMap):
             if not strict:
                 count += 1
 
-            if self.add_object_pos(obj_type, xs[i], ys[i], z, occupe) and strict:
+            if self._add_object_pos(obj_type, xs[i], ys[i], z, occupe) and strict:
                 count += 1
                 positions.append((xs[i], ys[i]))
 
@@ -675,7 +782,7 @@ class Map(BaseMap):
 
         return positions
 
-    def add_structure(
+    def _add_structure(
         self,
         obj_type: str,
         *,
@@ -683,6 +790,8 @@ class Map(BaseMap):
         z: int | None = 0,
         distance: float | None = 10,
     ):
+        """Essaie d'ajouter nb structure sur la carte, en respectant les différentes
+        contraintes, la distance entre les structures et leur nombre."""
 
         xs = np.random.randint(0, self.size[0], size=nb * 3)
         ys = np.random.randint(0, self.size[1], size=nb * 3)
@@ -697,7 +806,7 @@ class Map(BaseMap):
                 struct = np.array(self.structures)
                 diff = struct - np.array([xs[i], ys[i]])
                 if np.all(np.hypot(diff[:, 0], diff[:, 1]) > distance):
-                    if self.add_object_pos(obj_type, xs[i], ys[i], z, True):
+                    if self._add_object_pos(obj_type, xs[i], ys[i], z, True):
                         count += 1
                         self.structures.append((xs[i], ys[i]))
 
@@ -711,7 +820,7 @@ class Map(BaseMap):
                 i = 0
                 j += 1
 
-    def generate_paths(
+    def _generate_paths(
         self,
         randomness: float,
         *,
@@ -742,7 +851,8 @@ class Map(BaseMap):
 
                 self.road_map[x, y] = REPLACE_VALUE
 
-    def add_road(self, z: int, nb_tiles: int | None = 3):
+    def _add_road(self, z: int, nb_tiles: int | None = 3):
+        """Ajoute les tuile des routes sur la carte."""
 
         tiles = np.where(self.road_map == REPLACE_VALUE)
         choices = [i for i in range(len(self.asset["pave"]))]
@@ -758,7 +868,7 @@ class Map(BaseMap):
                 dx = all_dx[i][j]
                 dy = all_dy[i][j]
 
-                if not self.is_occupied(x, y, dx, dy):
+                if not self._is_occupied(x, y, dx, dy):
 
                     tx, ty = x + dx, y + dy
                     x_chunk, y_chunk = (
@@ -781,7 +891,7 @@ class Map(BaseMap):
                         }
                     )
 
-    def load_chunks(self, absolute_position: Tuple[int, int]):
+    def _load_chunks(self, absolute_position: Tuple[int, int]):
         """Prend la position du joueur sur la map, et charge les chunks atours"""
         abs_position = np.array(absolute_position, dtype=np.int32)
         assert np.less(abs_position, self.size * self.chunk_size_pix).all()
@@ -810,7 +920,7 @@ class Map(BaseMap):
     def get_ennemis(self) -> Dict[int, "Ennemi"]:
         return self.ennemis
 
-    def update_ennemis_solo(self):
+    def _update_ennemis_solo(self):
         del_key = []
         paths = []
 
@@ -838,7 +948,7 @@ class Map(BaseMap):
 
         return paths
 
-    def update_ennemis_host(self):
+    def _update_ennemis_host(self):
         del_key = []
         paths = []
 
@@ -880,7 +990,7 @@ class Map(BaseMap):
 
         return paths
 
-    def update_ennemis_guest(self):
+    def _update_ennemis_guest(self):
         """Côté guest : les ennemis sont pilotés par les données réseau."""
         del_key = []
 
@@ -900,15 +1010,15 @@ class Map(BaseMap):
 
     def _get_update_ennemis(self) -> Callable[[], List[Tuple[int, int]]]:
         if self.game.playing_mode == "solo":
-            return self.update_ennemis_solo
+            return self._update_ennemis_solo
         elif self.game.playing_mode == "host":
-            return self.update_ennemis_host
+            return self._update_ennemis_host
         elif self.game.playing_mode == "guest":
-            return self.update_ennemis_guest
+            return self._update_ennemis_guest
 
     def update(self, absolute_position: Tuple[int, int]) -> None:
 
-        self.load_chunks(absolute_position)
+        self._load_chunks(absolute_position)
 
         return self.check_action_tiles(absolute_position)
 
@@ -984,6 +1094,7 @@ class Map(BaseMap):
 
 
 class Hub(BaseMap):
+    """Classe dédié à la carte du Hub."""
 
     def __init__(self, screen: pygame.Surface, game: "Game"):
 
@@ -1099,6 +1210,18 @@ TYPE_STR: Dict[str, BaseMap] = {
 
 
 class MapManager(BaseMap):
+    """
+    Gestionnaire des différentes cartes.
+
+    Attributes:
+        maps (Dict[str, BaseMap]): un dictionnaire avec toutes les cartes.
+        map_name (str): le nom de la carte actuelle.
+        map (BaseMap): la carte actuelle.
+
+    Méthode publiques:
+        initialize_var(): initialize les différentes valeures lors d'un changement de carte.
+        change_map(name): change la map et met à jour le joueur et le game.
+    """
 
     def __init__(self, game: "Game", **kwarg: BaseMap):
 
