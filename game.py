@@ -725,6 +725,8 @@ class Game:
             }
         else:
             data = {
+                "last_save": str(datetime.datetime.today()),
+                "game_name": self.game_name,
                 "playing_mode": "multi",
                 "map": {
                     "seed": self.map.seed,
