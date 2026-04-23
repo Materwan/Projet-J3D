@@ -148,15 +148,7 @@ class Game:
 
             # Récupération de la map envoyée par l'hôte
             map_data = self.network.get_map_data()
-            principal_map = Map(
-                map_data["nb_chunks"],
-                map_data["chunk_size"],
-                map_data["octaves"],
-                self.screen,
-                map_data["seed"],
-            )
-            hub = Hub(self.screen)
-            self.map = MapManager(self, hub=hub, principal_map=principal_map)
+            self.map = MapManager._create_map(self.screen, self, map_data)
 
             # Récupération de la position initiale du guest
             initial = self.network.get_initial_state()
@@ -177,13 +169,14 @@ class Game:
 
             # -- Map --
             principal_map = Map(
+                self,
                 self.nb_chunks,
                 self.chunk_size,
                 self.octaves,
                 self.screen,
                 self.seed,
             )
-            hub = Hub(self.screen)
+            hub = Hub(self.screen, self)
             self.map = MapManager(self, hub=hub, principal_map=principal_map)
 
             # -- Controlleur --
@@ -198,16 +191,22 @@ class Game:
                 )
 
                 # Réseau : construction de l'état initial avec la map
-                initial_state = self.get_to_send_data_host(include_map=True)
+                initial_state = self.map._get_to_send_data()
                 self.network = HostNetwork(self.port)
                 self.network.start(initial_state)
 
             # -- Ennemis (pour test) --
             ennemi = Ennemi(
-                self.screen, (3500, 3500), 1, 32, self.map, self.camera, self.moteur
+                self.screen,
+                (3500, 3500),
+                1,
+                32,
+                principal_map,
+                self.camera,
+                self.moteur,
             )
             self.ennemis_id.append(0)
-            self.ennemis[0] = ennemi
+            principal_map.ennemis[0] = ennemi
 
         # -- Keybinds --
         self.player_controller.keybinds = self.keybinds
@@ -296,7 +295,26 @@ class Game:
             gc.host.attaque = data["host"]["attaque"]
 
         # Ennemis
-        self.update_ennemis_guest(data["ennemis"])
+        for key, ennemi_data in data["ennemis"].items():
+
+            if key not in self.ennemis_id:
+                if ennemi_data["dying"]:
+                    continue
+                self.ennemis[key] = Ennemi(
+                    self.screen,
+                    ennemi_data["position"],
+                    -1,
+                    -1,
+                    None,
+                    self.camera,
+                    None,
+                )
+                self.ennemis_id.append(key)
+
+            self.ennemis[key].update_variables(ennemi_data)
+            self.ennemis[key].update_animation()
+
+            self.spawn_death_particles(self.ennemis[key])
 
     def _send_close_and_disconnect(self):
         """
@@ -391,7 +409,7 @@ class Game:
         # -- Ennemis --
         self.paths = [[]]
         if isinstance(self.player_controller, SoloPlayerController):
-            self.update_ennemis_solo()
+            self.map.update_ennemis()
         elif isinstance(self.player_controller, HostController):
             self.update_ennemis_host()
         # Guest : gerer dans update_ennemis_guest() et appeler via update_variables_guest
@@ -463,14 +481,12 @@ class Game:
 
     def update_ennemis_guest(self, ennemis_data: Dict[str, Any]):
         """Côté guest : les ennemis sont pilotés par les données réseau."""
-        del_key = []
-
         for key, ennemi_data in ennemis_data.items():
 
             if key not in self.ennemis_id:
                 if ennemi_data["dying"]:
                     continue
-                self.ennemis[key] = Ennemi(
+                self.map.ennemis[key] = Ennemi(
                     self.screen,
                     ennemi_data["position"],
                     -1,
@@ -480,19 +496,6 @@ class Game:
                     None,
                 )
                 self.ennemis_id.append(key)
-
-            self.ennemis[key].update_variables(ennemi_data)
-            self.ennemis[key].update_animation()
-
-            self.spawn_death_particles(self.ennemis[key])
-
-            if time.time() > ennemi_data["death_time"]:
-                del_key.append(key)
-
-        for key in del_key:
-            del self.ennemis[key]
-            if key in self.ennemis_id:
-                self.ennemis_id.remove(key)
 
     def spawn_death_particles(self, ennemi: Ennemi):
         """Fait spawn des particules de mort si ennemi est mort"""
@@ -553,7 +556,7 @@ class Game:
         self.player_controller.display()
 
         # -- Ennemis --
-        for ennemi in self.ennemis.values():
+        for ennemi in self.map.ennemis.values():
             ennemi.display()
 
         # -- Particules --

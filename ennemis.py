@@ -246,11 +246,11 @@ class Ennemi:
 
         if not self.dying:
 
-            """# -- Path --
+            # -- Path --
             self.update_path([hitbox.center for hitbox in hitbox_joueur])
 
             # -- State --
-            self.update_velocity(hitbox_joueur)"""
+            self.update_velocity(hitbox_joueur)
 
             # -- Attaque --
             mini = min(

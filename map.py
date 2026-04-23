@@ -18,8 +18,8 @@ import pygame
 
 if TYPE_CHECKING:
     from ennemis import Ennemi
-    from moteur import Moteur
     from game import Game
+    from player import SoloPlayerController, HostController, GuestController
 
 REPLACE_VALUE = 0.3
 TILE_SIZE = (32, 32)
@@ -362,6 +362,19 @@ class BaseMap(ABC):
         pass
 
     @abstractmethod
+    def _create_map(
+        screen: pygame.Surface, game: "Game", map_data: Dict[str, Any]
+    ) -> "BaseMap":
+        """Créé une carte."""
+        pass
+
+    @abstractmethod
+    def _get_to_send_data(self) -> Dict[str, Any]:
+        """Renvoie les données correspondant à une carte,
+        pour l'envoyer à un client."""
+        pass
+
+    @abstractmethod
     def _register_actions(self):
         """Chaque sous-classe enregistre ses actions ici."""
         pass
@@ -404,7 +417,7 @@ class BaseMap(ABC):
         return None
 
     @abstractmethod
-    def update_ennemis(self, player_hitboxes: List[pygame.Rect], moteur: "Moteur"):
+    def update_ennemis(self):
         """Met à jour les ennemis et retourne les paths (pour le debug)."""
         pass
 
@@ -424,6 +437,7 @@ class Map(BaseMap):
 
     def __init__(
         self,
+        game: "Game",
         nb_chunks: Tuple[int, int],
         chunk_size: Tuple[int, int],
         octaves: Tuple[int, int],
@@ -444,6 +458,7 @@ class Map(BaseMap):
             self.tile_size,
         )
         self.screen = screen
+        self.game = game
         if seed is None:  # Si aucune graine n'est donnée, prend en une au hasard
             self.seed = np.random.randint(0, 999999999)
         else:
@@ -470,9 +485,36 @@ class Map(BaseMap):
 
         # -- Ennemis --
         self.ennemis = {}
+        if self.game.player_controller.__class__.__name__ == "SoloPlayerController":
+            self.update_ennemis = self.update_ennemis_solo
+        elif self.game.player_controller.__class__.__name__ == "HostController":
+            self.update_ennemis = self.update_ennemis_host
+        elif self.game.player_controller.__class__.__name__ == "GuestController":
+            self.update_ennemis = self.update_ennemis_guest
+
+    def _create_map(
+        screen: pygame.Surface, game: "Game", map_data: Dict[str, Any]
+    ) -> "Map":
+        return Map(
+            game,
+            map_data["nb_chunks"],
+            map_data["chunk_size"],
+            map_data["octaves"],
+            screen,
+            map_data["seed"],
+        )
 
     def _register_actions(self):
         pass
+
+    def _get_to_send_data(self) -> Dict[str, Any]:
+        return {
+            "type": "map",
+            "nb_chunks": self.nb_chunks.tolist(),
+            "chunk_size": self.chunk_size_tile.tolist(),
+            "octaves": self.octaves,
+            "seed": self.seed,
+        }
 
     def create_map(
         self,
@@ -770,15 +812,97 @@ class Map(BaseMap):
     def get_ennemis(self) -> Dict[int, "Ennemi"]:
         return self.ennemis
 
-    def update_ennemis(self, player_hitboxes: List[pygame.Rect], moteur: "Moteur"):
-        # Tout ce qui est actuellement dans Game.update() concernant les ennemis
+    def update_ennemis_solo(self):
         del_key = []
+        paths = []
+
         for key, ennemi in self.ennemis.items():
-            ennemi.update(*player_hitboxes)
+            paths.append(ennemi.update(self.game.player_controller.hitbox))
+
+            if ennemi.attaque_rect is not None:
+                self.game.moteur.apply_attack(
+                    ennemi.attaque_rect, self.game.player_controller
+                )
+
+            self.game.spawn_death_particles(ennemi)
+
             if time.time() > ennemi.death_time:
                 del_key.append(key)
+
         for key in del_key:
             del self.ennemis[key]
+
+        if self.game.player_controller.attaque_rect is not None:
+            for ennemi in self.ennemis.values():
+                self.game.moteur.apply_attack(
+                    self.game.player_controller.attaque_rect, ennemi
+                )
+
+        return paths
+
+    def update_ennemis_host(self):
+        del_key = []
+        paths = []
+
+        for key, ennemi in self.ennemis.items():
+            paths.append(
+                ennemi.update(
+                    self.game.player_controller.hitbox,
+                    self.game.player_controller.guest.hitbox,
+                )
+            )
+
+            if ennemi.attaque_rect is not None:
+                self.game.moteur.apply_attack(
+                    ennemi.attaque_rect, self.game.player_controller
+                )
+                self.game.moteur.apply_attack(
+                    ennemi.attaque_rect, self.game.player_controller.guest
+                )
+
+            self.game.spawn_death_particles(ennemi)
+
+            if time.time() > ennemi.death_time:
+                del_key.append(key)
+
+        for key in del_key:
+            del self.ennemis[key]
+
+        if self.game.player_controller.attaque_rect is not None:
+            for ennemi in self.ennemis.values():
+                self.game.moteur.apply_attack(
+                    self.game.player_controller.attaque_rect, ennemi
+                )
+
+        if self.game.player_controller.guest.attaque_rect is not None:
+            for ennemi in self.ennemis.values():
+                self.game.moteur.apply_attack(
+                    self.game.player_controller.guest.attaque_rect, ennemi
+                )
+
+        return paths
+
+    def update_ennemis_guest(self, ennemis_data: Dict[str, Any]):
+        """Côté guest : les ennemis sont pilotés par les données réseau."""
+        del_key = []
+
+        for key, ennemi_data in ennemis_data.items():
+
+            self.ennemis[key].update_variables(ennemi_data)
+            self.ennemis[key].update_animation()
+
+            self.game.spawn_death_particles(self.ennemis[key])
+
+            if time.time() > ennemi_data["death_time"]:
+                del_key.append(key)
+
+        for key in del_key:
+            del self.ennemis[key]
+            if key in self.game.ennemis_id:
+                self.game.ennemis_id.remove(key)
+
+    def update_ennemis(self):
+        pass
 
     def update(self, absolute_position: Tuple[int, int]) -> None:
 
@@ -854,9 +978,10 @@ class Map(BaseMap):
 
 class Hub(BaseMap):
 
-    def __init__(self, screen: pygame.Surface):
+    def __init__(self, screen: pygame.Surface, game: "Game"):
 
         self.screen = screen
+        self.game = game
 
         with open(path.join(TILEMAP_DIRECTORY, "tilemap_data.json"), "r") as file:
 
@@ -883,8 +1008,21 @@ class Hub(BaseMap):
 
         self._register_actions()
 
+        # -- Ennemis --
+        self.ennemis = {}
+
+    def _create_map(
+        screen: pygame.Surface, game: "Game", map_data: Dict[str, Any]
+    ) -> "Hub":
+        return Hub(screen, game)
+
     def _change_map(self, **map_name: str):
         return map_name["target"]
+
+    def _get_to_send_data(self) -> Dict[str, Any]:
+        return {
+            "type": "hub",
+        }
 
     def _register_actions(self):
         self._action_registry = {}
@@ -910,7 +1048,7 @@ class Hub(BaseMap):
     def get_ennemis(self) -> Dict[int, "Ennemi"]:
         return {}
 
-    def update_ennemis(self, player_hitboxes: List[pygame.Rect], moteur: "Moteur"):
+    def update_ennemis(self):
         pass
 
     def update(self, absolute_position: Tuple[int, int]) -> str | None:
@@ -945,18 +1083,39 @@ class Hub(BaseMap):
         self.screen.blit(self.image, (screen_x, screen_y))
 
 
+TYPE_STR: Dict[str, BaseMap] = {
+    "map": Map,
+    "hub": Hub,
+}
+
+
 class MapManager(BaseMap):
 
     def __init__(self, game: "Game", **kwarg: BaseMap):
 
         self.maps = kwarg
-        self.map_name = list(self.maps.keys())[0]
+        if len(self.maps) > 0:
+            self.map_name = list(self.maps.keys())[0]
+        else:
+            self.map_name = None
         self.inizialize_var()
 
         self.game = game
 
+    def _create_map(
+        screen: pygame.Surface, game: "Game", map_data: Dict[str, Any]
+    ) -> "MapManager":
+        temp = MapManager(game)
+        for name, map in map_data.items():
+            temp.maps[name] = TYPE_STR[map["type"]]._create_map(screen, game, map)
+        temp.inizialize_var()
+        return temp
+
     def _register_actions(self):
         pass
+
+    def _get_to_send_data(self) -> Dict[str, Any]:
+        return {name: map._get_to_send_data() for name, map in self.maps.items()}
 
     def get_nearby_obstacles(self, hitbox: pygame.Rect):
 
@@ -966,9 +1125,13 @@ class MapManager(BaseMap):
         """
         Initialise les différentes variables liée à une carte.
         """
-        self.map = self.maps[self.map_name]
-        self.size = self.map.size
-        self.tile_size = self.map.tile_size
+        if self.map_name:
+            self.map = self.maps[self.map_name]
+            self.size = self.map.size
+            self.tile_size = self.map.tile_size
+
+            # -- Ennemis --
+            self.ennemis = self.map.ennemis
 
     def change_map(self, name: str):
         """
@@ -986,8 +1149,8 @@ class MapManager(BaseMap):
     def get_ennemis(self) -> Dict[int, "Ennemi"]:
         return self.map.get_ennemis()
 
-    def update_ennemis(self, player_hitboxes: List[pygame.Rect], moteur: "Moteur"):
-        self.map.update_ennemis(player_hitboxes, moteur)
+    def update_ennemis(self):
+        self.map.update_ennemis()
 
     def update(self, absolute_position: Tuple[int, int]):
 
