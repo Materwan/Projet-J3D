@@ -346,6 +346,7 @@ class BaseMap(ABC):
     screen: pygame.Surface
     ennemis: Dict[int, "Ennemi"]
     _action_registry: Dict[str, Callable]
+    update_ennemis: Callable[[], List[Tuple[int, int]]]
 
     @abstractmethod
     def get_nearby_obstacles(self, hitbox: pygame.Rect):
@@ -417,7 +418,7 @@ class BaseMap(ABC):
         return None
 
     @abstractmethod
-    def update_ennemis(self):
+    def _get_update_ennemis(self) -> Callable[[], List[Tuple[int, int]]]:
         """Met à jour les ennemis et retourne les paths (pour le debug)."""
         pass
 
@@ -452,6 +453,7 @@ class Map(BaseMap):
         self.tile_size = np.array(TILE_SIZE, dtype=np.int32)
         self.start_position = (self.size * self.tile_size // 2).tolist()
         self.chunk_size_pix = self.chunk_size_tile * self.tile_size
+        self.action_tiles = []
         self.asset = load_assets(
             path.join(TILESET_DIRECTORY, "tile_data.json"),
             TILESET_DIRECTORY,
@@ -485,12 +487,8 @@ class Map(BaseMap):
 
         # -- Ennemis --
         self.ennemis = {}
-        if self.game.player_controller.__class__.__name__ == "SoloPlayerController":
-            self.update_ennemis = self.update_ennemis_solo
-        elif self.game.player_controller.__class__.__name__ == "HostController":
-            self.update_ennemis = self.update_ennemis_host
-        elif self.game.player_controller.__class__.__name__ == "GuestController":
-            self.update_ennemis = self.update_ennemis_guest
+        self.update_ennemis = self._get_update_ennemis()
+        print(self.update_ennemis)
 
     def _create_map(
         screen: pygame.Surface, game: "Game", map_data: Dict[str, Any]
@@ -882,18 +880,15 @@ class Map(BaseMap):
 
         return paths
 
-    def update_ennemis_guest(self, ennemis_data: Dict[str, Any]):
+    def update_ennemis_guest(self):
         """Côté guest : les ennemis sont pilotés par les données réseau."""
         del_key = []
 
-        for key, ennemi_data in ennemis_data.items():
-
-            self.ennemis[key].update_variables(ennemi_data)
-            self.ennemis[key].update_animation()
+        for key, ennemi in self.ennemis.items():
 
             self.game.spawn_death_particles(self.ennemis[key])
 
-            if time.time() > ennemi_data["death_time"]:
+            if time.time() > ennemi.death_time:
                 del_key.append(key)
 
         for key in del_key:
@@ -901,12 +896,21 @@ class Map(BaseMap):
             if key in self.game.ennemis_id:
                 self.game.ennemis_id.remove(key)
 
-    def update_ennemis(self):
-        pass
+        return []
+
+    def _get_update_ennemis(self) -> Callable[[], List[Tuple[int, int]]]:
+        if self.game.playing_mode == "solo":
+            return self.update_ennemis_solo
+        elif self.game.playing_mode == "host":
+            return self.update_ennemis_host
+        elif self.game.playing_mode == "guest":
+            return self.update_ennemis_guest
 
     def update(self, absolute_position: Tuple[int, int]) -> None:
 
         self.load_chunks(absolute_position)
+
+        return self.check_action_tiles(absolute_position)
 
     def get_nearby_obstacles(self, hitbox: pygame.Rect):
 
@@ -925,9 +929,12 @@ class Map(BaseMap):
                 rel_x = x % self.chunk_size_tile[0]
                 rel_y = y % self.chunk_size_tile[1]
                 # Collision sur la tuile
-                if self.chunks[(x_chunk, y_chunk)].collision[rel_x][rel_y]:
-                    # On crée le rectangle de collision pour cette tuile
-                    nearby_obstacles.append(pygame.Rect(x * 32, y * 32, 32, 32))
+                if 0 <= int(x_chunk) < int(self.nb_chunks[0]) and 0 <= int(
+                    y_chunk
+                ) < int(self.nb_chunks[1]):
+                    if self.chunks[(x_chunk, y_chunk)].collision[rel_x][rel_y]:
+                        # On crée le rectangle de collision pour cette tuile
+                        nearby_obstacles.append(pygame.Rect(x * 32, y * 32, 32, 32))
 
         return nearby_obstacles
 
@@ -1010,6 +1017,7 @@ class Hub(BaseMap):
 
         # -- Ennemis --
         self.ennemis = {}
+        self.update_ennemis = self._get_update_ennemis()
 
     def _create_map(
         screen: pygame.Surface, game: "Game", map_data: Dict[str, Any]
@@ -1048,8 +1056,9 @@ class Hub(BaseMap):
     def get_ennemis(self) -> Dict[int, "Ennemi"]:
         return {}
 
-    def update_ennemis(self):
-        pass
+    def _get_update_ennemis(self) -> Callable[[], List[Tuple[int, int]]]:
+
+        return lambda: []
 
     def update(self, absolute_position: Tuple[int, int]) -> str | None:
 
@@ -1108,6 +1117,12 @@ class MapManager(BaseMap):
         temp = MapManager(game)
         for name, map in map_data.items():
             temp.maps[name] = TYPE_STR[map["type"]]._create_map(screen, game, map)
+
+        if len(temp.maps) > 0:
+            temp.map_name = list(temp.maps.keys())[0]
+        else:
+            temp.map_name = None
+
         temp.inizialize_var()
         return temp
 
@@ -1125,10 +1140,13 @@ class MapManager(BaseMap):
         """
         Initialise les différentes variables liée à une carte.
         """
+
         if self.map_name:
             self.map = self.maps[self.map_name]
             self.size = self.map.size
             self.tile_size = self.map.tile_size
+            self.start_position = self.map.start_position
+            self.update_ennemis = self._get_update_ennemis()
 
             # -- Ennemis --
             self.ennemis = self.map.ennemis
@@ -1144,13 +1162,13 @@ class MapManager(BaseMap):
             )
         self.map_name = name
         self.inizialize_var()
-        self.game._change_map(self.map.start_position)
+        self.game._change_map(self.game.player_controller, self.map.start_position)
 
     def get_ennemis(self) -> Dict[int, "Ennemi"]:
         return self.map.get_ennemis()
 
-    def update_ennemis(self):
-        self.map.update_ennemis()
+    def _get_update_ennemis(self) -> List[Tuple[int, int]]:
+        return self.map.update_ennemis
 
     def update(self, absolute_position: Tuple[int, int]):
 

@@ -6,6 +6,7 @@ from typing import Tuple, Dict
 from moteur import Moteur
 from camera_system import Camera
 from animations import AnimationController
+from map import BaseMap
 
 
 SPEED = 3
@@ -29,6 +30,7 @@ class PlayerControllerBase:
         self.screen = screen
         self.camera = camera
         self.moteur = moteur
+        self.current_map: BaseMap = None
         self.keybinds: Dict = None
 
         # -- Animations --
@@ -91,7 +93,9 @@ class PlayerControllerBase:
 
         if self.velocity.length_squared() > 0:
             self.update_direction()
-            self.moteur.collision(self.hitbox, self.velocity, collision_hitbox)
+            self.moteur.collision(
+                self.hitbox, self.velocity, collision_hitbox, self.current_map
+            )
 
             mov = self.velocity.length_squared()
             if mov > 0:  # Si toujours du mouvement après moteur.collision

@@ -1,5 +1,5 @@
 import pygame
-from map import MapManager
+from map import MapManager, BaseMap
 from typing import List, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -22,6 +22,7 @@ class Moteur:
         hitbox: pygame.Rect,
         velocity: pygame.Vector2,
         other_hitbox: list[pygame.Rect],
+        map: BaseMap | None = None,
     ):
         """
         Anticipe et résout les collisions avec les obstacles environnants.
@@ -35,7 +36,8 @@ class Moteur:
             velocity (pygame.Vector2): Vecteur de déplacement souhaité (modifié sur place).
             other_hitbox (pygame.Rect|None): La boîte de collision actuelle de l'autre joueur.
         """
-        nearby_obstacles = self.map.get_nearby_obstacles(hitbox)
+        map = self.map.map if map is None else map
+        nearby_obstacles = map.get_nearby_obstacles(hitbox)
 
         for elt in other_hitbox:
             nearby_obstacles.append(elt)

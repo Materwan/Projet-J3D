@@ -9,7 +9,12 @@ import os
 
 import pygame
 
-from player import SoloPlayerController, HostController, GuestController
+from player import (
+    PlayerControllerBase,
+    SoloPlayerController,
+    HostController,
+    GuestController,
+)
 from network import HostNetwork, GuestNetwork
 from moteur import Moteur
 from map import Map, Hub, MapManager
@@ -182,16 +187,17 @@ class Game:
             # -- Controlleur --
             if self.playing_mode == "solo":
                 self.player_controller = SoloPlayerController(
-                    self.screen, self.camera, self.moteur, (100, 100)
+                    self.screen, self.camera, self.moteur, self.map.start_position
                 )
 
             elif self.playing_mode == "host":
                 self.player_controller = HostController(
-                    self.screen, self.camera, self.moteur, (4000, 4096)
+                    self.screen, self.camera, self.moteur, self.map.start_position
                 )
+                self.player_controller.guest.position.x += 20
 
                 # Réseau : construction de l'état initial avec la map
-                initial_state = self.map._get_to_send_data()
+                initial_state = self.get_to_send_data_host(include_map=True)
                 self.network = HostNetwork(self.port)
                 self.network.start(initial_state)
 
@@ -222,6 +228,7 @@ class Game:
 
         # -- Map -- Ne pas oublier de passer la map au moteur !
         self.moteur.map = self.map
+        self.player_controller.current_map = self.map.map
 
     # Réseau
 
@@ -231,6 +238,7 @@ class Game:
 
         dic: Dict[str, Any] = {
             "host": {
+                "map": self.map.map_name,
                 "position": list(hc.position),
                 "moving_intent": hc.moving_intent,
                 "direction": hc.direction,
@@ -240,17 +248,15 @@ class Game:
                 "position": list(hc.guest.position),
                 "pv": hc.guest.pv,
             },
+            "map": {
+                "name": self.map.map_name,
+            },
             "ennemis": serialize_ennemis(self.ennemis),
             "close": False,
         }
 
         if include_map:
-            dic["map"] = {
-                "nb_chunks": self.map.nb_chunks.tolist(),
-                "chunk_size": self.map.chunk_size_tile.tolist(),
-                "octaves": self.map.octaves,
-                "seed": self.map.seed,
-            }
+            dic["map"] = self.map._get_to_send_data()
 
         return dic
 
@@ -260,9 +266,13 @@ class Game:
 
         return {
             "guest": {
+                "map": self.map.map_name,
                 "velocity": list(gc.velocity),
                 "moving_intent": gc.moving_intent,
                 "attaque": gc.animation.current_state == "attack",
+            },
+            "map": {
+                "name": self.map.map_name,
             },
             "close": False,
         }
@@ -277,6 +287,16 @@ class Game:
             hc.guest.velocity = self.moteur.verif_velocity(data["guest"]["velocity"])
             hc.guest.moving_intent = data["guest"]["moving_intent"]
             hc.guest.attaque = data["guest"]["attaque"]
+            if hc.guest.current_map != self.map.maps[data["map"]["name"]]:
+                hc.guest.current_map = self.map.maps[data["map"]["name"]]
+                new_pos = hc.guest.current_map.start_position
+                self._change_map(hc.guest, new_pos)
+                if self.player_controller.hitbox.colliderect(
+                    self.player_controller.guest.hitbox
+                ):
+                    new_pos[0] += 50
+                    self.player_controller.guest.position.update(new_pos)
+                    self.player_controller.guest.hitbox.center = new_pos
 
     def update_variables_guest(self, data: Dict[str, Any]):
         """Applique les données reçues de l'hôte sur le GuestController."""
@@ -293,6 +313,7 @@ class Game:
             gc.host.moving_intent = data["host"]["moving_intent"]
             gc.host.direction = data["host"]["direction"]
             gc.host.attaque = data["host"]["attaque"]
+            gc.host.current_map = self.map.maps[data["map"]["name"]]
 
         # Ennemis
         for key, ennemi_data in data["ennemis"].items():
@@ -407,11 +428,7 @@ class Game:
         self.camera.update(self.player_controller.hitbox)
 
         # -- Ennemis --
-        self.paths = [[]]
-        if isinstance(self.player_controller, SoloPlayerController):
-            self.map.update_ennemis()
-        elif isinstance(self.player_controller, HostController):
-            self.update_ennemis_host()
+        self.paths = self.map.update_ennemis()
         # Guest : gerer dans update_ennemis_guest() et appeler via update_variables_guest
 
         # -- Particules --
@@ -420,9 +437,12 @@ class Game:
         # -- HUD --
         self.hud.update(self.manager.clock.get_time() / 1000)
 
-    def _change_map(self, new_position: Tuple[int, int]):
-        self.player_controller.position = new_position
-        self.player_controller.hitbox.center = new_position
+    def _change_map(
+        self, player_controller: PlayerControllerBase, new_position: Tuple[int, int]
+    ):
+        player_controller.current_map = self.map.map
+        player_controller.position.update(new_position)
+        player_controller.hitbox.center = new_position
 
     def update_ennemis_solo(self):
         del_key = []
