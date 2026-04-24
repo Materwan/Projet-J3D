@@ -107,7 +107,7 @@ class Manager:
 
             self.clock.tick(FPS)  # à ne pas toucher
 
-        self.states["GAME"].close_network()
+        self.states["GAME"].close_game()
 
 
 manager = Manager()
@@ -117,7 +117,7 @@ try:
 except (Exception, KeyboardInterrupt):
     manager.running = False
     manager.states["MENU_MULTI"].udp_event.clear()
-    manager.states["GAME"].close_network()
+    manager.states["GAME"].close_game()
     logging.error(traceback.format_exc())
 finally:
     pygame.quit()

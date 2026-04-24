@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from itertools import combinations
 from os import path
+import threading
 import time
 import math
 import json
@@ -369,6 +370,7 @@ class BaseMap(ABC):
         update_ennemis: fonction qui met à jour les ennemis et renvoie les chemin (debug).
 
     Méthodes publiques:
+        close_map(): ferme une carte et se processus et la supprime.
         get_nearby_obstacles(hitbox): renvoie les obstacle à proximité de la hitbox.
         register(name, func): associé un nom à une fonction et le met dans _action_registry.
         update(absolute_position): met à jour les différents éléments d'une carte.
@@ -391,6 +393,12 @@ class BaseMap(ABC):
     ennemis: Dict[int, "Ennemi"]
     _action_registry: Dict[str, Callable]
     update_ennemis: Callable[[], List[Tuple[int, int]]]
+
+    def close_map(self):
+        """
+        Ferme tous les processus d'une carte, et la supprime.
+        """
+        pass
 
     @abstractmethod
     def get_nearby_obstacles(self, hitbox: pygame.Rect):
@@ -509,6 +517,11 @@ class Map(BaseMap):
         road_map (np.ndarray): matrice avec les routes créées.
         structures (List[Dict]): liste des différentes structures sur la carte.
         loaded_chunk (Dict[Tuple[int, int], Chunk]): liste des chunks chargé en méméoire associé à leur position.
+        load_chunk_running (bool): si le thread de calcul des chunks tourne.
+        last_chunk (Tuple[int, int]): le dernier chunk dans lequel était le joueur.
+        load_chunk_position (Tuple[int, int]): position du joueur pour le calcul des chunks.
+        load_chunk_thread (threading.Thread): le thread de calcul des chunks.
+        load_chunk_event (threading.Event): l'event pour le calcul des chunks.
 
     Méthodes publiques:
         create_map(octaves,...): créer une matrice de valeur dans l'interval map_scale.
@@ -575,6 +588,11 @@ class Map(BaseMap):
         self.road_map = np.where(self.map < 0.5, -np.inf, self.map)
         self.structures = []
         self.loaded_chunks = {}
+        self.load_chunk_running = True
+        self.last_chunk: Tuple[int, int] = (0, 0)
+        self.load_chunk_position: Tuple[int, int] = self.start_position
+        self.load_chunk_thread = threading.Thread(target=self._load_chunks)
+        self.load_chunk_event = threading.Event()
 
         # -- Ajout éléments --
         self._add_object_pos("place", 128, 128, 3, occupe=True)
@@ -590,7 +608,14 @@ class Map(BaseMap):
         # -- Ennemis --
         self.ennemis = {}
         self.update_ennemis = self._get_update_ennemis()
-        print(self.update_ennemis)
+
+        # -- Charge chunks --
+        self.load_chunk_event.set()
+        self.load_chunk_thread.start()
+
+    def close_map(self):
+        self.load_chunk_running = False
+        self.load_chunk_event.clear()
 
     def _create_map(
         screen: pygame.Surface, game: "Game", map_data: Dict[str, Any]
@@ -659,16 +684,11 @@ class Map(BaseMap):
         mask = scale(mask, mask_pad_value, mask_func)  # Applique la fonction de masque
         mask = normalize(mask, mask_scale)  # Change l'interval
 
-        # print(np.min(mask), np.max(mask))
-        # print(np.min(noise), np.max(noise))
-
         # Fusione le masque et le bruit de perlin Merge noise with mask
         noise = np.add(
             noise * (1 - mask_weight), mask * mask_weight
         )  # Additione le masque et le bruit de perlin
         noise = normalize(noise, self.map_scale)  # Change l'interval
-
-        # print("\n", np.min(noise), np.max(noise))
 
         return noise
 
@@ -891,31 +911,48 @@ class Map(BaseMap):
                         }
                     )
 
-    def _load_chunks(self, absolute_position: Tuple[int, int]):
-        """Prend la position du joueur sur la map, et charge les chunks atours"""
-        abs_position = np.array(absolute_position, dtype=np.int32)
-        assert np.less(abs_position, self.size * self.chunk_size_pix).all()
+    def _load_chunks(self):
+        """Charge les chunks au alentour d'un joueur, dans un thread parallèle."""
+        while self.load_chunk_running:
+            if self.load_chunk_event.is_set():
+                abs_position = np.array(self.load_chunk_position, dtype=np.int32)
+                assert np.less(abs_position, self.size * self.chunk_size_pix).all()
 
-        chunk = abs_position // self.chunk_size_pix
+                chunk = abs_position // self.chunk_size_pix
 
-        for x in range(chunk[0] - 1, chunk[0] + 2):
-            for y in range(chunk[1] - 1, chunk[1] + 2):
-                if (
-                    0 <= x < self.nb_chunks[0]
-                    and 0 <= y < self.nb_chunks[1]
-                    and not (x, y) in self.loaded_chunks
-                ):
-                    self.loaded_chunks[(x, y)] = self.chunks[(x, y)].render()
+                for x in range(chunk[0] - 2, chunk[0] + 3):
+                    for y in range(chunk[1] - 2, chunk[1] + 3):
+                        if (
+                            0 <= x < self.nb_chunks[0]
+                            and 0 <= y < self.nb_chunks[1]
+                            and not (x, y) in self.loaded_chunks
+                        ):
+                            self.loaded_chunks[(x, y)] = self.chunks[(x, y)].render()
 
-        valid = {
-            (x, y)
-            for x in range(chunk[0] - 1, chunk[0] + 2)
-            for y in range(chunk[1] - 1, chunk[1] + 2)
-            if 0 <= x < self.nb_chunks[0] and 0 <= y < self.nb_chunks[1]
-        }
-        for key in list(self.loaded_chunks):
-            if key not in valid:
-                del self.loaded_chunks[key]
+                valid = {
+                    (x, y)
+                    for x in range(chunk[0] - 2, chunk[0] + 3)
+                    for y in range(chunk[1] - 2, chunk[1] + 3)
+                    if 0 <= x < self.nb_chunks[0] and 0 <= y < self.nb_chunks[1]
+                }
+                for key in list(self.loaded_chunks):
+                    if key not in valid:
+                        del self.loaded_chunks[key]
+
+                self.load_chunk_event.clear()
+            else:
+                time.sleep(0.5)
+
+    def _trigger_load_chunk(self, absolute_position: Tuple[int, int]):
+        """Dit au thread de calculer les nouveau chunks."""
+        chunk = (
+            absolute_position[0] // self.chunk_size_pix[0],
+            absolute_position[1] // self.chunk_size_pix[1],
+        )
+        if chunk != self.last_chunk:
+            self.load_chunk_event.set()
+            self.load_chunk_position = absolute_position
+            self.last_chunk = chunk
 
     def get_ennemis(self) -> Dict[int, "Ennemi"]:
         return self.ennemis
@@ -1018,7 +1055,7 @@ class Map(BaseMap):
 
     def update(self, absolute_position: Tuple[int, int]) -> None:
 
-        self._load_chunks(absolute_position)
+        self._trigger_load_chunk(absolute_position)
 
         return self.check_action_tiles(absolute_position)
 
@@ -1054,14 +1091,24 @@ class Map(BaseMap):
         L.sort(key=lambda p: p[1] * 10 + p[0], reverse=True)
 
         for x, y in L:
+
             chunk_world_x = x * self.chunk_size_pix[0]
             chunk_world_y = y * self.chunk_size_pix[1]
 
-            # Ces deux lignes doivent être DANS la boucle (indentation manquante)
             screen_x = chunk_world_x + camera.camera.x + camera.offset_x
             screen_y = chunk_world_y + camera.camera.y + camera.offset_y
 
+            if (
+                screen_x + self.chunk_size_pix[0] < 0
+                or screen_x > camera.width
+                or screen_y + self.chunk_size_pix[1] < 0
+                or screen_y > camera.height
+            ):
+                continue
+
             self.screen.blit(self.loaded_chunks[(x, y)], (screen_x, screen_y))
+
+        self._display_chunks(camera)
 
     def _render_full_map(self) -> pygame.Surface:
         """Génère une surface complète de la map en rendant tous les chunks."""
@@ -1091,6 +1138,33 @@ class Map(BaseMap):
         plt.colorbar()
 
         plt.show()
+
+    def _display_chunks(self, camera: Camera):
+        screen_x = camera.camera.x + camera.offset_x
+        screen_y = camera.camera.y + camera.offset_y
+
+        for x in range(int(self.nb_chunks[0])):
+            pygame.draw.line(
+                self.screen,
+                (0, 255, 0),
+                (x * self.chunk_size_pix[0] + screen_x, screen_y),
+                (
+                    x * self.chunk_size_pix[0] + screen_x,
+                    self.size[1] * self.tile_size[1] + screen_y,
+                ),
+                2,
+            )
+        for y in range(int(self.nb_chunks[1])):
+            pygame.draw.line(
+                self.screen,
+                (0, 255, 0),
+                (screen_x, y * self.chunk_size_pix[1] + screen_y),
+                (
+                    self.size[0] * self.tile_size[0] + screen_x,
+                    y * self.chunk_size_pix[1] + screen_y,
+                ),
+                2,
+            )
 
 
 class Hub(BaseMap):
@@ -1249,6 +1323,11 @@ class MapManager(BaseMap):
         temp.inizialize_var()
         return temp
 
+    def close_map(self):
+        for map in self.maps.values():
+            map.close_map()
+            del map
+
     def _register_actions(self):
         pass
 
@@ -1303,8 +1382,6 @@ class MapManager(BaseMap):
     def display(self, camera: Camera):
 
         self.map.display(camera)
-        if isinstance(self.map, Hub):
-            self.map.display_tiles(camera)
 
 
 if __name__ == "__main__":

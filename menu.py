@@ -776,7 +776,7 @@ class Pause_Menu(Menu):
             game = self.manager.states["GAME"]
             if isinstance(game.player_controller, GuestController):
                 game._send_close_and_disconnect()
-            game.close_network()
+            game.close_game()
             game.reset()
             self.manager.change_state("MENU_P")
 

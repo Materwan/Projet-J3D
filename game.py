@@ -290,7 +290,7 @@ class Game:
             if hc.guest.current_map != self.map.maps[data["map"]["name"]]:
                 hc.guest.current_map = self.map.maps[data["map"]["name"]]
                 new_pos = hc.guest.current_map.start_position
-                self._change_map(hc.guest, new_pos)
+                self._change_map(hc.guest, new_pos, move_camera=False)
                 if self.player_controller.hitbox.colliderect(
                     self.player_controller.guest.hitbox
                 ):
@@ -356,6 +356,11 @@ class Game:
             finally:
                 self.network = None
 
+    def close_game(self):
+        self.close_network()
+        if self.map:
+            self.map.close_map()
+
     # Game basic
 
     def event(self, events: List[pygame.event.Event]) -> bool:
@@ -415,7 +420,7 @@ class Game:
 
             # Si l'hôte quitte alors fermeture totale
             elif self.network.is_closed():
-                self.close_network()
+                self.close_game()
                 self.reset()
                 self.manager.change_state("MENU_P")
                 return
@@ -438,84 +443,16 @@ class Game:
         self.hud.update(self.manager.clock.get_time() / 1000)
 
     def _change_map(
-        self, player_controller: PlayerControllerBase, new_position: Tuple[int, int]
+        self,
+        player_controller: PlayerControllerBase,
+        new_position: Tuple[int, int],
+        move_camera: bool = True,
     ):
         player_controller.current_map = self.map.map
         player_controller.position.update(new_position)
         player_controller.hitbox.center = new_position
-
-    def update_ennemis_solo(self):
-        del_key = []
-
-        for key, ennemi in self.ennemis.items():
-            self.paths.append(ennemi.update(self.player_controller.hitbox))
-
-            if ennemi.attaque_rect is not None:
-                self.moteur.apply_attack(ennemi.attaque_rect, self.player_controller)
-
-            self.spawn_death_particles(ennemi)
-
-            if time.time() > ennemi.death_time:
-                del_key.append(key)
-
-        for key in del_key:
-            del self.ennemis[key]
-
-        if self.player_controller.attaque_rect is not None:
-            for ennemi in self.ennemis.values():
-                self.moteur.apply_attack(self.player_controller.attaque_rect, ennemi)
-
-    def update_ennemis_host(self):
-        del_key = []
-
-        for key, ennemi in self.ennemis.items():
-            self.paths.append(
-                ennemi.update(
-                    self.player_controller.hitbox, self.player_controller.guest.hitbox
-                )
-            )
-
-            if ennemi.attaque_rect is not None:
-                self.moteur.apply_attack(ennemi.attaque_rect, self.player_controller)
-                self.moteur.apply_attack(
-                    ennemi.attaque_rect, self.player_controller.guest
-                )
-
-            self.spawn_death_particles(ennemi)
-
-            if time.time() > ennemi.death_time:
-                del_key.append(key)
-
-        for key in del_key:
-            del self.ennemis[key]
-
-        if self.player_controller.attaque_rect is not None:
-            for ennemi in self.ennemis.values():
-                self.moteur.apply_attack(self.player_controller.attaque_rect, ennemi)
-
-        if self.player_controller.guest.attaque_rect is not None:
-            for ennemi in self.ennemis.values():
-                self.moteur.apply_attack(
-                    self.player_controller.guest.attaque_rect, ennemi
-                )
-
-    def update_ennemis_guest(self, ennemis_data: Dict[str, Any]):
-        """Côté guest : les ennemis sont pilotés par les données réseau."""
-        for key, ennemi_data in ennemis_data.items():
-
-            if key not in self.ennemis_id:
-                if ennemi_data["dying"]:
-                    continue
-                self.map.ennemis[key] = Ennemi(
-                    self.screen,
-                    ennemi_data["position"],
-                    -1,
-                    -1,
-                    None,
-                    self.camera,
-                    None,
-                )
-                self.ennemis_id.append(key)
+        if move_camera:
+            self.camera.set_position(new_position)
 
     def spawn_death_particles(self, ennemi: Ennemi):
         """Fait spawn des particules de mort si ennemi est mort"""
@@ -643,7 +580,6 @@ class Game:
         # Affichage du chemin jusqu'a l'ennemie
         for path in self.paths:
             for i in range(len(path) - 1):
-                # print(self.path[i], self.path[i + 1])
                 pygame.draw.line(
                     self.screen,
                     (255, 0, 128),
@@ -725,7 +661,7 @@ class Game:
             name="Sac du joueur",
             inv=self.inv_joueur,
             pos=((largeur - 486) // 2, hauteur - 293),
-            image_path="Ressources/inv_assets/chest.png",
+            image_path=os.path.join(INVENTORY_ASSET_DIRECTORY, "chest.png"),
             slot_size=52,
             slot_margin=4,
             padding=21,
