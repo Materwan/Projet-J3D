@@ -1,7 +1,6 @@
 import random
 import os
 import json
-
 import pygame
 
 INVENTORY_ASSET_DIRECTORY = r"Ressources\InventoryAsset"
@@ -236,18 +235,6 @@ class InventaireUI:
     Gère :
         - L'affichage du panneau (image + titre + icônes + highlight + tooltip)
         - La détection de la case sous la souris
-
-    Usage :
-        ui = InventaireUI(
-            name         = "Sac du joueur",
-            inv          = mon_inventaire,
-            pos          = (50, 100),
-            image_path   = "Ressources/InventoryAsset/chest.png",
-            slot_size    = 52,
-            slot_margin  = 4,
-            padding      = 21,
-            title_height = 11,
-        )
     """
 
     def __init__(
@@ -256,37 +243,33 @@ class InventaireUI:
         name,
         inv: Inventaire,
         pos: tuple,
-        image_path,
-        slot_size,
-        slot_margin,
-        padding,
-        title_height,
-        visible,
         is_merchant,
+        is_visible,
     ):
         self.screen: pygame.Surface = screen
 
         self.name = name
         self.inv = inv
-        self.pos = pos  # position où le panneau s'affiche
-        self.visible = visible
+        self.pos = pos
+        self.is_visible = is_visible
         self.is_merchant = is_merchant
         if is_merchant:
             self.price_multiplier = round(random.uniform(1.2, 1.6), 2)
         else:
             self.price_multiplier = 1.0
 
-        self.slot_size = slot_size  # taille d'une case en px
-        self.slot_margin = slot_margin  # espace entre les cases en px
-        self.padding = padding  # bord du panneau en px
-        self.title_height = title_height  # espace au-dessus pour le titre en px
+        self.slot_size = 52  # taille d'une case en px
+        self.slot_margin = 4  # espace entre les cases en px
+        self.padding = 21  # bord du panneau en px
+        self.title_height = 11  # espace au-dessus pour le titre en px
 
-        self.image = pygame.image.load(image_path).convert_alpha()
-
-        # Police d'écriture :
+        self.image = pygame.image.load(
+            os.path.join(INVENTORY_ASSET_DIRECTORY, "chest.png")
+        ).convert_alpha()
+        self.image_largeur = self.image.get_width()
 
         # Titre panneau
-        self.font_title = pygame.font.SysFont("segoeui", 11, bold=True)
+        self.font_title = pygame.font.SysFont("segoeui", 14, bold=True)
         # Compteur stack
         self.font_stack = pygame.font.SysFont("segoeui", 12, bold=True)
         # Nom item tooltip
@@ -322,15 +305,13 @@ class InventaireUI:
         """
         Retourne la position row, col de la case sous la souris, ou None.
         """
-        if not self.visible:
-            return None
         for i in range(self.inv.rows):
             for j in range(self.inv.cols):
                 if self.slot_rect(i, j).collidepoint(mouse_pos):
                     return (i, j)
         return None
 
-    def draw(self, mouse_pos, drag_mgr: "InventaireManager"):
+    def draw(self, mouse_pos, drag_mgr: "InventaireManager | None" = None):
         """
         Dessine le panneau complet dans l'ordre :
         - Image de fond
@@ -338,7 +319,7 @@ class InventaireUI:
         - Highlight de survol
         - Icônes des items
         """
-        if not self.visible:
+        if not self.is_visible:
             return
 
         # image de fond
@@ -349,9 +330,10 @@ class InventaireUI:
         self.screen.blit(
             title_surf,
             (
-                self.pos[0] + (self.image.get_width() - title_surf.get_width()) // 2,
+                self.pos[0] + (self.image_largeur - title_surf.get_width()) // 2,
                 self.pos[1]
-                + (self.padding + self.title_height - title_surf.get_height()) // 2,
+                + (self.padding + self.title_height - title_surf.get_height()) // 2
+                - 2,
             ),
         )
 
@@ -373,7 +355,8 @@ class InventaireUI:
                 # La case source du drag paraît vide :
                 # l'item "flotte" sous la souris, on ne le dessine pas ici
                 is_drag_source = (
-                    drag_mgr.drag_source_ui is self
+                    drag_mgr is not None
+                    and drag_mgr.drag_source_ui is self
                     and drag_mgr.drag_source_row == i
                     and drag_mgr.drag_source_col == j
                 )
@@ -568,7 +551,7 @@ class InventaireManager:
         # Clic gauche :
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for ui in self.ui_list:
-                if not ui.visible:
+                if not ui.is_visible:
                     continue
                 slot = ui.slot_at(mouse_pos)
                 if slot is not None:
@@ -579,7 +562,7 @@ class InventaireManager:
                         if pygame.key.get_mods() & pygame.KMOD_SHIFT:
                             # cherche le premier inventaire visible différent de l'actuel
                             for target_ui in self.ui_list:
-                                if target_ui is ui or not target_ui.visible:
+                                if target_ui is ui or not target_ui.is_visible:
                                     continue
                                 # tente d'ajouter dans l'autre inventaire
                                 reste = target_ui.inv.add_item(item)
@@ -603,7 +586,7 @@ class InventaireManager:
         # Clic droit :
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
             for ui in self.ui_list:
-                if not ui.visible:
+                if not ui.is_visible:
                     continue
                 slot = ui.slot_at(mouse_pos)
                 if slot is not None:
@@ -642,7 +625,7 @@ class InventaireManager:
                 return
 
             for ui in self.ui_list:
-                if not ui.visible:
+                if not ui.is_visible:
                     continue
                 slot = ui.slot_at(mouse_pos)
                 if slot is not None:
@@ -682,7 +665,7 @@ class InventaireManager:
         # affiche la tooltip
         if self.drag_item is None:
             for ui in self.ui_list:
-                if not ui.visible:
+                if not ui.is_visible:
                     continue
                 hovered = ui.slot_at(mouse_pos)
                 if hovered is not None:
@@ -704,6 +687,7 @@ class InventaireManager:
         self.screen.blit(ghost, (icon_x, icon_y))
 
 
+# TOUCHE I ET E POUR TESTER
 if __name__ == "__main__":
     pygame.init()
     screen = pygame.display.set_mode((1000, 700))
@@ -732,27 +716,17 @@ if __name__ == "__main__":
         screen,
         name="Sac du joueur",
         inv=inv_joueur,
-        pos=(30, 80),
-        image_path=os.path.join(INVENTORY_ASSET_DIRECTORY, "chest.png"),
-        slot_size=52,
-        slot_margin=4,
-        padding=21,
-        title_height=11,
-        visible=True,
+        pos=(400, 80),
         is_merchant=False,
+        is_visible=True,
     )
     ui_coffre = InventaireUI(
         screen,
-        name="Coffre",
+        name="Marchant de drogue",
         inv=inv_coffre,
         pos=(30, 400),
-        image_path=os.path.join(INVENTORY_ASSET_DIRECTORY, "chest.png"),
-        slot_size=52,
-        slot_margin=4,
-        padding=21,
-        title_height=11,
-        visible=True,
         is_merchant=True,
+        is_visible=True,
     )
 
     drag_mgr = InventaireManager(screen, [ui_joueur, ui_coffre])
@@ -774,9 +748,9 @@ if __name__ == "__main__":
                 if event.key == pygame.K_ESCAPE:
                     running = False
                 if event.key == pygame.K_i:
-                    ui_joueur.visible = not ui_joueur.visible
+                    ui_joueur.is_visible = not ui_joueur.is_visible
                 if event.key == pygame.K_e:
-                    ui_coffre.visible = not ui_coffre.visible
+                    ui_coffre.is_visible = not ui_coffre.is_visible
 
             drag_mgr.handle_event(event, mouse_pos, on_use=on_use)
 

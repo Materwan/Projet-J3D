@@ -110,13 +110,8 @@ class Game:
             name="Sac du joueur",
             inv=self.inv_joueur,
             pos=((largeur - 486) // 2, hauteur - 293),
-            image_path=os.path.join(INVENTORY_ASSET_DIRECTORY, "chest.png"),
-            slot_size=52,
-            slot_margin=4,
-            padding=21,
-            title_height=11,
-            visible=False,
             is_merchant=False,
+            is_visible=False,
         )
         self.drag_mgr = InventaireManager(self.screen, [self.ui_joueur])
 
@@ -398,7 +393,7 @@ class Game:
                 elif event.key == pygame.K_F2:  # Debug F2
                     self.show_hitbox = not self.show_hitbox
                 elif event.key == pygame.K_i:  # Ouvre inventaire
-                    self.ui_joueur.visible = not self.ui_joueur.visible
+                    self.ui_joueur.is_visible = not self.ui_joueur.is_visible
 
                 # TEMPORAIRE !
                 elif event.key == pygame.K_h:
