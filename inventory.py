@@ -227,6 +227,30 @@ class Inventaire:
         else:
             self.grid[row_a][col_a], other_inv.grid[row_b][col_b] = item_b, item_a
 
+    def count_item(self, name: str) -> int:
+        """Retourne la quantité totale d'un item d'un iventaire par son nom."""
+        return sum(s.quantity for row in self.grid for s in row if s and s.name == name)
+
+    def has_items(self, objectifs: list[dict]) -> bool:
+        """Retourne True si la grille contient tous les items requis."""
+        for obj in objectifs:
+            total = self.count_item(obj["item"])
+            if total < obj["quantite"]:
+                return False
+        return True
+
+    def remove_items(self, objectifs: list[dict]):
+        """Retire de la grille les quantités exactes définies dans objectifs."""
+        for obj in objectifs:
+            reste = obj["quantite"]
+            for i in range(self.rows):
+                for j in range(self.cols):
+                    slot = self.grid[i][j]
+                    if slot and slot.name == obj["item"] and reste > 0:
+                        retire = min(slot.quantity, reste)
+                        self.remove_item(i, j, retire)
+                        reste -= retire
+
 
 class InventaireUI:
     """
