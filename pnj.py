@@ -258,7 +258,7 @@ class PNJ:
         )
 
 
-class PNJ_Panel_UI:
+class PnjPanelUI:
     """Class parent pour MenuInteractionUI, DialogueUI, BoutiqueUI et QueteUI"""
 
     def __init__(self, screen: pygame.Surface, largeur: int, hauteur: int):
@@ -275,10 +275,9 @@ class PNJ_Panel_UI:
 
         # police d'écriture
         self.font_titre = pygame.font.SysFont("dejavusans", 18, bold=True)
-        self.font_text_16 = pygame.font.SysFont("dejavusans", 16)
-        self.font_text_15 = pygame.font.SysFont("dejavusans", 15)
-        self.font_text_14 = pygame.font.SysFont("dejavusans", 14)
-        self.font_text_13 = pygame.font.SysFont("dejavusans", 13)
+        self.font_corps = pygame.font.SysFont("dejavusans", 16)
+        self.font_sub = pygame.font.SysFont("dejavusans", 14)
+        self.font_hint = pygame.font.SysFont("dejavusans", 13)
 
     def draw_panel(self, rect: pygame.Rect):
         bg = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
@@ -300,7 +299,7 @@ class PNJ_Panel_UI:
         self.screen.blit(portrait, (p_rect.x + 5, p_rect.y + 5))
 
 
-class MenuInteractionUI(PNJ_Panel_UI):
+class MenuInteractionUI(PnjPanelUI):
     """
     Affiche le menu d'interaction (Parler, Optionnel(Quête ou Échanger), Quitter).
     """
@@ -369,7 +368,7 @@ class MenuInteractionUI(PNJ_Panel_UI):
             )
             self.screen.blit(bs, (btn.x, btn.y))
 
-            text = self.font_text_16.render(option, True, (240, 240, 255))
+            text = self.font_corps.render(option, True, (240, 240, 255))
             self.screen.blit(
                 text,
                 (
@@ -379,7 +378,7 @@ class MenuInteractionUI(PNJ_Panel_UI):
             )
 
 
-class DialogueUI(PNJ_Panel_UI):
+class DialogueUI(PnjPanelUI):
     """
     Affiche les dialogues d'un PNJ dialogue par dialogue avec effet machine à écrire.
     """
@@ -452,15 +451,15 @@ class DialogueUI(PNJ_Panel_UI):
         y_offset = self.y + 42
         for elt in wrap_text(
             self.list_dialogue[self.dialogue][: self.caractere],
-            self.font_text_16,
+            self.font_corps,
             self.larg - 102,
         ):
-            surf = self.font_text_16.render(elt, True, (210, 210, 222))
+            surf = self.font_corps.render(elt, True, (210, 210, 222))
             self.screen.blit(surf, (137, y_offset))
             y_offset += surf.get_height() + 2
 
         # Numéro de dialogue
-        dialogue_s = self.font_text_16.render(
+        dialogue_s = self.font_corps.render(
             f"{self.dialogue + 1} / {len(self.list_dialogue)}", True, (110, 110, 155)
         )
         self.screen.blit(
@@ -478,7 +477,7 @@ class DialogueUI(PNJ_Panel_UI):
             else:
                 hint = "[E] Continuer"
 
-            hs = self.font_text_16.render(hint, True, (130, 200, 130))
+            hs = self.font_corps.render(hint, True, (130, 200, 130))
             self.screen.blit(
                 hs,
                 (
@@ -488,7 +487,7 @@ class DialogueUI(PNJ_Panel_UI):
             )
 
 
-class BoutiqueUI(PNJ_Panel_UI):
+class BoutiqueUI(PnjPanelUI):
     """
     Affiche la boutique d'échange du jeu.
     """
@@ -635,10 +634,10 @@ class BoutiqueUI(PNJ_Panel_UI):
         )
 
         # Hints d'interaction centrés au-dessus de chaque grille
-        hint_v = self.font_text_13.render(
+        hint_v = self.font_hint.render(
             "Clic = vendre 1   Shift+clic = tout vendre", False, (230, 140, 140)
         )
-        hint_a = self.font_text_13.render(
+        hint_a = self.font_hint.render(
             "Clic = acheter 1   Shift+clic = acheter max", False, (140, 230, 140)
         )
         joueur_center = self.ui_joueur.pos[0] + self.larg_inv // 2
@@ -684,7 +683,7 @@ class BoutiqueUI(PNJ_Panel_UI):
             border_radius=7,
         )
         self.screen.blit(bs, (self.btn.x, self.btn.y))
-        ts = self.font_text_14.render(
+        ts = self.font_sub.render(
             "Fermer", True, (240, 240, 255) if self.btn_hovered else (180, 180, 210)
         )
         self.screen.blit(
@@ -696,9 +695,7 @@ class BoutiqueUI(PNJ_Panel_UI):
         )
 
         # Mole_Coins du joueur, centré entre les grilles et le bouton Fermer
-        coins = self.font_text_15.render(
-            f"Mole_Coins : {self.money}", True, (255, 215, 0)
-        )
+        coins = self.font_sub.render(f"Mole_Coins : {self.money}", True, (255, 215, 0))
         self.screen.blit(
             coins,
             (
@@ -709,7 +706,7 @@ class BoutiqueUI(PNJ_Panel_UI):
 
         # Message temporaire (achat/vente/erreur)
         if self.msg_timer > 0:
-            msg = self.font_text_13.render(self.msg_text, False, self.msg_color)
+            msg = self.font_hint.render(self.msg_text, False, self.msg_color)
             msg.set_alpha(
                 int(255 * min(1.0, self.msg_timer / (self.msg_duration * 0.4)))
             )
@@ -722,7 +719,7 @@ class BoutiqueUI(PNJ_Panel_UI):
             )
 
 
-class QueteUI(PNJ_Panel_UI):
+class QueteUI(PnjPanelUI):
     """Affiche la quête courante du PNJ avec ses objectifs et récompenses."""
 
     def __init__(self, screen: pygame.Surface, largeur: int, hauteur: int):
@@ -854,7 +851,7 @@ class QueteUI(PNJ_Panel_UI):
 
         # Numéro de quête en haut à gauche (si plusieurs)
         if len(self.pnj.quests) > 1:
-            num_s = self.font_text_13.render(
+            num_s = self.font_hint.render(
                 f"Quête {self.pnj.quest_index + 1} / {len(self.pnj.quests)}",
                 True,
                 (120, 120, 160),
@@ -863,7 +860,7 @@ class QueteUI(PNJ_Panel_UI):
 
         # Statut en haut à droite
         lbl_etat, col_etat = self.msg_statut[self.pnj.quest_etat]
-        etat_s = self.font_text_13.render(f"Statut : {lbl_etat}", True, col_etat)
+        etat_s = self.font_hint.render(f"Statut : {lbl_etat}", True, col_etat)
         self.screen.blit(
             etat_s, (self.rect.right - etat_s.get_width() - 14, self.rect.y + 14)
         )
@@ -871,23 +868,23 @@ class QueteUI(PNJ_Panel_UI):
         ty = self.rect.y + 46
 
         # Description wrappée
-        for line in wrap_text(q["description"], self.font_text_15, self.larg - 32):
-            ls = self.font_text_15.render(line, True, (200, 200, 215))
+        for line in wrap_text(q["description"], self.font_sub, self.larg - 32):
+            ls = self.font_sub.render(line, True, (200, 200, 215))
             self.screen.blit(ls, (self.x + 25, ty))
             ty += ls.get_height() + 3
         ty += 8
 
         # Objectifs
         self.screen.blit(
-            self.font_text_14.render("Objectifs :", True, (180, 160, 120)),
+            self.font_sub.render("Objectifs :", True, (180, 160, 120)),
             (self.x + 25, ty),
         )
-        ty += self.font_text_14.get_height() + 4
+        ty += self.font_sub.get_height() + 4
         for obj in q["objectifs"]:
             possede = self.inv_joueur.count_item(obj["item"])
             rempli = possede >= obj["quantite"]
             col = (100, 220, 100) if rempli else (220, 100, 100)
-            ls = self.font_text_15.render(
+            ls = self.font_sub.render(
                 f"  {'   ✓' if rempli else '   ✗'}  {obj['item']} : {possede} / {obj['quantite']}",
                 True,
                 col,
@@ -898,20 +895,20 @@ class QueteUI(PNJ_Panel_UI):
 
         # Récompenses
         self.screen.blit(
-            self.font_text_14.render("Récompenses :", True, (180, 160, 120)),
+            self.font_sub.render("Récompenses :", True, (180, 160, 120)),
             (self.x + 25, ty),
         )
-        ty += self.font_text_14.get_height() + 4
+        ty += self.font_sub.get_height() + 4
 
         if q["recompense_coins"] > 0:
-            coins_s = self.font_text_15.render(
+            coins_s = self.font_sub.render(
                 f"    +{q['recompense_coins']} Mole_Coins", True, (255, 215, 0)
             )
             self.screen.blit(coins_s, (self.x + 25, ty))
             ty += coins_s.get_height() + 3
 
         for ri in q["recompense_items"]:
-            ri_s = self.font_text_15.render(
+            ri_s = self.font_sub.render(
                 f"    {ri['quantite']}× {ri['item']}", True, (160, 220, 160)
             )
             self.screen.blit(ri_s, (self.x + 25, ty))
@@ -934,7 +931,7 @@ class QueteUI(PNJ_Panel_UI):
             )
             self.screen.blit(bs, (btn.x, btn.y))
 
-            ts = self.font_text_14.render(label, True, col_txt)
+            ts = self.font_sub.render(label, True, col_txt)
             self.screen.blit(
                 ts,
                 (
@@ -945,7 +942,7 @@ class QueteUI(PNJ_Panel_UI):
 
         # Message temporaire
         if self.msg_timer > 0:
-            msg = self.font_text_14.render(self.msg_text, True, self.msg_color)
+            msg = self.font_sub.render(self.msg_text, True, self.msg_color)
             msg.set_alpha(
                 int(255 * min(1.0, self.msg_timer / (self.msg_duration * 0.4)))
             )
