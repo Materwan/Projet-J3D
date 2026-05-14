@@ -9,16 +9,16 @@ import json
 import heapq
 
 import numpy as np
+from utils import resource_path
 from perlin_numpy import generate_perlin_noise_2d
 from camera_system import Camera
 import matplotlib.pyplot as plt
 import pygame
 
-
 REPLACE_VALUE = 0.3
 TILE_SIZE = (32, 32)
-ASSET_DIRECTORY = r"Ressources\TileSet"
-TILESET_DIRECTORY = r"Ressources\tileset"
+ASSET_DIRECTORY = resource_path(r"Ressources\TileSet")
+TILESET_DIRECTORY = resource_path(r"Ressources\tileset")
 
 
 def load_assets(file: str, asset_folder: str, tile_size: Tuple[int, int]):

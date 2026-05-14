@@ -9,21 +9,22 @@ import os
 
 import pygame as p
 import animations as a
+from utils import resource_path
 
 if TYPE_CHECKING:
     from main import Manager
 
-MENU_ASSET_DIRECTORY = "Ressources/UIAsset/"
-BACKGROUND = MENU_ASSET_DIRECTORY + "fond ecran menu.png"
-PLAY_BUTTON = MENU_ASSET_DIRECTORY + "PLAY.png"
-SETTING_BUTTON = MENU_ASSET_DIRECTORY + "SETTINGS.png"
-EXIT_BUTTON = MENU_ASSET_DIRECTORY + "EXIT.png"
-EMPTY_BUTTON = MENU_ASSET_DIRECTORY + "EMPTY.png"
-TITLE = MENU_ASSET_DIRECTORY + "logo.png"
+MENU_ASSET_DIRECTORY = resource_path(r"Ressources\UIAsset")
+BACKGROUND = os.path.join(MENU_ASSET_DIRECTORY, "fond ecran menu.png")
+PLAY_BUTTON = os.path.join(MENU_ASSET_DIRECTORY, "PLAY.png")
+SETTING_BUTTON = os.path.join(MENU_ASSET_DIRECTORY, "SETTINGS.png")
+EXIT_BUTTON = os.path.join(MENU_ASSET_DIRECTORY, "EXIT.png")
+EMPTY_BUTTON = os.path.join(MENU_ASSET_DIRECTORY, "EMPTY.png")
+TITLE = os.path.join(MENU_ASSET_DIRECTORY, "logo.png")
 
-SAVE_FILE = "save/"
-SAVE_MULTI = SAVE_FILE + "multiplayer"
-SAVE_SOLO = SAVE_FILE + "solo"
+SAVE_FILE = resource_path(r"save")
+SAVE_MULTI = os.path.join(SAVE_FILE, "multiplayer")
+SAVE_SOLO = os.path.join(SAVE_FILE, "solo")
 
 UDP_IP = "0.0.0.0"
 UDP_PORT = 9999

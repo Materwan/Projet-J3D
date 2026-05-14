@@ -4,7 +4,9 @@ import json
 
 import pygame
 
-INVENTORY_ASSET_DIRECTORY = r"Ressources\InventoryAsset"
+from utils import resource_path
+
+INVENTORY_ASSET_DIRECTORY = resource_path(r"Ressources\InventoryAsset")
 
 """
 item_dic c'est la base de données des Items du jeu

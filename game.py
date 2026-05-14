@@ -8,6 +8,7 @@ from random import randint
 from typing import Dict, List, Any, Tuple, TYPE_CHECKING
 import os
 
+from utils import resource_path
 from player import SoloPlayerController, HostController, GuestController
 from network import HostNetwork, GuestNetwork
 from moteur import Moteur
@@ -21,7 +22,7 @@ from particule import spawn_local_particle
 if TYPE_CHECKING:
     from main import Manager
 
-INVENTORY_ASSET_DIRECTORY = r"Ressources\InventoryAsset"
+INVENTORY_ASSET_DIRECTORY = resource_path(r"Ressources\InventoryAsset")
 RESPAWN_PV = 2
 SPECTATE_DURATION = 15
 RESPAWN_OFFSET = 50  # l'autre joueur respawn 50 pixel a droite de l'autre

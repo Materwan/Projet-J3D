@@ -1,4 +1,6 @@
 import pygame
+
+from utils import resource_path
 from camera_system import Camera
 from particule import spawn_local_particle
 from player import SoloPlayerController, HostController, GuestController
@@ -30,15 +32,21 @@ class HUD:
 
         # image :
         self.base_heart = pygame.transform.scale(
-            pygame.image.load("Ressources/HUD/sprite_5.png").convert_alpha(),
+            pygame.image.load(
+                resource_path("Ressources/HUD/sprite_5.png")
+            ).convert_alpha(),
             (self.size, self.size),
         )
         self.damaged_heart = pygame.transform.scale(
-            pygame.image.load("Ressources/HUD/sprite_6.png").convert_alpha(),
+            pygame.image.load(
+                resource_path("Ressources/HUD/sprite_6.png")
+            ).convert_alpha(),
             (self.size, self.size),
         )
         self.empty_heart = pygame.transform.scale(
-            pygame.image.load("Ressources/HUD/sprite_7.png").convert_alpha(),
+            pygame.image.load(
+                resource_path("Ressources/HUD/sprite_7.png")
+            ).convert_alpha(),
             (self.size, self.size),
         )
 

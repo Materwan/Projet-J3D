@@ -6,7 +6,7 @@ from typing import Tuple, Dict
 from moteur import Moteur
 from camera_system import Camera
 from animations import AnimationController
-
+from utils import resource_path
 
 SPEED = 3
 MAX_PV = 10
@@ -35,7 +35,7 @@ class PlayerControllerBase:
 
         # -- Animations --
         self.animation = AnimationController(
-            r"Ressources\Animations\Player", (100, 100), self.screen
+            resource_path(r"Ressources\Animations\Player"), (100, 100), self.screen
         )
         self.im_size = pygame.Vector2(self.animation.im_size)
 

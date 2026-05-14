@@ -8,11 +8,11 @@ import time
 import pygame
 
 import numpy as np
+from utils import resource_path
 from map import Map
 from camera_system import Camera
 from animations import AnimationController
 from moteur import Moteur
-
 
 RECALC_MAX = 0.5
 DEATH_TIME = 1
@@ -136,7 +136,7 @@ class Ennemi:
 
         # -- Animation --
         self.animation = AnimationController(
-            r"Ressources\Animations\Ennemis\ennemy_1", None, self.screen
+            resource_path(r"Ressources\Animations\Ennemis\ennemy_1"), None, self.screen
         )
         self.direction = "right"
 
