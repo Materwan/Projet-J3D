@@ -1,5 +1,7 @@
 import pygame
+from camera_system import Camera
 from inventory import Item, Inventaire, InventaireUI, InventaireManager
+import math
 
 """
 pnj_dic c'est la base de données des PNJ du jeu
@@ -17,7 +19,7 @@ pnj_dic: dict[str, dict] = {
     # =========================================================================
     "Vieux Taupier": {
         "pnj_type": "Basic",
-        "image_path": "Ressources/pnj/old_mole/",
+        "image_path": "Ressources/Animations/PNJ/PNJ_1/",
         "dialogues": [
             "Ah, bonjour jeune aventurier ! Les chemins sont dangereux par ici...",
             "On dit que des créatures étranges rôdent dans les tunnels du nord.",
@@ -29,7 +31,7 @@ pnj_dic: dict[str, dict] = {
     },
     "Garde Roland": {
         "pnj_type": "Basic",
-        "image_path": "Ressources/pnj/old_mole/",
+        "image_path": "Ressources/Animations/PNJ/PNJ_1/",
         "dialogues": [
             "Halte ! ... Ah non, vous pouvez passer.",
             "Je surveille cette porte depuis dix ans. Rien à signaler.",
@@ -43,7 +45,7 @@ pnj_dic: dict[str, dict] = {
     # =========================================================================
     "Marchande Isabelle": {
         "pnj_type": "Merchant",
-        "image_path": "Ressources/pnj/old_mole/",
+        "image_path": "Ressources/Animations/PNJ/PNJ_1/",
         "dialogues": [
             "Bienvenue dans ma boutique ! J'ai ce qu'il vous faut.",
             "Revenez quand vous voulez, j'ai toujours du stock frais !",
@@ -64,14 +66,14 @@ pnj_dic: dict[str, dict] = {
     # =========================================================================
     "Forgeron Otto": {
         "pnj_type": "Quest",
-        "image_path": "Ressources/pnj/old_mole/",
+        "image_path": "Ressources/Animations/PNJ/PNJ_1/",
         "dialogues": ["Merci encore pour votre aide, je ne l'oublierai pas."],
         "interaction_radius": 80,
         "stock": None,
         "quests": [
             {
                 "titre": "Les matériaux du forgeron",
-                "description": "Otto a besoin de 5 Bûches et 3 Charbons pour forger une arme légendaire.",
+                "description": "Otto a besoin de 5 Bûches et 3 Charbons pour forger une arme légendaire.Otto a besoin de 5 Bûches et 3 Charbons pour forger une arme légendaire.Otto a besoin de 5 Bûches et 3 Charbons pour forger une arme légendaire.Otto a besoin de 5 Bûches et 3 Charbons pour forger une arme légendaire.Otto a besoin de 5 Bûches et 3 Charbons pour forger une arme légendaire.Otto a besoin de 5 Bûches et 3 Charbons pour forger une arme légendaire.",
                 "objectifs": [
                     {"item": "Bûche", "quantite": 5},
                     {"item": "Charbon", "quantite": 3},
@@ -118,7 +120,7 @@ pnj_dic: dict[str, dict] = {
     },
     "Vieille Sorcière": {
         "pnj_type": "Quest",
-        "image_path": "Ressources/pnj/old_mole/",
+        "image_path": "Ressources/Animations/PNJ/PNJ_1/",
         "dialogues": ["Merci encore pour votre aide, je ne l'oublierai pas."],
         "interaction_radius": 80,
         "stock": None,
@@ -154,9 +156,6 @@ class PNJ:
     """
     Données et état d'un personnage non joueur.
 
-    Les frames d'animation sont chargées depuis :
-        Ressources/pnj/<...>/sprite_0, sprite_1, ..., sprite_4
-
     Usage :
         pnj = PNJ.create("Marchande Isabelle", pos=(500, 300))
     """
@@ -165,7 +164,7 @@ class PNJ:
         self,
         name: str,
         pnj_type: str,
-        pos: tuple,
+        pos: list,
         frames: list[pygame.Surface],
         dialogues: list[str],
         interaction_radius: int,
@@ -174,7 +173,8 @@ class PNJ:
     ):
         self.name = name
         self.pnj_type = pnj_type
-        self.pos = list(pos)
+        self.pos = pos
+        self.hitbox = pygame.Rect(pos[0], pos[1], 32, 32)
         self.frames = frames
         self.sprite = frames[0]
         self.dialogues = dialogues
@@ -206,7 +206,7 @@ class PNJ:
 
         dx = self.pos[0] - player_pos[0]
         dy = self.pos[1] - player_pos[1]
-        return (dx * dx + dy * dy) ** 0.5 <= self.interaction_radius
+        return dx * dx + dy * dy <= self.interaction_radius * self.interaction_radius
 
     def get_current_dialogue(self):
         if self.pnj_type == "Quest":
@@ -231,7 +231,7 @@ class PNJ:
 
         try:
             frames = []
-            for i in range(5):
+            for i in range(3):
                 image = pygame.image.load(
                     data["image_path"] + f"sprite_{i}.png"
                 ).convert_alpha()
@@ -240,7 +240,11 @@ class PNJ:
             print(
                 f"\nUne ou plusieurs images de '{name}' introuvable : '{data['image_path']}'.\n"
             )
-            frames = [pygame.image.load("Ressources/pnj/not_found.png").convert_alpha()]
+            frames = [
+                pygame.image.load(
+                    "Ressources/Animations/PNJ/not_found.png"
+                ).convert_alpha()
+            ]
 
         return PNJ(
             name=name,
@@ -254,26 +258,57 @@ class PNJ:
         )
 
 
-class MenuInteractionUI:
-    """
-    Affiche le menu d'interaction (Parler, Optionnel(Quête ou Échanger), Quitter) en bas d'écran.
-    Pour la navigation : souris uniquement + la touche Échap pour quitter.
-    """
+class PnjPanelUI:
+    """Class parent pour MenuInteractionUI, DialogueUI, BoutiqueUI et QueteUI"""
 
-    def __init__(self, screen: pygame.Surface):
+    def __init__(self, screen: pygame.Surface, largeur: int, hauteur: int):
         self.screen = screen
+        self.largeur = largeur
+        self.hauteur = hauteur
+
         self.pnj: PNJ | None = None
+
+        self.x = 25
+        self.y = self.hauteur - 190
+        self.larg = self.largeur - 50
+        self.haut = 160
+
+        # police d'écriture
+        self.font_titre = pygame.font.SysFont("dejavusans", 18, bold=True)
+        self.font_corps = pygame.font.SysFont("dejavusans", 16)
+        self.font_sub = pygame.font.SysFont("dejavusans", 14)
+        self.font_hint = pygame.font.SysFont("dejavusans", 13)
+
+    def draw_panel(self, rect: pygame.Rect):
+        bg = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+        pygame.draw.rect(bg, (10, 10, 22, 200), bg.get_rect(), border_radius=10)
+        pygame.draw.rect(
+            bg, (75, 75, 120, 255), bg.get_rect(), width=2, border_radius=10
+        )
+        self.screen.blit(bg, rect.topleft)
+
+    def draw_portrait(self, pnj: "PNJ", panel_rect: pygame.Rect):
+        p_rect = pygame.Rect(
+            panel_rect.x + 12, panel_rect.y + 12, 90, panel_rect.height - 24
+        )
+        pygame.draw.rect(self.screen, (22, 22, 40), p_rect, border_radius=6)
+        pygame.draw.rect(self.screen, (70, 70, 110), p_rect, width=2, border_radius=6)
+        portrait = pygame.transform.scale(
+            pnj.sprite, (p_rect.width - 10, p_rect.height - 10)
+        )
+        self.screen.blit(portrait, (p_rect.x + 5, p_rect.y + 5))
+
+
+class MenuInteractionUI(PnjPanelUI):
+    """
+    Affiche le menu d'interaction (Parler, Optionnel(Quête ou Échanger), Quitter).
+    """
+
+    def __init__(self, screen: pygame.Surface, largeur: int, hauteur: int):
+
+        super().__init__(screen, largeur, hauteur)
+
         self.options = []
-
-        self.font_nom = pygame.font.SysFont("segoeui", 14, bold=True)
-        self.font_btn = pygame.font.SysFont("segoeui", 13)
-        self.font_hint = pygame.font.SysFont("segoeui", 11)
-
-        largeur, hauteur = self.screen.get_size()
-        self.x = 22
-        self.y = hauteur - 172
-        self.larg = largeur - 44
-        self.haut = 150
 
     def open(self, pnj: PNJ):
         self.pnj = pnj
@@ -284,53 +319,39 @@ class MenuInteractionUI:
             self.options.append("Quête")
         self.options.append("Quitter")
 
+        # crée la liste des rects
+        self.btn_rects = [
+            pygame.Rect(136 + i * 162, self.y + 45, 150, 36)
+            for i in range(len(self.options))
+        ]
+
     def handle_event(self, event: pygame.event.Event, mouse_pos) -> str | None:
         """Renvoie None si rien de nouveau sinon soit Parler, Quête, Échanger ou Quitter"""
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.pnj = None
             return "Quitter"
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            rects = []
             for i in range(len(self.options)):
-                rects.append(pygame.Rect(136 + i * 162, self.y + 45, 150, 36))
-            for i in range(len(self.options)):
-                if rects[i].collidepoint(mouse_pos):
+                if self.btn_rects[i].collidepoint(mouse_pos):
                     self.pnj = None
                     return self.options[i]
         return None
 
     def draw(self, mouse_pos):
+
         # Background
-        interface = pygame.Surface((self.larg, self.haut), pygame.SRCALPHA)
-        pygame.draw.rect(
-            interface, (10, 10, 22, 200), (0, 0, self.larg, self.haut), border_radius=10
-        )
-        pygame.draw.rect(
-            interface,
-            (75, 75, 120, 255),
-            (0, 0, self.larg, self.haut),
-            width=2,
-            border_radius=10,
-        )
-        self.screen.blit(interface, (self.x, self.y))
+        self.draw_panel(pygame.Rect(self.x, self.y, self.larg, self.haut))
 
         # Portrait
-        p_rect = pygame.Rect(self.x + 12, self.y + 12, 90, self.haut - 24)
-        pygame.draw.rect(self.screen, (22, 22, 40), p_rect, border_radius=6)
-        pygame.draw.rect(self.screen, (70, 70, 110), p_rect, width=2, border_radius=6)
-        portrait = pygame.transform.scale(
-            self.pnj.sprite, (p_rect.width - 10, p_rect.height - 10)
-        )
-        self.screen.blit(portrait, (p_rect.x + 5, p_rect.y + 5))
+        self.draw_portrait(self.pnj, pygame.Rect(self.x, self.y, self.larg, self.haut))
 
         # Le nom du PNJ
-        nom_s = self.font_nom.render(self.pnj.name, True, (230, 210, 160))
+        nom_s = self.font_titre.render(self.pnj.name, True, (230, 210, 160))
         self.screen.blit(nom_s, (136, self.y + 14))
 
         # Les boutons d'interactions
         for i in range(len(self.options)):
-            option = self.options[i]
-            btn = pygame.Rect(136 + 162 * i, self.y + 45, 150, 36)
+            option, btn = self.options[i], self.btn_rects[i]
             hovered = btn.collidepoint(mouse_pos)
 
             if hovered:
@@ -347,7 +368,7 @@ class MenuInteractionUI:
             )
             self.screen.blit(bs, (btn.x, btn.y))
 
-            text = self.font_btn.render(option, True, (240, 240, 255))
+            text = self.font_corps.render(option, True, (240, 240, 255))
             self.screen.blit(
                 text,
                 (
@@ -357,32 +378,21 @@ class MenuInteractionUI:
             )
 
 
-class DialogueUI:
+class DialogueUI(PnjPanelUI):
     """
     Affiche les dialogues d'un PNJ dialogue par dialogue avec effet machine à écrire.
-    Avancer : [E], [Entrée], [Espace] ou clic gauche.
     """
 
-    def __init__(self, screen: pygame.Surface):
-        self.screen = screen
-        self.pnj: PNJ | None = None
+    def __init__(self, screen: pygame.Surface, largeur: int, hauteur: int):
+
+        super().__init__(screen, largeur, hauteur)
+
         self.list_dialogue: list[str] = []
         self.dialogue = 0
         self.caractere = 0
         self.timer = 0.0
         self.done = False  # True quand le dialogue a été entièrement affichée
         self.char_delay = 28  # le délai en ms entre chaque caractère
-
-        self.font_nom = pygame.font.SysFont("segoeui", 14, bold=True)
-        self.font_text = pygame.font.SysFont("segoeui", 13)
-        self.font_hint = pygame.font.SysFont("segoeui", 11)
-
-        w, h = self.screen.get_size()
-        self.x = 22
-        self.y = h - 172
-        self.larg = w - 44
-        self.haut = 150
-        self.larg_max = self.larg - (136 - self.x) - 12
 
     def open(self, pnj: PNJ):
         self.pnj = pnj
@@ -391,14 +401,6 @@ class DialogueUI:
         self.caractere = 0
         self.timer = 0.0
         self.done = False
-
-    def update(self, dt):
-        self.timer += dt
-        while self.timer >= self.char_delay:
-            self.timer -= self.char_delay
-            self.caractere += 1
-            if self.caractere >= len(self.list_dialogue[self.dialogue]):
-                self.done = True
 
     def handle_event(self, event: pygame.event.Event) -> bool:
         """Renvoie True si fin du dialogue sinon False"""
@@ -425,46 +427,39 @@ class DialogueUI:
 
         return False
 
+    def update(self, dt):
+        self.timer += dt
+        while self.timer >= self.char_delay:
+            self.timer -= self.char_delay
+            self.caractere += 1
+            if self.caractere >= len(self.list_dialogue[self.dialogue]):
+                self.done = True
+
     def draw(self):
+
         # Background
-        interface = pygame.Surface((self.larg, self.haut), pygame.SRCALPHA)
-        pygame.draw.rect(
-            interface, (10, 10, 22, 200), (0, 0, self.larg, self.haut), border_radius=10
-        )
-        pygame.draw.rect(
-            interface,
-            (75, 75, 120, 255),
-            (0, 0, self.larg, self.haut),
-            width=2,
-            border_radius=10,
-        )
-        self.screen.blit(interface, (self.x, self.y))
+        self.draw_panel(pygame.Rect(self.x, self.y, self.larg, self.haut))
 
         # Portrait
-        p_rect = pygame.Rect(self.x + 12, self.y + 12, 90, self.haut - 24)
-        pygame.draw.rect(self.screen, (22, 22, 40), p_rect, border_radius=6)
-        pygame.draw.rect(self.screen, (70, 70, 110), p_rect, width=2, border_radius=6)
-        portrait = pygame.transform.scale(
-            self.pnj.sprite, (p_rect.width - 10, p_rect.height - 10)
-        )
-        self.screen.blit(portrait, (p_rect.x + 5, p_rect.y + 5))
+        self.draw_portrait(self.pnj, pygame.Rect(self.x, self.y, self.larg, self.haut))
 
         # Le nom du PNJ
-        nom_s = self.font_nom.render(self.pnj.name, True, (230, 210, 160))
+        nom_s = self.font_titre.render(self.pnj.name, True, (230, 210, 160))
         self.screen.blit(nom_s, (136, self.y + 14))
 
-        # Texte style machine à écrire
+        # Le texte
+        y_offset = self.y + 42
         for elt in wrap_text(
             self.list_dialogue[self.dialogue][: self.caractere],
-            self.font_text,
-            self.larg_max,
+            self.font_corps,
+            self.larg - 102,
         ):
-            self.screen.blit(
-                self.font_text.render(elt, True, (210, 210, 222)), (136, self.y + 39)
-            )
+            surf = self.font_corps.render(elt, True, (210, 210, 222))
+            self.screen.blit(surf, (137, y_offset))
+            y_offset += surf.get_height() + 2
 
         # Numéro de dialogue
-        dialogue_s = self.font_hint.render(
+        dialogue_s = self.font_corps.render(
             f"{self.dialogue + 1} / {len(self.list_dialogue)}", True, (110, 110, 155)
         )
         self.screen.blit(
@@ -482,7 +477,7 @@ class DialogueUI:
             else:
                 hint = "[E] Continuer"
 
-            hs = self.font_hint.render(hint, True, (130, 200, 130))
+            hs = self.font_corps.render(hint, True, (130, 200, 130))
             self.screen.blit(
                 hs,
                 (
@@ -490,6 +485,634 @@ class DialogueUI:
                     self.y + self.haut - hs.get_height() - 8,
                 ),
             )
+
+
+class BoutiqueUI(PnjPanelUI):
+    """
+    Affiche la boutique d'échange du jeu.
+    """
+
+    def __init__(self, screen: pygame.Surface, largeur: int, hauteur: int):
+
+        super().__init__(screen, largeur, hauteur)
+
+        self.inv_joueur: Inventaire | None = None
+        self.money = 0
+
+        self.ui_stock: InventaireUI | None = None
+        self.ui_joueur: InventaireUI | None = None
+
+        self.msg_text = ""
+        self.msg_color = (130, 220, 100)
+        self.msg_timer = 0.0
+        self.msg_duration = 2500.0
+
+        self.larg_inv = 486  # la largeur en pixels d'une grille d'inventaire complète
+        self.rect = pygame.Rect(self.x, self.y - 240, self.larg, 400)
+        self.position_inv_x = self.larg // 2 - self.larg_inv + self.x // 2
+        self.position_inv_y = self.rect.y + 55
+
+        self.btn_hovered = False
+        # rect du bouton fermer de la boutique
+        self.btn = pygame.Rect(
+            self.rect.x + self.rect.width // 2 - 75,
+            self.rect.y + self.rect.height - 44,
+            150,
+            34,
+        )
+
+    def open(self, pnj: PNJ, inv_joueur: Inventaire, money: int):
+        self.pnj = pnj
+        self.inv_joueur = inv_joueur
+        self.money = money
+
+        self.ui_joueur = InventaireUI(
+            self.screen,
+            name="Votre sac",
+            inv=inv_joueur,
+            pos=(self.position_inv_x - 10, self.position_inv_y),
+            is_merchant=False,
+            is_visible=True,
+        )
+
+        self.ui_stock = InventaireUI(
+            self.screen,
+            name=f"Stock — {pnj.name}",
+            inv=pnj.stock,
+            pos=(self.position_inv_x + self.larg_inv + 30, self.position_inv_y),
+            is_merchant=True,
+            is_visible=True,
+        )
+
+    def print_temporary_msg(self, text: str, color: tuple = (130, 220, 100)):
+        self.msg_text = text
+        self.msg_timer = self.msg_duration
+        self.msg_color = color
+
+    def acheter(self, row: int, col: int, is_shift_press: bool, item: Item):
+        prix_unit = round(item.price * self.ui_stock.price_multiplier)
+
+        qty = min(item.quantity, self.money // prix_unit) if is_shift_press else 1
+
+        if qty <= 0 or self.money < prix_unit:
+            self.print_temporary_msg("Pas assez de Mole_Coins !", (220, 140, 40))
+            return
+
+        to_add = item.copy()
+        to_add.quantity = qty
+        reste = self.inv_joueur.add_item(to_add)
+        bought = qty - reste
+        if bought == 0:
+            self.print_temporary_msg("Inventaire plein !", (220, 140, 40))
+            return
+        cout = prix_unit * bought
+        self.money -= cout
+        self.pnj.stock.remove_item(row, col, bought)
+        self.print_temporary_msg(
+            f"Acheté : {item.name} ×{bought}  −{cout} Mole_Coins", (220, 80, 80)
+        )
+
+    def vendre(self, row: int, col: int, is_shift_press: bool, item: Item):
+        qty = item.quantity if is_shift_press else 1
+
+        vendu = self.inv_joueur.remove_item(row, col, qty)
+        to_stock = vendu.copy()
+        to_stock.quantity = qty
+        self.pnj.stock.add_item(to_stock)
+
+        prix_vente = item.price * qty
+        self.money += prix_vente
+        self.print_temporary_msg(
+            f"Vendu : {item.name} ×{qty}  +{prix_vente} Mole_Coins", (130, 220, 100)
+        )
+
+    def handle_event(self, event: pygame.event.Event, mouse_pos: tuple) -> bool:
+        """Renvoie True si fermeture boutique."""
+        self.btn_hovered = self.btn.collidepoint(mouse_pos)
+
+        if event.type == pygame.KEYDOWN and event.key in (pygame.K_e, pygame.K_ESCAPE):
+            self.btn_hovered = False
+            return True
+
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.btn_hovered:
+                self.btn_hovered = False
+                return True
+
+            is_shift_press = bool(pygame.key.get_mods() & pygame.KMOD_SHIFT)
+
+            slot = self.ui_joueur.slot_at(mouse_pos)
+            if slot is not None:
+                item = self.inv_joueur.get(slot[0], slot[1])
+                if item is not None:
+                    self.vendre(slot[0], slot[1], is_shift_press, item)
+                return False
+
+            slot = self.ui_stock.slot_at(mouse_pos)
+            if slot is not None:
+                item = self.pnj.stock.get(slot[0], slot[1])
+                if item is not None:
+                    self.acheter(slot[0], slot[1], is_shift_press, item)
+
+        return False
+
+    def update(self, dt: float):
+        if self.msg_timer > 0:
+            self.msg_timer -= dt
+
+    def draw(self, mouse_pos: tuple):
+
+        # Background
+        self.draw_panel(pygame.Rect(self.x, self.rect.y, self.larg, self.rect.height))
+
+        # Nom de la boutique en haut à gauche
+        self.screen.blit(
+            self.font_titre.render(
+                f"Boutique — {self.pnj.name}", True, (230, 210, 160)
+            ),
+            (self.rect.x + 20, self.rect.y + 14),
+        )
+
+        # Hints d'interaction centrés au-dessus de chaque grille
+        hint_v = self.font_hint.render(
+            "Clic = vendre 1   Shift+clic = tout vendre", False, (230, 140, 140)
+        )
+        hint_a = self.font_hint.render(
+            "Clic = acheter 1   Shift+clic = acheter max", False, (140, 230, 140)
+        )
+        joueur_center = self.ui_joueur.pos[0] + self.larg_inv // 2
+        stock_center = self.ui_stock.pos[0] + self.larg_inv // 2
+        hint_y = self.rect.y + 37
+        self.screen.blit(hint_v, (joueur_center - hint_v.get_width() // 2, hint_y))
+        self.screen.blit(hint_a, (stock_center - hint_a.get_width() // 2, hint_y))
+
+        # Ligne séparatrice verticale entre les deux grilles
+        sep_x = self.ui_joueur.pos[0] + self.larg_inv + 20 // 2 + 10
+        sep_top = hint_y + hint_v.get_height()
+        sep_bot = self.rect.y + 55 + self.ui_joueur.image.get_height()
+        pygame.draw.line(
+            self.screen, (110, 110, 180), (sep_x, sep_top), (sep_x, sep_bot), 2
+        )
+
+        # Grilles inventaire joueur (gauche) et stock marchand (droite)
+        self.ui_joueur.draw(mouse_pos)
+        self.ui_stock.draw(mouse_pos)
+
+        # Tooltip de l'item survolé (priorité grille joueur, puis stock)
+        for ui in (self.ui_joueur, self.ui_stock):
+            slot = ui.slot_at(mouse_pos)
+            if slot is not None:
+                item = ui.inv.get(slot[0], slot[1])
+                if item is not None:
+                    ui.draw_tooltip(item, mouse_pos)
+                break
+
+        # Bouton Fermer centré en bas du panel
+        bs = pygame.Surface((self.btn.width, self.btn.height), pygame.SRCALPHA)
+        pygame.draw.rect(
+            bs,
+            (60, 90, 160, 220) if self.btn_hovered else (28, 28, 50, 200),
+            (0, 0, self.btn.width, self.btn.height),
+            border_radius=7,
+        )
+        pygame.draw.rect(
+            bs,
+            (130, 160, 230, 255) if self.btn_hovered else (55, 55, 100, 255),
+            (0, 0, self.btn.width, self.btn.height),
+            width=2,
+            border_radius=7,
+        )
+        self.screen.blit(bs, (self.btn.x, self.btn.y))
+        ts = self.font_sub.render(
+            "Fermer", True, (240, 240, 255) if self.btn_hovered else (180, 180, 210)
+        )
+        self.screen.blit(
+            ts,
+            (
+                self.btn.x + (self.btn.width - ts.get_width()) // 2,
+                self.btn.y + (self.btn.height - ts.get_height()) // 2,
+            ),
+        )
+
+        # Mole_Coins du joueur, centré entre les grilles et le bouton Fermer
+        coins = self.font_sub.render(f"Mole_Coins : {self.money}", True, (255, 215, 0))
+        self.screen.blit(
+            coins,
+            (
+                self.rect.x + self.rect.width // 2 - coins.get_width() // 2,
+                self.btn.y - coins.get_height() - 4,
+            ),
+        )
+
+        # Message temporaire (achat/vente/erreur)
+        if self.msg_timer > 0:
+            msg = self.font_hint.render(self.msg_text, False, self.msg_color)
+            msg.set_alpha(
+                int(255 * min(1.0, self.msg_timer / (self.msg_duration * 0.4)))
+            )
+            self.screen.blit(
+                msg,
+                (
+                    self.rect.x + self.rect.width // 2 - msg.get_width() // 2,
+                    self.ui_joueur.pos[1] - msg.get_height() - 22,
+                ),
+            )
+
+
+class QueteUI(PnjPanelUI):
+    """Affiche la quête courante du PNJ avec ses objectifs et récompenses."""
+
+    def __init__(self, screen: pygame.Surface, largeur: int, hauteur: int):
+
+        super().__init__(screen, largeur, hauteur)
+
+        self.inv_joueur: Inventaire | None = None
+        self.money = 0
+
+        self.msg_text = ""
+        self.msg_color = (130, 220, 100)
+        self.msg_timer = 0.0
+        self.msg_duration = 2500.0
+
+        self.msg_statut = {
+            "disponible": ("Disponible", (180, 180, 80)),
+            "active": ("En cours...", (80, 180, 220)),
+            "complete": ("Prêt !", (80, 220, 80)),
+            "terminee": ("Terminée !", (130, 130, 130)),
+        }
+
+        self.msg_action_btn = {
+            "disponible": ("Accepter", True),
+            "active": ("En cours...", False),
+            "complete": ("Remettre les items !", True),
+            "terminee": ("Terminée", False),
+        }
+
+        self.rect = pygame.Rect(
+            self.x,
+            self.y - 160,
+            self.larg,
+            320,
+        )
+
+        self.btn_action_hov = False
+        self.btn_action = pygame.Rect(
+            self.x + 20, self.rect.y + self.rect.height - 50, 190, 36
+        )
+
+        self.btn_fermer_hov = False
+        self.btn_fermer = pygame.Rect(
+            self.rect.right - 210, self.rect.y + self.rect.height - 50, 190, 36
+        )
+
+    def open(self, pnj: PNJ, inv_joueur: Inventaire, money: int):
+        self.pnj = pnj
+        self.inv_joueur = inv_joueur
+        self.money = money
+
+        has_all = inv_joueur.has_items(pnj.quests[pnj.quest_index]["objectifs"])
+
+        if pnj.quest_etat == "active" and has_all:
+            pnj.quest_etat = "complete"
+        elif pnj.quest_etat == "complete" and not has_all:
+            pnj.quest_etat = "active"
+
+    def print_temporary_msg(self, text: str, color: tuple = (130, 220, 100)):
+        self.msg_text = text
+        self.msg_timer = self.msg_duration
+        self.msg_color = color
+
+    def remettre_items(self):
+        q = self.pnj.quests[self.pnj.quest_index]
+
+        self.inv_joueur.remove_items(q["objectifs"])
+
+        self.money += q["recompense_coins"]
+        for r in q["recompense_items"]:
+            self.inv_joueur.add_item(Item.create(r["item"], r["quantite"]))
+
+        self.pnj.quest_etat = "terminee"
+        self.print_temporary_msg("Récompense reçue !")
+
+    def handle_event(self, event: pygame.event.Event, mouse_pos: tuple) -> bool:
+        """Renvoie True si fermeture sinon False."""
+
+        self.btn_action_hov = self.btn_action.collidepoint(mouse_pos)
+        self.btn_fermer_hov = self.btn_fermer.collidepoint(mouse_pos)
+
+        if event.type == pygame.KEYDOWN and event.key in (pygame.K_e, pygame.K_ESCAPE):
+            self.btn_fermer_hov = False
+            self.btn_action_hov = False
+            return True
+
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.btn_fermer_hov:
+                self.btn_fermer_hov = False
+                self.btn_action_hov = False
+                return True
+            if self.btn_action_hov:
+                if self.pnj.quest_etat == "disponible":
+                    self.pnj.quest_etat = "active"
+                    self.print_temporary_msg("Quête acceptée !")
+                    if self.inv_joueur.has_items(
+                        self.pnj.quests[self.pnj.quest_index]["objectifs"]
+                    ):
+                        self.pnj.quest_etat = "complete"
+                elif self.pnj.quest_etat == "complete":
+                    self.remettre_items()
+        return False
+
+    def update(self, dt: float):
+        if self.msg_timer > 0:
+            self.msg_timer -= dt
+
+    def draw(self):
+
+        # Background
+        self.draw_panel(pygame.Rect(self.x, self.rect.y, self.larg, self.rect.height))
+
+        q = self.pnj.quests[self.pnj.quest_index]
+
+        # Titre centré + séparateur horizontal
+        titre = self.font_titre.render(f"Quête — {q['titre']}", True, (230, 210, 160))
+        self.screen.blit(
+            titre,
+            (
+                self.rect.x + (self.rect.width - titre.get_width()) // 2,
+                self.rect.y + 12,
+            ),
+        )
+        pygame.draw.line(
+            self.screen,
+            (60, 60, 100),
+            (self.rect.x + 20, self.rect.y + 36),
+            (self.rect.right - 20, self.rect.y + 36),
+        )
+
+        # Numéro de quête en haut à gauche (si plusieurs)
+        if len(self.pnj.quests) > 1:
+            num_s = self.font_hint.render(
+                f"Quête {self.pnj.quest_index + 1} / {len(self.pnj.quests)}",
+                True,
+                (120, 120, 160),
+            )
+            self.screen.blit(num_s, (self.rect.x + 20, self.rect.y + 14))
+
+        # Statut en haut à droite
+        lbl_etat, col_etat = self.msg_statut[self.pnj.quest_etat]
+        etat_s = self.font_hint.render(f"Statut : {lbl_etat}", True, col_etat)
+        self.screen.blit(
+            etat_s, (self.rect.right - etat_s.get_width() - 14, self.rect.y + 14)
+        )
+
+        ty = self.rect.y + 46
+
+        # Description wrappée
+        for line in wrap_text(q["description"], self.font_sub, self.larg - 32):
+            ls = self.font_sub.render(line, True, (200, 200, 215))
+            self.screen.blit(ls, (self.x + 25, ty))
+            ty += ls.get_height() + 3
+        ty += 8
+
+        # Objectifs
+        self.screen.blit(
+            self.font_sub.render("Objectifs :", True, (180, 160, 120)),
+            (self.x + 25, ty),
+        )
+        ty += self.font_sub.get_height() + 4
+        for obj in q["objectifs"]:
+            possede = self.inv_joueur.count_item(obj["item"])
+            rempli = possede >= obj["quantite"]
+            col = (100, 220, 100) if rempli else (220, 100, 100)
+            ls = self.font_sub.render(
+                f"  {'   ✓' if rempli else '   ✗'}  {obj['item']} : {possede} / {obj['quantite']}",
+                True,
+                col,
+            )
+            self.screen.blit(ls, (self.x + 25, ty))
+            ty += ls.get_height() + 3
+        ty += 8
+
+        # Récompenses
+        self.screen.blit(
+            self.font_sub.render("Récompenses :", True, (180, 160, 120)),
+            (self.x + 25, ty),
+        )
+        ty += self.font_sub.get_height() + 4
+
+        if q["recompense_coins"] > 0:
+            coins_s = self.font_sub.render(
+                f"    +{q['recompense_coins']} Mole_Coins", True, (255, 215, 0)
+            )
+            self.screen.blit(coins_s, (self.x + 25, ty))
+            ty += coins_s.get_height() + 3
+
+        for ri in q["recompense_items"]:
+            ri_s = self.font_sub.render(
+                f"    {ri['quantite']}× {ri['item']}", True, (160, 220, 160)
+            )
+            self.screen.blit(ri_s, (self.x + 25, ty))
+            ty += ri_s.get_height() + 3
+
+        # Boutons action + fermer
+        a_lbl, a_en = self.msg_action_btn[self.pnj.quest_etat]
+        for btn, label, enabled, hovered in (
+            (self.btn_action, a_lbl, a_en, self.btn_action_hov and a_en),
+            (self.btn_fermer, "Fermer", True, self.btn_fermer_hov),
+        ):
+            col_bg = (60, 90, 160, 220) if hovered else (28, 28, 50, 200)
+            col_brd = (130, 160, 230, 255) if hovered else (55, 55, 100, 255)
+            col_txt = (240, 240, 255) if enabled else (100, 100, 130)
+
+            bs = pygame.Surface((btn.width, btn.height), pygame.SRCALPHA)
+            pygame.draw.rect(bs, col_bg, (0, 0, btn.width, btn.height), border_radius=7)
+            pygame.draw.rect(
+                bs, col_brd, (0, 0, btn.width, btn.height), width=2, border_radius=7
+            )
+            self.screen.blit(bs, (btn.x, btn.y))
+
+            ts = self.font_sub.render(label, True, col_txt)
+            self.screen.blit(
+                ts,
+                (
+                    btn.x + (btn.width - ts.get_width()) // 2,
+                    btn.y + (btn.height - ts.get_height()) // 2,
+                ),
+            )
+
+        # Message temporaire
+        if self.msg_timer > 0:
+            msg = self.font_sub.render(self.msg_text, True, self.msg_color)
+            msg.set_alpha(
+                int(255 * min(1.0, self.msg_timer / (self.msg_duration * 0.4)))
+            )
+            self.screen.blit(
+                msg,
+                (
+                    self.rect.x + self.rect.width // 2 - msg.get_width() // 2,
+                    self.btn_action.y - msg.get_height() - 8,
+                ),
+            )
+
+
+class PNJManager:
+    """
+    La Class PNJManager pour la gestion des PNJ en jeu.
+    """
+
+    def __init__(self, screen: pygame.Surface, camera):
+        self.screen = screen
+        self.largeur, self.hauteur = self.screen.get_size()
+        self.camera = camera
+
+        self.pnjs: list[PNJ] = []
+
+        self.menu_ui = MenuInteractionUI(screen, self.largeur, self.hauteur)
+        self.dialogue_ui = DialogueUI(screen, self.largeur, self.hauteur)
+        self.boutique_ui = BoutiqueUI(screen, self.largeur, self.hauteur)
+        self.quete_ui = QueteUI(screen, self.largeur, self.hauteur)
+
+        self.inv_joueur: Inventaire | None = None
+        self.money: int = 0
+
+        # Mode courant : None | "menu" | "dialogue" | "boutique" | "quete"
+        self.mode: str | None = None
+        self.pnj_actif: PNJ | None = None
+        self.neary_pnj: PNJ | None = None
+
+        # crée une surface pour mettre sur le screen plus tard : [E]
+        self.e_bubble_text = pygame.font.SysFont("trebuchetms", 14, bold=True).render(
+            "[E]", True, (230, 210, 160)
+        )
+        self.surface_bubble = pygame.Surface((25, 25), pygame.SRCALPHA)
+        pygame.draw.rect(
+            self.surface_bubble, (18, 18, 32, 215), (0, 0, 25, 25), border_radius=5
+        )
+        pygame.draw.rect(
+            self.surface_bubble, (120, 120, 168, 255), (0, 0, 25, 25), 1, 5
+        )
+        self.surface_bubble.blit(self.e_bubble_text, (3, 3))
+
+    def add(self, pnj: PNJ):
+        self.pnjs.append(pnj)
+
+    def remove(self, pnj: PNJ):
+        self.pnjs.remove(pnj)
+
+    def set_inventaire(self, inv_joueur: Inventaire, money: int):
+        """money : int — montant de la monnaie du joueur."""
+        self.inv_joueur = inv_joueur
+        self.money = money
+
+    def handle_event(self, event: pygame.event.Event, mouse_pos: tuple) -> bool:
+        """Retourne True si l'event a été consommé par un UI PNJ."""
+        match self.mode:
+            case "menu":
+                action = self.menu_ui.handle_event(event, mouse_pos)
+                if action is None:
+                    return True
+                if action == "Parler":
+                    self.mode = "dialogue"
+                    self.dialogue_ui.open(self.pnj_actif)
+                elif action == "Échanger":
+                    self.mode = "boutique"
+                    self.boutique_ui.open(self.pnj_actif, self.inv_joueur, self.money)
+                elif action == "Quête":
+                    self.mode = "quete"
+                    self.quete_ui.open(self.pnj_actif, self.inv_joueur, self.money)
+                else:  # action == "Quitter"
+                    self.mode = None
+                    self.pnj_actif = None
+
+            case "dialogue":
+                if self.dialogue_ui.handle_event(event):
+                    self.mode = None
+                    self.pnj_actif = None
+                return True
+
+            case "boutique":
+                if self.boutique_ui.handle_event(event, mouse_pos):
+                    self.money = self.boutique_ui.money
+                    self.mode = None
+                    self.pnj_actif = None
+                return True
+
+            case "quete":
+                if self.quete_ui.handle_event(event, mouse_pos):
+                    self.money = self.quete_ui.money
+                    self.mode = None
+                    self.pnj_actif = None
+                return True
+
+        # Aucun UI ouvert : [E] déclenche l'interaction avec le PNJ proche
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_e and self.neary_pnj:
+            pnj = self.neary_pnj
+
+            # Si la quête précédente est terminée, passe à la suivante
+            if pnj.pnj_type == "Quest" and pnj.quest_etat == "terminee":
+                if pnj.quest_index + 1 < len(pnj.quests):
+                    pnj.quest_index += 1
+                    pnj.quest_etat = "disponible"
+
+            self.pnj_actif = pnj
+            self.mode = "menu"
+            self.menu_ui.open(pnj)
+            return True
+
+        return False
+
+    def update(self, player_pos: tuple, dt: float):
+        # Mise à jour du timer de l'UI active
+        match self.mode:
+            case "dialogue":
+                self.dialogue_ui.update(dt)
+            case "boutique":
+                self.boutique_ui.update(dt)
+            case "quete":
+                self.quete_ui.update(dt)
+
+        # Animation de tous les PNJ
+        for pnj in self.pnjs:
+            pnj.update()
+
+        # Détecte le PNJ le plus proche
+        if self.mode is None:
+            self.neary_pnj = next((p for p in self.pnjs if p.is_near(player_pos)), None)
+
+    def draw_pnj(self):
+        """Dessine les PNJ si il sont sur le screen"""
+        screen_rect = pygame.Rect(0, 0, self.largeur, self.hauteur)
+
+        for pnj in self.pnjs:
+            screen_hitbox = self.camera.apply(pnj.hitbox)
+            pygame.draw.rect(self.screen, "red", screen_hitbox, 2)
+
+            if screen_rect.colliderect(screen_hitbox):
+                self.screen.blit(
+                    pnj.sprite, (screen_hitbox.centerx - 50, screen_hitbox.y - 50)
+                )
+                if pnj is self.neary_pnj and self.mode is None:
+                    self.screen.blit(
+                        self.surface_bubble,
+                        (
+                            screen_hitbox.centerx - 13,
+                            screen_hitbox.top
+                            - 50
+                            + math.sin(pygame.time.get_ticks() * 0.005) * 5,
+                        ),
+                    )
+
+    def draw_ui(self, mouse_pos: tuple):
+        """Dessine l'UI PNJ active par-dessus tout le reste."""
+        match self.mode:
+            case "menu":
+                self.menu_ui.draw(mouse_pos)
+            case "dialogue":
+                self.dialogue_ui.draw()
+            case "boutique":
+                self.boutique_ui.draw(mouse_pos)
+            case "quete":
+                self.quete_ui.draw()
 
 
 def wrap_text(text: str, font: pygame.font.Font, max_width: int) -> list[str]:
@@ -508,3 +1131,91 @@ def wrap_text(text: str, font: pygame.font.Font, max_width: int) -> list[str]:
     if current:
         liste.append(current)
     return liste
+
+
+if __name__ == "__main__":
+    pygame.init()
+    screen = pygame.display.set_mode((0, 0))
+    clock = pygame.time.Clock()
+
+    inv = Inventaire(rows=4, cols=8)
+    inv.add_item(Item.create("Potion Rouge", 3))
+    inv.add_item(Item.create("Pain", 5))
+    inv.add_item(Item.create("Pièce d'or", 30))
+    inv.add_item(Item.create("Bûche", 8))
+    inv.add_item(Item.create("Charbon", 5))
+    inv.add_item(Item.create("Pioche", 2))
+    inv.add_item(Item.create("Marteau", 2))
+    money = 1500
+
+    # camera
+    width, height = screen.get_size()
+    camera = Camera(width, height, 0, 0)
+
+    pnj_mgr = PNJManager(screen, camera)
+    pnj_mgr.set_inventaire(inv, money)
+    pnj_mgr.add(PNJ.create("Vieux Taupier", pos=[200, 350]))
+    pnj_mgr.add(PNJ.create("Marchande Isabelle", pos=[500, 350]))
+    pnj_mgr.add(PNJ.create("Forgeron Otto", pos=[800, 350]))
+
+    ui_inv = InventaireUI(
+        screen,
+        "Sac du joueur",
+        inv,
+        pos=((1000 - 486) // 2, 700 - 293),
+        is_merchant=False,
+        is_visible=False,
+    )
+    drag_mgr = InventaireManager(screen, [ui_inv])
+
+    def on_use(item, slot, ui: InventaireUI):
+        ui.inv.remove_item(*slot, 1)
+
+    PLAYER_SIZE = 20
+    SPEED = 5
+    player_rect = pygame.Rect(500 - PLAYER_SIZE // 2, 400, PLAYER_SIZE, PLAYER_SIZE)
+
+    running = True
+    while running:
+        dt = clock.tick(60)
+        mouse_pos = pygame.mouse.get_pos()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    if pnj_mgr.mode is None and not ui_inv.is_visible:
+                        running = False
+                elif event.key == pygame.K_i:
+                    if pnj_mgr.mode is None:
+                        ui_inv.is_visible = not ui_inv.is_visible
+            if pnj_mgr.handle_event(event, mouse_pos):
+                drag_mgr.handle_event(event, mouse_pos, on_use=on_use)
+
+        if pnj_mgr.mode is None:
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_LEFT]:
+                player_rect.x -= SPEED
+            if keys[pygame.K_RIGHT]:
+                player_rect.x += SPEED
+            if keys[pygame.K_UP]:
+                player_rect.y -= SPEED
+            if keys[pygame.K_DOWN]:
+                player_rect.y += SPEED
+
+        player_pos = (player_rect.centerx, player_rect.centery)
+        pnj_mgr.update(player_pos, dt)
+
+        screen.fill((25, 25, 38))
+
+        pnj_mgr.draw_pnj()
+        pygame.draw.rect(screen, (200, 60, 60), player_rect)
+
+        if pnj_mgr.mode is None:
+            drag_mgr.draw(mouse_pos)
+
+        pnj_mgr.draw_ui(mouse_pos)
+        pygame.display.flip()
+
+    pygame.quit()

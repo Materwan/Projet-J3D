@@ -1,8 +1,10 @@
 import logging
 import traceback
+import os
 
 import pygame
 
+from utils import resource_path
 from menu import (
     Principal_Menu,
     Setting_Menu,
@@ -23,11 +25,11 @@ pygame.display.set_caption("MoleTale")
 FPS = 60
 TAILLE_ECRAN = (0, 0)  # (500, 500) pour petit ecran (0, 0) pour plein ecran
 
-SOUND_PATH = "Ressources/Musics/"
-MUSIC_HOLDER = SOUND_PATH + "placeholder.mp3"
-SOUND_AMBIANCE = SOUND_PATH + "ambiance.mp3"
-SOUND_FOOTSTEP = SOUND_PATH + "footstep.mp3"
-SOUND_ATTACK = SOUND_PATH + "attack.mp3"
+SOUND_PATH = resource_path("Ressources/Musics/")
+MUSIC_HOLDER = os.path.join(SOUND_PATH, "placeholder.mp3")
+SOUND_AMBIANCE = os.path.join(SOUND_PATH, "ambiance.mp3")
+SOUND_FOOTSTEP = os.path.join(SOUND_PATH, "footstep.mp3")
+SOUND_ATTACK = os.path.join(SOUND_PATH, "attack.mp3")
 SOUND = {
     "main_music": SoundController(MUSIC_HOLDER),
     "ambiance": SoundController(SOUND_AMBIANCE),

@@ -14,6 +14,7 @@ import heapq
 import pytmx
 
 import numpy as np
+from utils import resource_path
 from perlin_numpy import generate_perlin_noise_2d
 from camera_system import Camera
 import pygame

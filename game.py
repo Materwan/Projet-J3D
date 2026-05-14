@@ -15,6 +15,7 @@ from player import (
     HostController,
     GuestController,
 )
+from utils import resource_path
 from network import HostNetwork, GuestNetwork
 from moteur import Moteur
 from map import Map, Hub, Dungeon, MapManager
@@ -27,7 +28,10 @@ from particule import spawn_local_particle
 if TYPE_CHECKING:
     from main import Manager
 
-INVENTORY_ASSET_DIRECTORY = r"Ressources\InventoryAsset"
+INVENTORY_ASSET_DIRECTORY = resource_path(r"Ressources\InventoryAsset")
+RESPAWN_PV = 2
+SPECTATE_DURATION = 15
+RESPAWN_OFFSET = 50  # l'autre joueur respawn 50 pixel a droite de l'autre
 
 
 def serialize_ennemis(ennemis: Dict[int, Ennemi]) -> Dict[int, Any]:
@@ -102,6 +106,9 @@ class Game:
         self.address = "0.0.0.0"
         self.port = 8888
 
+        # -- Mort / Spectateur --
+        self.spectate_start: float | None = None
+
         # -- Inventaire -- : touche I pour ouvrir et fermer l'inventaire
         largeur, hauteur = self.screen.get_size()
         self.inv_joueur = Inventaire(rows=4, cols=8)
@@ -109,14 +116,9 @@ class Game:
             self.screen,
             name="Sac du joueur",
             inv=self.inv_joueur,
-            pos=((largeur - 486) // 2, hauteur - 293),
-            image_path=os.path.join(INVENTORY_ASSET_DIRECTORY, "chest.png"),
-            slot_size=52,
-            slot_margin=4,
-            padding=21,
-            title_height=11,
-            visible=False,
+            pos=((largeur - 480) // 2, hauteur - 290),
             is_merchant=False,
+            is_visible=False,
         )
         self.drag_mgr = InventaireManager(self.screen, [self.ui_joueur])
 
@@ -127,9 +129,12 @@ class Game:
         """Inventaire : Appelé au clic droit sur un consommable."""
 
         if item.item_type == "Consommable" and item.effect is not None:
-            ui.inv.remove_item(slot[0], slot[1], 1)
-            print(f"You've suck dry your potion : {item.effect:+d} PV")
-            # self.player_controller.pv += item.effect par exemple
+            if self.player_controller.pv >= self.player_controller.max_pv:
+                print("You are already full health !")
+            else:
+                ui.inv.remove_item(slot[0], slot[1], 1)
+                print("You've suck dry your potion : +1 HP")
+                self.player_controller.pv += 1
 
     def initialize(self):
         """Initialise le moteur, la map, le contrôleur et le réseau."""
@@ -229,6 +234,57 @@ class Game:
         self.moteur.map = self.map
         self.player_controller.current_map = self.map.map
 
+    def get_camera_target(self) -> pygame.Rect:
+        """Renvoie la hitbox cible pour la caméra."""
+        if self.player_controller.is_dead:
+            if isinstance(self.player_controller, HostController):
+                return self.player_controller.guest.hitbox
+            if isinstance(self.player_controller, GuestController):
+                return self.player_controller.host.hitbox
+        return self.player_controller.hitbox
+
+    def get_position_target(self) -> pygame.Rect:
+        """Renvoie la position cible pour la map."""
+        if self.player_controller.is_dead:
+            if isinstance(self.player_controller, HostController):
+                return self.player_controller.guest.position
+            if isinstance(self.player_controller, GuestController):
+                return self.player_controller.host.position
+        return self.player_controller.position
+
+    def _handle_death(self):
+        """Gère la mort des joueurs : spectateur 30 s puis respawn, ou écran de mort."""
+        pc = self.player_controller
+
+        if isinstance(pc, SoloPlayerController):
+            if pc.is_dead:
+                self.manager.change_state("DEATH_SCREEN")
+
+        elif isinstance(pc, HostController):
+
+            if pc.is_dead and pc.guest.is_dead:
+                self.spectate_start = None
+                self.manager.change_state("DEATH_SCREEN")
+
+            elif pc.is_dead or pc.guest.is_dead:
+                if self.spectate_start is None:
+                    self.spectate_start = time.time()
+                elif time.time() - self.spectate_start >= SPECTATE_DURATION:
+                    if pc.is_dead:
+                        pc.respawn(
+                            (pc.guest.position.x + RESPAWN_OFFSET, pc.guest.position.y),
+                            RESPAWN_PV,
+                        )
+                    else:
+                        pc.guest.respawn(
+                            (pc.position.x + RESPAWN_OFFSET, pc.position.y), RESPAWN_PV
+                        )
+                    self.spectate_start = None
+
+        elif isinstance(pc, GuestController):
+            if pc.is_dead and pc.host.is_dead:
+                self.manager.change_state("DEATH_SCREEN")
+
     # Réseau
 
     def get_to_send_data_host(self, include_map: bool = False) -> Dict[str, Any]:
@@ -242,10 +298,12 @@ class Game:
                 "moving_intent": hc.moving_intent,
                 "direction": hc.direction,
                 "attaque": hc.animation.current_state == "attack",
+                "is_dead": hc.is_dead,
             },
             "guest": {
                 "position": list(hc.guest.position),
                 "pv": hc.guest.pv,
+                "is_dead": hc.guest.is_dead,
             },
             "map": {
                 "name": self.map.map_name,
@@ -306,6 +364,7 @@ class Game:
         if "guest" in data:
             gc.target_pos = pygame.Vector2(data["guest"]["position"])
             gc.pv = data["guest"]["pv"]
+            gc.is_dead = data["guest"]["is_dead"]
 
         if "host" in data:
             gc.host_target_pos = pygame.Vector2(data["host"]["position"])
@@ -313,6 +372,7 @@ class Game:
             gc.host.direction = data["host"]["direction"]
             gc.host.attaque = data["host"]["attaque"]
             gc.host.current_map = self.map.maps[data["map"]["name"]]
+            gc.host.is_dead = data["host"]["is_dead"]
 
         # Ennemis
         for key, ennemi_data in data["ennemis"].items():
@@ -371,18 +431,21 @@ class Game:
                 self.manager.running = False
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    if self.ui_joueur.visible:  # Ferme inventaire
-                        self.ui_joueur.visible = False
+                    if self.ui_joueur.is_visible:  # Ferme inventaire
+                        self.ui_joueur.is_visible = False
                     else:  # Pause
                         self.manager.change_state("MENU_PAUSE")
-                elif event.key == self.keybinds["attack"]:  # Attaque
+                elif (
+                    event.key == self.keybinds["attack"]
+                    and not self.player_controller.is_dead
+                ):
                     self.player_controller.attaque = True
                 elif event.key == pygame.K_0:
                     self.save()
                 elif event.key == pygame.K_F2:  # Debug F2
                     self.show_hitbox = not self.show_hitbox
                 elif event.key == pygame.K_i:  # Ouvre inventaire
-                    self.ui_joueur.visible = not self.ui_joueur.visible
+                    self.ui_joueur.is_visible = not self.ui_joueur.is_visible
 
                 # TEMPORAIRE !
                 elif event.key == pygame.K_h:
@@ -429,7 +492,7 @@ class Game:
 
         # -- Joueur --
         self.player_controller.update(self.ennemis)
-        self.camera.update(self.player_controller.hitbox)
+        self.camera.update(self.get_camera_target())
 
         # -- Ennemis --
         self.paths = self.map.update_ennemis()
@@ -452,6 +515,98 @@ class Game:
         player_controller.hitbox.center = new_position
         if move_camera:
             self.camera.set_position(new_position)
+        # -- Mort / Spectateur --
+        self._handle_death()
+
+    def update_ennemis_solo(self):
+        del_key = []
+
+        for key, ennemi in self.ennemis.items():
+            self.paths.append(ennemi.update(self.player_controller))
+
+            if ennemi.attaque_rect is not None:
+                self.moteur.apply_attack(ennemi.attaque_rect, self.player_controller)
+
+            self.spawn_death_particles(ennemi)
+
+            if time.time() > ennemi.death_time:
+                del_key.append(key)
+
+        for key in del_key:
+            del self.ennemis[key]
+
+        if self.player_controller.attaque_rect is not None:
+            for ennemi in self.ennemis.values():
+                self.moteur.apply_attack(self.player_controller.attaque_rect, ennemi)
+
+    def update_ennemis_host(self):
+        del_key = []
+
+        for key, ennemi in self.ennemis.items():
+            self.paths.append(
+                ennemi.update(self.player_controller, self.player_controller.guest)
+            )
+
+            if ennemi.attaque_rect is not None:
+                if not self.player_controller.is_dead:
+                    self.moteur.apply_attack(
+                        ennemi.attaque_rect, self.player_controller
+                    )
+                if not self.player_controller.guest.is_dead:
+                    self.moteur.apply_attack(
+                        ennemi.attaque_rect, self.player_controller.guest
+                    )
+
+            self.spawn_death_particles(ennemi)
+
+            if time.time() > ennemi.death_time:
+                del_key.append(key)
+
+        for key in del_key:
+            del self.ennemis[key]
+
+        if self.player_controller.attaque_rect is not None:
+            for ennemi in self.ennemis.values():
+                self.moteur.apply_attack(self.player_controller.attaque_rect, ennemi)
+
+        if self.player_controller.guest.attaque_rect is not None:
+            for ennemi in self.ennemis.values():
+                self.moteur.apply_attack(
+                    self.player_controller.guest.attaque_rect, ennemi
+                )
+
+    def update_ennemis_guest(self, ennemis_data: Dict[str, Any]):
+        """Côté guest : les ennemis sont pilotés par les données réseau."""
+        del_key = []
+
+        for key, ennemi_data in ennemis_data.items():
+
+            if key not in self.ennemis_id:
+                if ennemi_data["dying"]:
+                    continue
+                self.ennemis[key] = Ennemi(
+                    self.screen,
+                    ennemi_data["position"],
+                    -1,
+                    -1,
+                    None,
+                    self.camera,
+                    None,
+                )
+                self.ennemis_id.append(key)
+
+            self.ennemis[key].update_variables(ennemi_data)
+            self.ennemis[key].update_animation()
+
+            self.spawn_death_particles(self.ennemis[key])
+
+            if time.time() > ennemi_data["death_time"]:
+                del_key.append(key)
+
+        for key in del_key:
+            del self.ennemis[key]
+            if key in self.ennemis_id:
+                self.ennemis_id.remove(key)
 
     def spawn_death_particles(self, ennemi: Ennemi):
         """Fait spawn des particules de mort si ennemi est mort"""
@@ -662,14 +817,9 @@ class Game:
             self.screen,
             name="Sac du joueur",
             inv=self.inv_joueur,
-            pos=((largeur - 486) // 2, hauteur - 293),
-            image_path=os.path.join(INVENTORY_ASSET_DIRECTORY, "chest.png"),
-            slot_size=52,
-            slot_margin=4,
-            padding=21,
-            title_height=11,
-            visible=False,
+            pos=((largeur - 480) // 2, hauteur - 290),
             is_merchant=False,
+            is_visible=False,
         )
         self.drag_mgr = InventaireManager(self.screen, [self.ui_joueur])
 

@@ -7,8 +7,11 @@ from moteur import Moteur
 from camera_system import Camera
 from animations import AnimationController
 from map import BaseMap
+from utils import resource_path
 
-SPEED = 5
+SPEED = 3
+MAX_PV = 10
+PV = 3
 
 
 class PlayerControllerBase:
@@ -34,7 +37,7 @@ class PlayerControllerBase:
 
         # -- Animations --
         self.animation = AnimationController(
-            r"Ressources\Animations\Player", (100, 100), self.screen
+            resource_path(r"Ressources\Animations\Player"), (100, 100), self.screen
         )
         self.im_size = pygame.Vector2(self.animation.im_size)
 
@@ -49,12 +52,15 @@ class PlayerControllerBase:
         self.moving_intent = False
 
         # -- PV --
-        self.max_pv = 10
-        self.pv = 10
+        self.max_pv = MAX_PV
+        self.pv = PV
 
         # -- Invincibilité --
         self.last_hit = 0.0
         self.hit_interval = 1.0
+
+        # -- Mort --
+        self.is_dead = False
 
         # -- Attaque --
         self.attaque = False
@@ -69,8 +75,16 @@ class PlayerControllerBase:
             self.pv = max(0, self.pv + modif)
             self.last_hit = time.time()
 
-            if self.pv <= 0:
-                pass  # Mort du joueur
+            if self.pv <= 0 and not self.is_dead:
+                self.is_dead = True
+
+    def respawn(self, position: Tuple[int, int], pv: int):
+        """Réinitialise le joueur à une position donnée avec des PV réduits."""
+        self.is_dead = False
+        self.pv = pv
+        self.position.update(position)
+        self.hitbox.center = self.position
+        self.hitbox_damage.midbottom = self.position
 
     def event(self, keys: Tuple[bool]):
         """Détermine le vecteur de mouvement à partir des entrées clavier."""
@@ -129,11 +143,11 @@ class PlayerControllerBase:
 
     def display(self):
         """Affiche tous les éléments avec la camera."""
-
-        self.animation.display(
-            pygame.Vector2(self.camera.apply(self.hitbox).center)
-            - pygame.Vector2(self.im_size[0] // 2, self.im_size[1] - 22)
-        )  # -22 pour afficher le joueur un peu au dessus de la hitbox
+        if not self.is_dead:
+            self.animation.display(
+                pygame.Vector2(self.camera.apply(self.hitbox).center)
+                - pygame.Vector2(self.im_size[0] // 2, self.im_size[1] - 22)
+            )  # -22 pour afficher le joueur un peu au dessus de la hitbox
 
 
 class SoloPlayerController(PlayerControllerBase):
@@ -142,9 +156,10 @@ class SoloPlayerController(PlayerControllerBase):
     def update(self, ennemis):
         """Met à jour les éléments nécessaire du joueur."""
 
-        # -- Joueur --
-        self.moving_intent = self.velocity.length_squared() > 0
-        self.authority_update([e.hitbox for e in ennemis.values() if e.hitbox])
+        if not self.is_dead:
+            # -- Joueur --
+            self.moving_intent = self.velocity.length_squared() > 0
+            self.authority_update([e.hitbox for e in ennemis.values() if e.hitbox])
 
 
 class HostController(PlayerControllerBase):
@@ -174,11 +189,15 @@ class HostController(PlayerControllerBase):
         ennemis_hitboxes = [e.hitbox for e in ennemis.values() if e.hitbox]
 
         # -- Update Host --
-        self.moving_intent = self.velocity.length_squared() > 0
-        self.authority_update(ennemis_hitboxes + [self.guest.hitbox])
+        if not self.is_dead:
+            self.moving_intent = self.velocity.length_squared() > 0
+            guest_hitbox = [self.guest.hitbox] if not self.guest.is_dead else []
+            self.authority_update(ennemis_hitboxes + guest_hitbox)
 
         # -- Update Client --
-        self.guest.authority_update(ennemis_hitboxes + [self.hitbox])
+        if not self.guest.is_dead:
+            host_hitbox = [self.hitbox] if not self.is_dead else []
+            self.guest.authority_update(ennemis_hitboxes + host_hitbox)
 
     def display(self):
         """Affiche l'invité puis le joueur"""
@@ -215,10 +234,12 @@ class GuestController(PlayerControllerBase):
         """Met à jour les éléments nécessaire du joueur et de l'hôte."""
 
         # -- Guest : Client-Side Prediction--
-        self.moving_intent = self.velocity.length_squared() > 0
-        self.authority_update(
-            [e.hitbox for e in ennemis.values() if e.hitbox] + [self.host.hitbox]
-        )
+        if not self.is_dead:
+            self.moving_intent = self.velocity.length_squared() > 0
+            host_hitbox = [self.host.hitbox] if not self.host.is_dead else []
+            self.authority_update(
+                [e.hitbox for e in ennemis.values() if e.hitbox] + host_hitbox
+            )
 
         if self.target_pos is not None:
             delta = (self.target_pos - self.position).length()
