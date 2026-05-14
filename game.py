@@ -763,7 +763,7 @@ class Game:
             inv=self.inv_joueur,
             pos=((largeur - 480) // 2, hauteur - 290),
             is_merchant=False,
-            visible=False,
+            is_visible=False,
         )
         self.drag_mgr = InventaireManager(self.screen, [self.ui_joueur])
 
