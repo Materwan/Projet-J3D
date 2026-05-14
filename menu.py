@@ -1138,7 +1138,11 @@ def get_all_saves(mode: str) -> List[Dict[str, str]] | List[str]:
 
     L = []
     list_file = []
-    folder = r"save" + r"\solo" if mode == "solo" else r"save" + r"\multiplayer"
+    folder = (
+        os.path.join(resource_path(r"save"), r"solo")
+        if mode == "solo"
+        else os.path.join(resource_path(r"save"), r"multiplayer")
+    )
 
     for file in os.listdir(folder):
         list_file.append(file)
