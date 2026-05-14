@@ -110,7 +110,7 @@ class Game:
             self.screen,
             name="Sac du joueur",
             inv=self.inv_joueur,
-            pos=((largeur - 486) // 2, hauteur - 293),
+            pos=((largeur - 480) // 2, hauteur - 290),
             is_merchant=False,
             is_visible=False,
         )
@@ -123,9 +123,12 @@ class Game:
         """Inventaire : Appelé au clic droit sur un consommable."""
 
         if item.item_type == "Consommable" and item.effect is not None:
-            ui.inv.remove_item(slot[0], slot[1], 1)
-            print(f"You've suck dry your potion : {item.effect:+d} PV")
-            # self.player_controller.pv += item.effect par exemple
+            if self.player_controller.pv >= self.player_controller.max_pv:
+                print("You are already full health !")
+            else:
+                ui.inv.remove_item(slot[0], slot[1], 1)
+                print("You've suck dry your potion : +1 HP")
+                self.player_controller.pv += 1
 
     def initialize(self):
         """Initialise le moteur, la map, le contrôleur et le réseau."""
@@ -380,8 +383,8 @@ class Game:
                 self.manager.running = False
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    if self.ui_joueur.visible:  # Ferme inventaire
-                        self.ui_joueur.visible = False
+                    if self.ui_joueur.is_visible:  # Ferme inventaire
+                        self.ui_joueur.is_visible = False
                     else:  # Pause
                         self.manager.change_state("MENU_PAUSE")
                 elif (
@@ -758,14 +761,9 @@ class Game:
             self.screen,
             name="Sac du joueur",
             inv=self.inv_joueur,
-            pos=((largeur - 486) // 2, hauteur - 293),
-            image_path=os.path.join(INVENTORY_ASSET_DIRECTORY, "chest.png"),
-            slot_size=52,
-            slot_margin=4,
-            padding=21,
-            title_height=11,
-            visible=False,
+            pos=((largeur - 480) // 2, hauteur - 290),
             is_merchant=False,
+            visible=False,
         )
         self.drag_mgr = InventaireManager(self.screen, [self.ui_joueur])
 
