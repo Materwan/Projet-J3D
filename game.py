@@ -17,7 +17,7 @@ from player import (
 )
 from network import HostNetwork, GuestNetwork
 from moteur import Moteur
-from map import Map, Hub, MapManager
+from map import Map, Hub, Dungeon, MapManager
 from camera_system import Camera
 from hud import HUD
 from inventory import Item, Inventaire, InventaireUI, InventaireManager
@@ -88,7 +88,7 @@ class Game:
         self.nb_chunks = (8, 8)
         self.chunk_size = (32, 32)
         self.octaves = (8, 8)
-        self.seed = 0
+        self.seed = 1545
 
         # -- Moteur --
         self.moteur: Moteur = None
@@ -173,16 +173,15 @@ class Game:
         else:
 
             # -- Map --
-            principal_map = Map(
+            self.map = MapManager(
+                self.screen,
                 self,
+                7,
                 self.nb_chunks,
                 self.chunk_size,
                 self.octaves,
-                self.screen,
                 self.seed,
             )
-            hub = Hub(self.screen, self)
-            self.map = MapManager(self, hub=hub, principal_map=principal_map)
 
             # -- Controlleur --
             if self.playing_mode == "solo":
@@ -207,12 +206,12 @@ class Game:
                 (3500, 3500),
                 1,
                 32,
-                principal_map,
+                self.map["principal_map"],
                 self.camera,
                 self.moteur,
             )
             self.ennemis_id.append(0)
-            principal_map.ennemis[0] = ennemi
+            self.map["principal_map"].ennemis[0] = ennemi
 
         # -- Keybinds --
         self.player_controller.keybinds = self.keybinds
@@ -504,7 +503,7 @@ class Game:
     def display(self):
         """Affiche tout les éléments."""
         # -- Reset --
-        self.screen.fill((100, 100, 100))
+        self.screen.fill((32, 35, 32))
 
         # -- Map --
         self.map.display(self.camera)
@@ -516,9 +515,9 @@ class Game:
         for ennemi in self.map.ennemis.values():
             ennemi.display()
 
-        # -- Particules --
+        """ # -- Particules --
         for sprite in self.particles:
-            self.screen.blit(sprite.image, self.camera.apply(sprite.rect))
+            self.screen.blit(sprite.image, self.camera.apply(sprite.rect))"""
 
         # -- F2 : TOUTES les hitboxes --
         if self.show_hitbox:
@@ -572,10 +571,13 @@ class Game:
                     self.screen, "yellow", self.camera.apply(ennemi.attaque_rect), 2
                 )
 
-        # Affichage des obstacles du jeu
+        # Affichage des obstacles du jeu et tuiles d'action
         for hitbox in all_hitboxes:
             for obs in self.map.get_nearby_obstacles(hitbox):
                 pygame.draw.rect(self.screen, "red", self.camera.apply(obs), 2)
+
+            for obs in self.map.get_nearby_action_tiles(hitbox):
+                pygame.draw.rect(self.screen, "blue", self.camera.apply(obs), 2)
 
         # Affichage du chemin jusqu'a l'ennemie
         for path in self.paths:

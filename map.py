@@ -4,17 +4,18 @@ from typing import Tuple, List, Dict, Any, TYPE_CHECKING
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from itertools import combinations
-from os import path
+import queue
+import os
 import threading
 import time
 import math
 import json
 import heapq
+import pytmx
 
 import numpy as np
 from perlin_numpy import generate_perlin_noise_2d
 from camera_system import Camera
-import matplotlib.pyplot as plt
 import pygame
 
 if TYPE_CHECKING:
@@ -26,6 +27,55 @@ REPLACE_VALUE = 0.3
 TILE_SIZE = (32, 32)
 TILESET_DIRECTORY = r"Ressources\TileSet"
 TILEMAP_DIRECTORY = r"Ressources\TileMap"
+DUNGEON_TILEMAP_DIRECTORY = r"Ressources\TileMap"
+
+
+def get_dungeon_tiles(
+    tmx_filepath,
+) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]:
+    """
+    Analyse un fichier .tmx pour détecter les positions des tuiles vides ('0').
+
+    Args:
+        tmx_filepath (str): Le chemin complet vers le fichier .tmx à analyser.
+
+    Returns:
+        list[tuple]: Une liste de tuples, où chaque tuple représente la
+                     position (x, y) d'une tuile vide trouvée.
+    """
+    if not os.path.exists(tmx_filepath):
+        print(f"Erreur : Le fichier spécifié n'existe pas : {tmx_filepath}")
+        return []
+
+    empty_tile_positions = []
+    occupied_tiles = []
+
+    map = pytmx.load_pygame(tmx_filepath)
+
+    layer: pytmx.TiledTileLayer = map.layers[0]
+
+    for y, row in enumerate(layer.data):
+        for x, case in enumerate(row):
+            if case == 0:
+                empty_tile_positions.append((x, y))
+            occupied_tiles.append((x, y))
+
+    return empty_tile_positions, occupied_tiles
+
+
+def load_dungeons_tilesets(file: str, folder: str):
+
+    with open(file, "r") as f:
+        s = f.read()
+    dic = json.loads(s)
+    for key in dic.keys():
+        dic[key]["image"] = pygame.transform.scale2x(
+            pygame.image.load(os.path.join(folder, key + ".png"))
+        )
+        dic[key]["collision_tiles"], dic[key]["occupied_tiles"] = get_dungeon_tiles(
+            os.path.join(folder, key + ".tmx")
+        )
+    return dic
 
 
 def load_assets(file: str, asset_folder: str, tile_size: Tuple[int, int]):
@@ -43,7 +93,7 @@ def load_assets(file: str, asset_folder: str, tile_size: Tuple[int, int]):
         if isinstance(value["width"], list):
 
             temp = []
-            directory = path.join(asset_folder, value["file"])
+            directory = os.path.join(asset_folder, value["file"])
             image = pygame.image.load(directory)
 
             for i in range(len(value["width"])):
@@ -68,6 +118,9 @@ def load_assets(file: str, asset_folder: str, tile_size: Tuple[int, int]):
                 temp2["collision_tiles"] = _build_tile_list(
                     temp2["size"], value["collision_tiles"]
                 )
+
+                if "action_tiles" in value.keys():
+                    temp2["action_tiles"] = value["action_tiles"]
 
                 # Image
                 asset_image = image.subsurface(left, top, width, height)
@@ -95,8 +148,11 @@ def load_assets(file: str, asset_folder: str, tile_size: Tuple[int, int]):
                 temp["size"], value["collision_tiles"]
             )
 
+            if "action_tiles" in value.keys():
+                temp["action_tiles"] = value["action_tiles"]
+
             # Image
-            directory = path.join(asset_folder, value["file"])
+            directory = os.path.join(asset_folder, value["file"])
             image = pygame.image.load(directory)
             asset_image = image.subsurface(
                 value["left"], value["top"], value["width"], value["height"]
@@ -110,7 +166,8 @@ def load_assets(file: str, asset_folder: str, tile_size: Tuple[int, int]):
 def invert(val: np.ndarray) -> np.ndarray:
     """Renvoie l'inverse d'une matrice de valeur entre 0 et 1. (0 -> 1, 1 -> 0)"""
     # Vérifie que les valeurs sont entre 0 et 1
-    assert 0 <= np.min(val) <= 1 and 0 <= np.max(val) <= 1
+    if 0 > np.min(val) > 1 or 0 > np.max(val) > 1:
+        raise ValueError("Les valeurs doivent être comprises en 0 et 1")
 
     return np.abs(val - 1)
 
@@ -128,8 +185,10 @@ def normalize(
         minimum = min_value
 
     max_value = np.max(val)
-    assert minimum != max_value  # Vérifie que le minimum est différent du max
-    assert scale[0] < scale[1]  # Vérifie si l'interval est valide
+    if minimum == max_value:
+        raise ValueError("le minimum est le maximum doivent être différent.")
+    if scale[0] >= scale[1]:
+        raise ValueError(f"L'interval doit être valide {scale}.")
 
     normalize_0_1 = (val - min_value) / (
         max_value - min_value
@@ -355,6 +414,79 @@ class Chunk:
         return ground_sur
 
 
+class DungeonRoom:
+    """
+    Représente une salle placée dans le donjon.
+
+    Attributes:
+        position (np.ndarray): position de la salle dans la grille du donjon (en cases, pas en pixels).
+        type (str): nom du fichier .png correspondant à ce template de salle.
+        size (Tuple[int, int]): taille de la salle en tuiles (width, height), lu depuis dungeon_data.json.
+        ios (List[Dict]): liste des IOs (entrées/sorties) de cette salle, chacun sous la forme
+            {"x": int, "y": int, "dir": str, "connected": bool}.
+            - x, y : position de l'IO dans la grille locale de la salle (en tuiles)
+            - dir   : direction de sortie ("n", "s", "e", "w")
+            - connected : True si cet IO est déjà relié à une autre salle
+        surface (pygame.Surface): l'image de la salle chargée depuis le disque.
+    """
+
+    # Directions opposées : pour connecter deux salles, l'IO entrant
+    # doit être la direction opposée de l'IO sortant.
+    OPPOSITE: Dict[str, str] = {"n": "s", "s": "n", "e": "w", "w": "e"}
+
+    # Décalage en cases de grille pour atteindre la salle voisine selon la direction.
+    # Une salle de taille (sw, sh) placée en (gx, gy) expose un IO "e" :
+    # la salle suivante devra être placée en (gx + sw, gy) pour que son IO "w" coïncide.
+    # Ces deltas sont calculés dynamiquement dans Dungeon.generate_dungeon car ils
+    # dépendent de la taille de la salle courante ; DIRECTION_DELTA donne juste le signe.
+    DIRECTION_DELTA: Dict[str, Tuple[int, int]] = {
+        "n": (0, -1),
+        "s": (0, 1),
+        "e": (1, 0),
+        "w": (-1, 0),
+    }
+
+    def __init__(self, position: Tuple[int, int], room_type: str, tile_maps: Dict):
+        """
+        Args:
+            position  : position (col, row) dans la grille du donjon.
+            room_type : clé dans tile_maps (= nom du fichier .png).
+            tile_maps : le dictionnaire complet chargé depuis dungeon_data.json.
+        """
+        self.position = np.array(position)  # (col, row) en cases de grille
+        self.type = room_type
+        self.size: Tuple[int, int] = tuple(
+            tile_maps[room_type]["size"]
+        )  # (w, h) en tuiles
+
+        # Copie des IOs avec un flag "connected" initialisé à False
+        self.ios: List[Dict] = [
+            {**io, "connected": False} for io in tile_maps[room_type]["IO"]
+        ]
+
+        # Matrices locales de collision et d'occupation (en tuiles, repère local à la salle)
+        # Forme : (width, height) pour rester cohérent avec [x][y]
+        w, h = self.size
+        self.collision_tiles = np.zeros((w, h), dtype=np.uint8)
+        self.occupied_tiles = np.zeros((w, h), dtype=np.uint8)
+
+        data = tile_maps[room_type]
+        if data.get("collision_tiles"):
+            xs, ys = zip(*data["collision_tiles"])
+            self.collision_tiles[list(xs), list(ys)] = 1
+
+        if data.get("occupied_tiles"):
+            xs, ys = zip(*data["occupied_tiles"])
+            self.occupied_tiles[list(xs), list(ys)] = 1
+
+        self.surface: pygame.Surface = data["image"]
+
+    @property
+    def free_ios(self) -> List[Dict]:
+        """Renvoie les IOs pas encore connectés."""
+        return [io for io in self.ios if not io["connected"]]
+
+
 class BaseMap(ABC):
     """
     Structure générale du carte.
@@ -414,6 +546,33 @@ class BaseMap(ABC):
         """
         pass
 
+    def get_nearby_action_tiles(self, hitbox: pygame.Rect) -> List[pygame.Rect]:
+        """
+        Renvoie les tuiles d'actions au alentour du joueur.
+
+        Args:
+            hitbox (pygame.Rect): La hitbox du joueur pour calculer sa position sur la grille.
+        Returns:
+            list[pygame.Rect]: Liste des tuiles d'action à proximité immédiate.
+        """
+        nearby_action_tiles = []
+
+        # Trouver la position du joueur dans la grille
+        tile_x = hitbox.centerx // self.tile_size[0]
+        tile_y = hitbox.centery // self.tile_size[1]
+
+        for tile in self.action_tiles:
+            if (
+                tile_x - 1 <= tile["x"] <= tile_x + 1
+                and tile_y - 1 <= tile["y"] <= tile_y + 1
+            ):
+                nearby_action_tiles.append(
+                    pygame.Rect(tile["x"] * 32, tile["y"] * 32, 32, 32)
+                )
+
+        return nearby_action_tiles
+
+    @classmethod
     @abstractmethod
     def _create_map(
         screen: pygame.Surface, game: "Game", map_data: Dict[str, Any]
@@ -546,6 +705,7 @@ class Map(BaseMap):
         nb_chunks: Tuple[int, int],
         chunk_size: Tuple[int, int],
         octaves: Tuple[int, int],
+        nb_dungeons: int,
         screen: pygame.Surface,
         seed: int | None,
     ):
@@ -565,12 +725,14 @@ class Map(BaseMap):
         self.chunk_size_tile = np.array(chunk_size, dtype=np.int32)
         self.size = self.nb_chunks * self.chunk_size_tile
         self.octaves = octaves
+        self.nb_dungeons = nb_dungeons
+        self.dungeons = 0
         self.tile_size = np.array(TILE_SIZE, dtype=np.int32)
         self.start_position = (self.size * self.tile_size // 2).tolist()
         self.chunk_size_pix = self.chunk_size_tile * self.tile_size
         self.action_tiles = []
         self.asset = load_assets(
-            path.join(TILESET_DIRECTORY, "tile_data.json"),
+            os.path.join(TILESET_DIRECTORY, "tile_data.json"),
             TILESET_DIRECTORY,
             self.tile_size,
         )
@@ -597,13 +759,16 @@ class Map(BaseMap):
         # -- Ajout éléments --
         self._add_object_pos("place", 128, 128, 3, occupe=True)
         self.structures.append((128, 128))
+        self._add_structure("dungeon_entrance", nb=self.nb_dungeons, z=10, distance=5)
         self._add_structure("place", nb=3, z=3, distance=10)
-        self._generate_paths(0.3, prop=1)
+        self._generate_paths(0.3, prop=0.5)
         self._add_road(0, 2)
         self._add_objects("grass", prob=0.1, z=-1, occupe=True)
         self._add_objects("tree", prob=0.01, z=2)
         self._add_objects("bush", prob=0.1, z=0)
         self._add_objects("rock", prob=0.01, z=1)
+
+        self._register_actions()
 
         # -- Ennemis --
         self.ennemis = {}
@@ -617,6 +782,7 @@ class Map(BaseMap):
         self.load_chunk_running = False
         self.load_chunk_event.clear()
 
+    @staticmethod
     def _create_map(
         screen: pygame.Surface, game: "Game", map_data: Dict[str, Any]
     ) -> "Map":
@@ -630,7 +796,11 @@ class Map(BaseMap):
         )
 
     def _register_actions(self):
-        pass
+        self._action_registry = {}
+        self.register("change_map", self._change_map)
+
+    def _change_map(self, **map_name: str):
+        return map_name["target"]
 
     def _get_to_send_data(self) -> Dict[str, Any]:
         return {
@@ -748,6 +918,18 @@ class Map(BaseMap):
 
                     self.chunks[(x_chunk, y_chunk)].collision[rel_x][rel_y] = True
 
+                if "action_tiles" in self.asset[obj_type].keys():
+                    if obj_type == "dungeon_entrance":
+                        for tile in self.asset[obj_type]["action_tiles"]:
+                            self.action_tiles.append(
+                                {
+                                    "x": int(tile["x"] + tx - 1),
+                                    "y": int(tile["y"] + ty - 2),
+                                    "action": tile["action"],
+                                    "params": {"target": f"dungeon{self.dungeons}"},
+                                }
+                            )
+
             x_chunk, y_chunk = x // x_map_size, y // y_map_size
             rel_x, rel_y = x % x_map_size, y % y_map_size
 
@@ -774,9 +956,13 @@ class Map(BaseMap):
 
         Ici z définit la priotité d'un élément, plus elle est haute, plus il sera affiché en dernier.
         """
-        assert (nb is not None or prob is not None) and (nb is None or prob is None)
+        if nb and prob:
+            raise ValueError(f"nb ou prob doit être fourni, nb = {nb}, prob = {prob}.")
         if prob is not None:
-            assert 0 <= prob <= 1
+            if 0 > prob > 1:
+                raise ValueError(
+                    f"La probabilité soit être valide, entre 0 et 1, prob = {prob}."
+                )
             strict = False
             nb = int((self.size[0] * self.size[1]) * prob)
         else:
@@ -799,6 +985,11 @@ class Map(BaseMap):
                 positions.append((xs[i], ys[i]))
 
             i += 1
+
+            if i > nb * 3:
+                i = 0
+                xs = np.random.randint(0, self.size[0], size=nb * 3)
+                ys = np.random.randint(0, self.size[1], size=nb * 3)
 
         return positions
 
@@ -827,6 +1018,8 @@ class Map(BaseMap):
                 diff = struct - np.array([xs[i], ys[i]])
                 if np.all(np.hypot(diff[:, 0], diff[:, 1]) > distance):
                     if self._add_object_pos(obj_type, xs[i], ys[i], z, True):
+                        if obj_type == "dungeon_entrance":
+                            self.dungeons += 1
                         count += 1
                         self.structures.append((xs[i], ys[i]))
 
@@ -849,10 +1042,14 @@ class Map(BaseMap):
     ):
         """Créer un chemin entre la position de départ et d'arrivé en ajoutant
         du hasard pour générer des tuiles au hasard."""
-        assert (nb is not None or prop is not None) and (nb is None or prop is None)
+        if nb and prop:
+            raise ValueError(f"nb ou prob doit être fourni, nb = {nb}, prob = {prop}.")
         nb_struct = len(self.structures)
         if prop is not None:
-            assert 0 <= prop <= 1
+            if 0 > prop > 1:
+                raise ValueError(
+                    f"La probabilité soit être valide, entre 0 et 1, prob = {prop}."
+                )
             nb = int((nb_struct * (nb_struct - 1)) / 2 * prop)
 
         all_pairs = list(combinations(range(nb_struct), 2))
@@ -916,7 +1113,10 @@ class Map(BaseMap):
         while self.load_chunk_running:
             if self.load_chunk_event.is_set():
                 abs_position = np.array(self.load_chunk_position, dtype=np.int32)
-                assert np.less(abs_position, self.size * self.chunk_size_pix).all()
+                if not np.less(abs_position, self.size * self.chunk_size_pix).all():
+                    raise ValueError(f"La position fourni n'est pas dans la carte,\
+                        position = {abs_position},\
+                        taille map = {self.size * self.chunk_size_pix}.")
 
                 chunk = abs_position // self.chunk_size_pix
 
@@ -1129,6 +1329,8 @@ class Map(BaseMap):
 
     def _display(self):
 
+        import matplotlib.pyplot as plt
+
         plt.subplot(221)
         plt.imshow(self.map.T)
         plt.colorbar()
@@ -1175,7 +1377,7 @@ class Hub(BaseMap):
         self.screen = screen
         self.game = game
 
-        with open(path.join(TILEMAP_DIRECTORY, "tilemap_data.json"), "r") as file:
+        with open(os.path.join(TILEMAP_DIRECTORY, "tilemap_data.json"), "r") as file:
 
             data = json.loads(file.read())
 
@@ -1196,7 +1398,7 @@ class Hub(BaseMap):
 
             self.action_tiles: List[Dict[str, Any]] = data["hub"]["action_tiles"]
 
-        self.image = pygame.image.load(path.join(TILEMAP_DIRECTORY, "hub.png"))
+        self.image = pygame.image.load(os.path.join(TILEMAP_DIRECTORY, "hub.png"))
 
         self._register_actions()
 
@@ -1204,6 +1406,7 @@ class Hub(BaseMap):
         self.ennemis = {}
         self.update_ennemis = self._get_update_ennemis()
 
+    @staticmethod
     def _create_map(
         screen: pygame.Surface, game: "Game", map_data: Dict[str, Any]
     ) -> "Hub":
@@ -1277,6 +1480,361 @@ class Hub(BaseMap):
         self.screen.blit(self.image, (screen_x, screen_y))
 
 
+class Dungeon(BaseMap):
+
+    def __init__(self, screen: pygame.Surface, nb_rooms: int):
+
+        self.screen = screen
+        self.start_position = [0, 0]
+        self.action_tiles = []
+        self.ennemis = {}
+
+        self.tile_maps = load_dungeons_tilesets(
+            os.path.join(DUNGEON_TILEMAP_DIRECTORY, "dungeon_data.json"),
+            DUNGEON_TILEMAP_DIRECTORY,
+        )
+
+        self.tile_size = np.array(TILE_SIZE) * 2
+        self.dungeon_size = 9 * self.tile_size
+
+        self.nb_rooms = nb_rooms
+        self.rooms: List[DungeonRoom] = []
+
+        self.generate_dungeon()
+        self.update_ennemis = self._get_update_ennemis()
+        print(len(self.rooms))
+
+    def _get_to_send_data(self) -> Dict[str, Any]:
+        return {
+            "type": "dungeon",
+            "nb_rooms": self.nb_rooms,
+        }
+
+    def close_map(self):
+
+        pass
+
+    def get_nearby_obstacles(self, hitbox: pygame.Rect):
+
+        return []
+
+    def _create_map(
+        screen: pygame.Surface, game: "Game", map_data: Dict[str, Any]
+    ) -> "BaseMap":
+
+        return Dungeon(screen, map_data["nb_rooms"])
+
+    def _register_actions(self):
+        self._action_registry = {}
+
+    def get_ennemis(self) -> Dict[int, "Ennemi"]:
+
+        return self.ennemis
+
+    def _get_update_ennemis(self) -> Callable[[], List[Tuple[int, int]]]:
+
+        return lambda: []
+
+    def update(self, absolute_position: Tuple[int, int]):
+
+        pass
+
+    def _room_grid_rect(self, room: DungeonRoom) -> Tuple[int, int, int, int]:
+        """
+        Renvoie le rectangle occupé par une salle dans la grille,
+        sous la forme (col_min, row_min, col_max_exclu, row_max_exclu).
+
+        La salle de taille (w, h) en tuiles occupe exactement
+        ceil(w / CELL) colonnes et ceil(h / CELL) lignes dans la grille,
+        où CELL = 9 (taille de la cellule de référence en tuiles).
+        """
+        cell = self.dungeon_size[0] // self.tile_size[0]  # 9 tuiles par cellule
+        cols = math.ceil(room.size[0] / cell)
+        rows = math.ceil(room.size[1] / cell)
+        col, row = int(room.position[0]), int(room.position[1])
+        return col, row, col + cols, row + rows
+
+    def _rooms_overlap(self, a: DungeonRoom, b: DungeonRoom) -> bool:
+        """Renvoie True si les deux salles se chevauchent dans la grille."""
+        ac0, ar0, ac1, ar1 = self._room_grid_rect(a)
+        bc0, br0, bc1, br1 = self._room_grid_rect(b)
+        return ac0 < bc1 and ac1 > bc0 and ar0 < br1 and ar1 > br0
+
+    def _position_is_free(self, candidate: DungeonRoom) -> bool:
+        """Renvoie True si aucune salle existante n'occupe la même zone de grille."""
+        return all(not self._rooms_overlap(candidate, placed) for placed in self.rooms)
+
+    def _compute_neighbor_position(
+        self,
+        src_room: DungeonRoom,
+        src_io: Dict,
+        dst_type: str,
+        dst_io: Dict,
+    ) -> Tuple[int, int]:
+        """
+        Calcule la position de grille (col, row) que doit avoir la salle
+        destination pour que son IO `dst_io` soit aligné avec `src_io` de la
+        salle source.
+
+        Principe géométrique
+        --------------------
+        Chaque salle est exprimée dans un repère de tuiles local (origine = coin
+        haut-gauche de la salle).  L'IO est à la position (io_x, io_y) en tuiles.
+        La taille d'une cellule de grille est CELL tuiles.
+
+        La position en tuiles du coin haut-gauche de src_room dans la grille
+        globale est :  src_origin_tile = src_room.position * CELL
+
+        La position en tuiles de src_io dans la grille globale est donc :
+            src_io_tile = src_origin_tile + (src_io["x"], src_io["y"])
+
+        On veut que dst_io soit au même endroit :
+            dst_origin_tile + (dst_io["x"], dst_io["y"]) = src_io_tile
+
+        D'où :
+            dst_origin_tile = src_io_tile - (dst_io["x"], dst_io["y"])
+
+        Puis on convertit en position de grille :
+            dst_position = dst_origin_tile / CELL  (division entière)
+        """
+        cell = self.dungeon_size[0] // self.tile_size[0]  # 9
+
+        src_origin_tile = src_room.position * cell
+        src_io_tile = src_origin_tile + np.array([src_io["x"], src_io["y"]])
+
+        dst_io_tile_local = np.array([dst_io["x"], dst_io["y"]])
+        dst_origin_tile = src_io_tile - dst_io_tile_local
+
+        dst_position = dst_origin_tile // cell
+        return tuple(dst_position.tolist())
+
+    def _candidates_for_io(
+        self, src_room: DungeonRoom, src_io: Dict
+    ) -> List[Tuple[str, Dict, Tuple[int, int]]]:
+        """
+        Construit la liste de tous les (type, io_entrant, position) compatibles
+        avec le `src_io` de `src_room`, mélangée aléatoirement.
+
+        Une salle est compatible si elle possède au moins un IO dont la direction
+        est l'opposée de `src_io["dir"]`.
+        """
+        needed_dir = DungeonRoom.OPPOSITE[src_io["dir"]]
+        candidates = []
+
+        for room_type, data in self.tile_maps.items():
+            for dst_io in data["IO"]:
+                if dst_io["dir"] != needed_dir:
+                    continue
+                # Créer une salle temporaire juste pour calculer la position
+                tmp = DungeonRoom((0, 0), room_type, self.tile_maps)
+                pos = self._compute_neighbor_position(src_room, src_io, tmp, dst_io)
+                candidates.append((room_type, dst_io, pos))
+
+        np.random.shuffle(candidates)
+        return candidates
+
+    def generate_dungeon(self):
+        """
+        Génère un donjon en plaçant `self.nb_rooms` salles connectées.
+
+        Algorithme : expansion BFS avec backtracking local
+        --------------------------------------------------
+        1. On place une salle de départ aléatoire en (0, 0).
+        2. On maintient une file (queue) des IOs libres à traiter.
+        3. Pour chaque IO libre, on tente de placer une salle compatible
+           (direction opposée, pas de collision avec les salles existantes).
+           - Si on trouve une candidate valide → on la place, on marque les
+             deux IOs comme connectés, et on ajoute ses nouveaux IOs libres
+             à la queue.
+           - Si aucune candidate ne convient → on ignore cet IO (dead end).
+        4. On s'arrête quand on atteint `nb_rooms` salles ou que la queue
+           est vide (plus d'IO à explorer).
+        """
+        self.rooms = []
+
+        # --- Salle de départ ---
+        start_type = np.random.choice(list(self.tile_maps.keys()))
+        start_room = DungeonRoom((0, 0), start_type, self.tile_maps)
+        self.rooms.append(start_room)
+
+        # Queue : chaque élément = (salle_source, io_source)
+        pending: List[Tuple[DungeonRoom, Dict]] = [
+            (start_room, io) for io in start_room.ios
+        ]
+        np.random.shuffle(pending)
+
+        while pending and len(self.rooms) < self.nb_rooms:
+
+            src_room, src_io = pending.pop(0)
+
+            # IO déjà connecté entre-temps (une autre branche a pu le fermer) → skip
+            if src_io["connected"]:
+                continue
+
+            # Cherche une salle candidate non-collisionnante
+            placed = False
+            for room_type, dst_io_template, pos in self._candidates_for_io(
+                src_room, src_io
+            ):
+
+                new_room = DungeonRoom(pos, room_type, self.tile_maps)
+
+                if not self._position_is_free(new_room):
+                    continue  # Collision → essaie le prochain candidat
+
+                # Placement valide
+                self.rooms.append(new_room)
+
+                # Marque les deux IOs comme connectés
+                src_io["connected"] = True
+                # Trouve l'IO correspondant dans new_room (même dir que dst_io_template)
+                for io in new_room.ios:
+                    if io["dir"] == dst_io_template["dir"] and not io["connected"]:
+                        io["connected"] = True
+                        break
+
+                # Ajoute les IOs libres de la nouvelle salle à la queue
+                new_pending = [(new_room, io) for io in new_room.free_ios]
+                np.random.shuffle(new_pending)
+                pending.extend(new_pending)
+
+                placed = True
+                break
+
+            # Si aucun candidat valide → l'IO reste libre (dead end naturel, pas grave)
+
+        # --- Normalisation : décale toutes les salles pour que le coin
+        # haut-gauche du donjon soit à (0, 0) dans la grille.
+        # Nécessaire car la caméra ne gère que les coordonnées positives.
+        if self.rooms:
+            min_col = min(int(r.position[0]) for r in self.rooms)
+            min_row = min(int(r.position[1]) for r in self.rooms)
+            offset = np.array([min_col, min_row])
+            for room in self.rooms:
+                room.position -= offset
+            self.start_position = (
+                -offset * self.tile_size * 9 + self.tile_size * 4.5
+            ).tolist()
+
+        # --- Construction des matrices globales de tuiles ---
+        self._build_tile_grids()
+
+    def _build_tile_grids(self):
+        """
+        Construit deux matrices numpy globales (en tuiles) couvrant l'ensemble
+        du donjon, en agrégeant les tuiles locales de chaque salle placée.
+
+        Après normalisation, toutes les positions de salle sont >= (0, 0).
+        La taille globale est donnée par self.size (propriété).
+
+        Attributs créés :
+            collision_tiles (np.ndarray[uint8]) : 1 là où le joueur est bloqué.
+            occupied_tiles  (np.ndarray[uint8]) : 1 là où une tuile est déjà occupée.
+        """
+        cell = self.dungeon_size[0] // self.tile_size[0]  # 9 tuiles par cellule
+        total_w, total_h = self.size  # en tuiles (via property)
+
+        self.collision_tiles = np.zeros((total_w, total_h), dtype=np.uint8)
+        self.occupied_tiles = np.zeros((total_w, total_h), dtype=np.uint8)
+
+        for room in self.rooms:
+            # Origine de la salle dans le repère global en tuiles
+            origin_x = int(room.position[0]) * cell
+            origin_y = int(room.position[1]) * cell
+            w, h = room.size
+
+            self.collision_tiles[
+                origin_x : origin_x + w, origin_y : origin_y + h
+            ] |= room.collision_tiles
+            self.occupied_tiles[
+                origin_x : origin_x + w, origin_y : origin_y + h
+            ] |= room.occupied_tiles
+
+    def get_nearby_obstacles(self, hitbox: pygame.Rect) -> List[pygame.Rect]:
+        """
+        Renvoie les pygame.Rect des tuiles de collision dans un voisinage 3×3
+        autour de la hitbox fournie — même interface que Hub et Map.
+
+        Args:
+            hitbox (pygame.Rect): hitbox de l'entité (joueur, ennemi…).
+        Returns:
+            List[pygame.Rect]: rectangles de collision à proximité.
+        """
+        nearby = []
+
+        grid_x = hitbox.centerx // self.tile_size[0]
+        grid_y = hitbox.centery // self.tile_size[1]
+
+        total_w, total_h = self.collision_tiles.shape
+
+        for x in range(grid_x - 1, grid_x + 2):
+            for y in range(grid_y - 1, grid_y + 2):
+                if 0 <= x < total_w and 0 <= y < total_h:
+                    if self.collision_tiles[x, y]:
+                        nearby.append(
+                            pygame.Rect(
+                                x * self.tile_size[0],
+                                y * self.tile_size[1],
+                                self.tile_size[0],
+                                self.tile_size[1],
+                            )
+                        )
+
+        return nearby
+
+    def is_tile_occupied(self, tile_x: int, tile_y: int) -> bool:
+        """
+        Indique si une tuile globale (en coordonnées de tuiles) est occupée.
+
+        Args:
+            tile_x, tile_y : coordonnées globales de la tuile.
+        Returns:
+            bool : True si la tuile est hors-limites ou marquée comme occupée.
+        """
+        total_w, total_h = self.occupied_tiles.shape
+        if not (0 <= tile_x < total_w and 0 <= tile_y < total_h):
+            return True  # hors-limites = occupé par convention
+        return bool(self.occupied_tiles[tile_x, tile_y])
+
+    @property
+    def size(self) -> np.ndarray:
+        """Taille totale du donjon en tuiles (bounding box de toutes les salles)."""
+        if not self.rooms:
+            return np.array([0, 0])
+        cell = self.dungeon_size[0] // self.tile_size[0]  # 9 tuiles par cellule
+        max_col = max(int(r.position[0]) * cell + r.size[0] for r in self.rooms)
+        max_row = max(int(r.position[1]) * cell + r.size[1] for r in self.rooms)
+        min_col = min(int(r.position[0]) * cell for r in self.rooms)
+        min_row = min(int(r.position[1]) * cell for r in self.rooms)
+        return np.array([max_col - min_col, max_row - min_row])
+
+    def display(self, camera: Camera):
+        """
+        Affiche toutes les salles du donjon en tenant compte de la caméra.
+
+        Chaque salle est placée dans l'espace monde à partir de sa position de
+        grille (col, row) multipliée par dungeon_size (taille d'une cellule en
+        pixels). L'offset caméra est ensuite appliqué pour obtenir la position
+        écran, exactement comme dans Hub.display().
+
+        Args:
+            camera (Camera): la caméra du jeu (gère position + tremblement).
+        """
+        offset_x = camera.camera.x + camera.offset_x
+        offset_y = camera.camera.y + camera.offset_y
+
+        for room in self.rooms:
+            # Position monde du coin haut-gauche de la salle (en pixels)
+            world_x = int(room.position[0]) * self.dungeon_size[0]
+            world_y = int(room.position[1]) * self.dungeon_size[1]
+
+            # Position écran
+            screen_x = world_x + offset_x
+            screen_y = world_y + offset_y
+
+            self.screen.blit(room.surface, (screen_x, screen_y))
+
+
 TYPE_STR: Dict[str, BaseMap] = {
     "map": Map,
     "hub": Hub,
@@ -1297,17 +1855,37 @@ class MapManager(BaseMap):
         change_map(name): change la map et met à jour le joueur et le game.
     """
 
-    def __init__(self, game: "Game", **kwarg: BaseMap):
+    def __init__(
+        self,
+        screen: pygame.Surface,
+        game: "Game",
+        nb_dungeons,
+        nb_chunks: Tuple[int, int],
+        chunk_size: Tuple[int, int],
+        octaves: Tuple[int, int],
+        seed: int,
+    ):
 
-        self.maps = kwarg
+        self.maps: Dict[str, BaseMap] = {
+            "hub": Hub(screen, game),
+            "principal_map": Map(
+                game, nb_chunks, chunk_size, octaves, nb_dungeons, screen, seed
+            ),
+        }
+        for i in range(nb_dungeons):
+            self.maps[f"dungeon{i}"] = Dungeon(screen, 20)
         if len(self.maps) > 0:
             self.map_name = list(self.maps.keys())[0]
         else:
             self.map_name = None
-        self.inizialize_var()
+        self.initialize_var()
 
         self.game = game
 
+    def __getitem__(self, key):
+        return self.maps[key]
+
+    @staticmethod
     def _create_map(
         screen: pygame.Surface, game: "Game", map_data: Dict[str, Any]
     ) -> "MapManager":
@@ -1320,13 +1898,12 @@ class MapManager(BaseMap):
         else:
             temp.map_name = None
 
-        temp.inizialize_var()
+        temp.initialize_var()
         return temp
 
     def close_map(self):
         for map in self.maps.values():
             map.close_map()
-            del map
 
     def _register_actions(self):
         pass
@@ -1338,7 +1915,7 @@ class MapManager(BaseMap):
 
         return self.map.get_nearby_obstacles(hitbox)
 
-    def inizialize_var(self):
+    def initialize_var(self):
         """
         Initialise les différentes variables liée à une carte.
         """
@@ -1348,6 +1925,7 @@ class MapManager(BaseMap):
             self.size = self.map.size
             self.tile_size = self.map.tile_size
             self.start_position = self.map.start_position
+            self.action_tiles = self.map.action_tiles
             self.update_ennemis = self._get_update_ennemis()
 
             # -- Ennemis --
@@ -1363,7 +1941,7 @@ class MapManager(BaseMap):
                 f"La map '{name}' n'est pas dans la liste des map : {list(self.maps.keys())}"
             )
         self.map_name = name
-        self.inizialize_var()
+        self.initialize_var()
         self.game._change_map(self.game.player_controller, self.map.start_position)
 
     def get_ennemis(self) -> Dict[int, "Ennemi"]:
@@ -1386,9 +1964,16 @@ class MapManager(BaseMap):
 
 if __name__ == "__main__":
 
+    asset = load_assets(
+        os.path.join(TILESET_DIRECTORY, "tile_data.json"),
+        TILESET_DIRECTORY,
+        [32, 32],
+    )
+    print(asset)
+
     pygame.init()
 
-    screen = pygame.display.set_mode((500, 500))
+    screen = pygame.display.set_mode((800, 800))
 
     class Loop:
 
@@ -1397,15 +1982,9 @@ if __name__ == "__main__":
             self.screen = screen
             self.screen_size = pygame.Vector2(self.screen.get_size())
             self.clock = pygame.time.Clock()
-            self.map = Map(
-                (8, 8),
-                (32, 32),
-                (8, 8),
-                self.screen,
-                0,
-            )
-            self.surf = self.map.render_full_map()
-            self.surf = pygame.transform.scale(self.surf, self.screen_size)
+            self.t = Dungeon(screen, 50)
+            self.t.generate_dungeon()
+            print(len(self.t.rooms))
 
         def event(self):
 
@@ -1413,6 +1992,11 @@ if __name__ == "__main__":
 
                 if event.type == pygame.QUIT:
                     self.running = False
+
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_h:
+                        self.t = Dungeon(screen, np.random.randint(1, 50))
+                        self.t.generate_dungeon()
 
         def update(self):
 
@@ -1422,8 +2006,7 @@ if __name__ == "__main__":
 
             self.screen.fill((0, 0, 0))
 
-            self.screen.blit(self.surf, (0, 0))
-
+            self.t.display()
             pygame.display.flip()
 
         def run(self):
@@ -1438,12 +2021,6 @@ if __name__ == "__main__":
 
     loop = Loop(screen)
 
-    loop.map._display()
-
     loop.run()
 
     pygame.quit()
-
-    # map = Map((8, 8), (32, 32), (8, 8), (32, 32), screen, 0)
-
-    load_assets("tile_data.json")

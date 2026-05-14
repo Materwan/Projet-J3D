@@ -8,8 +8,7 @@ from camera_system import Camera
 from animations import AnimationController
 from map import BaseMap
 
-
-SPEED = 3
+SPEED = 5
 
 
 class PlayerControllerBase:
