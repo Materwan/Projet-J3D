@@ -4,7 +4,6 @@ from typing import Tuple, List, Dict, Any, TYPE_CHECKING
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from itertools import combinations
-import queue
 import os
 import threading
 import time
@@ -26,9 +25,9 @@ if TYPE_CHECKING:
 
 REPLACE_VALUE = 0.3
 TILE_SIZE = (32, 32)
-TILESET_DIRECTORY = r"Ressources\TileSet"
-TILEMAP_DIRECTORY = r"Ressources\TileMap"
-DUNGEON_TILEMAP_DIRECTORY = r"Ressources\TileMap"
+TILESET_DIRECTORY = resource_path(r"Ressources\TileSet")
+TILEMAP_DIRECTORY = resource_path(r"Ressources\TileMap")
+DUNGEON_TILEMAP_DIRECTORY = resource_path(r"Ressources\TileMap")
 
 
 def get_dungeon_tiles(
@@ -1163,7 +1162,7 @@ class Map(BaseMap):
         paths = []
 
         for key, ennemi in self.ennemis.items():
-            paths.append(ennemi.update(self.game.player_controller.hitbox))
+            paths.append(ennemi.update(self.game.player_controller))
 
             if ennemi.attaque_rect is not None:
                 self.game.moteur.apply_attack(
@@ -1503,7 +1502,6 @@ class Dungeon(BaseMap):
 
         self.generate_dungeon()
         self.update_ennemis = self._get_update_ennemis()
-        print(len(self.rooms))
 
     def _get_to_send_data(self) -> Dict[str, Any]:
         return {
