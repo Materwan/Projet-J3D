@@ -518,6 +518,10 @@ class Game:
         # -- Mort / Spectateur --
         self._handle_death()
 
+    def _boss_fight_start(self):
+        print("start boss fight")
+        # self.manager.change_state("CARD")
+
     def update_ennemis_solo(self):
         del_key = []
 
@@ -736,6 +740,8 @@ class Game:
 
         # Affichage du chemin jusqu'a l'ennemie
         for path in self.paths:
+            if path is None:
+                path = []
             for i in range(len(path) - 1):
                 pygame.draw.line(
                     self.screen,

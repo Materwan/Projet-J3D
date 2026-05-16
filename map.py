@@ -69,9 +69,8 @@ def load_dungeons_tilesets(file: str, folder: str):
         s = f.read()
     dic = json.loads(s)
     for key in dic.keys():
-        dic[key]["image"] = pygame.transform.scale2x(
-            pygame.image.load(os.path.join(folder, key + ".png"))
-        )
+        dic[key]["image"] = pygame.image.load(os.path.join(folder, key + ".png"))
+        # dic[key]["image"] = pygame.transform.scale2x(dic[key]["image"])
         dic[key]["collision_tiles"], dic[key]["occupied_tiles"] = get_dungeon_tiles(
             os.path.join(folder, key + ".tmx")
         )
@@ -546,6 +545,7 @@ class BaseMap(ABC):
         """
         pass
 
+    @abstractmethod
     def get_nearby_action_tiles(self, hitbox: pygame.Rect) -> List[pygame.Rect]:
         """
         Renvoie les tuiles d'actions au alentour du joueur.
@@ -555,22 +555,7 @@ class BaseMap(ABC):
         Returns:
             list[pygame.Rect]: Liste des tuiles d'action à proximité immédiate.
         """
-        nearby_action_tiles = []
-
-        # Trouver la position du joueur dans la grille
-        tile_x = hitbox.centerx // self.tile_size[0]
-        tile_y = hitbox.centery // self.tile_size[1]
-
-        for tile in self.action_tiles:
-            if (
-                tile_x - 1 <= tile["x"] <= tile_x + 1
-                and tile_y - 1 <= tile["y"] <= tile_y + 1
-            ):
-                nearby_action_tiles.append(
-                    pygame.Rect(tile["x"] * 32, tile["y"] * 32, 32, 32)
-                )
-
-        return nearby_action_tiles
+        pass
 
     @classmethod
     @abstractmethod
@@ -1285,6 +1270,24 @@ class Map(BaseMap):
 
         return nearby_obstacles
 
+    def get_nearby_action_tiles(self, hitbox):
+        nearby_action_tiles = []
+
+        # Trouver la position du joueur dans la grille
+        tile_x = hitbox.centerx // self.tile_size[0]
+        tile_y = hitbox.centery // self.tile_size[1]
+
+        for tile in self.action_tiles:
+            if (
+                tile_x - 1 <= tile["x"] <= tile_x + 1
+                and tile_y - 1 <= tile["y"] <= tile_y + 1
+            ):
+                nearby_action_tiles.append(
+                    pygame.Rect(tile["x"] * 32, tile["y"] * 32, 32, 32)
+                )
+
+        return nearby_action_tiles
+
     def display(self, camera: Camera):
 
         L = list(self.loaded_chunks.keys())
@@ -1441,6 +1444,24 @@ class Hub(BaseMap):
 
         return nearby_obstacles
 
+    def get_nearby_action_tiles(self, hitbox):
+        nearby_action_tiles = []
+
+        # Trouver la position du joueur dans la grille
+        tile_x = hitbox.centerx // self.tile_size[0]
+        tile_y = hitbox.centery // self.tile_size[1]
+
+        for tile in self.action_tiles:
+            if (
+                tile_x - 1 <= tile["x"] <= tile_x + 1
+                and tile_y - 1 <= tile["y"] <= tile_y + 1
+            ):
+                nearby_action_tiles.append(
+                    pygame.Rect(tile["x"] * 32, tile["y"] * 32, 32, 32)
+                )
+
+        return nearby_action_tiles
+
     def get_ennemis(self) -> Dict[int, "Ennemi"]:
         return {}
 
@@ -1482,8 +1503,9 @@ class Hub(BaseMap):
 
 class Dungeon(BaseMap):
 
-    def __init__(self, screen: pygame.Surface, nb_rooms: int):
+    def __init__(self, game: "Game", screen: pygame.Surface, nb_rooms: int):
 
+        self.game = game
         self.screen = screen
         self.start_position = [0, 0]
         self.action_tiles = []
@@ -1494,7 +1516,7 @@ class Dungeon(BaseMap):
             DUNGEON_TILEMAP_DIRECTORY,
         )
 
-        self.tile_size = np.array(TILE_SIZE) * 2
+        self.tile_size = np.array(TILE_SIZE)
         self.dungeon_size = 9 * self.tile_size
 
         self.nb_rooms = nb_rooms
@@ -1502,6 +1524,7 @@ class Dungeon(BaseMap):
 
         self.generate_dungeon()
         self.update_ennemis = self._get_update_ennemis()
+        self._register_actions()
 
     def _get_to_send_data(self) -> Dict[str, Any]:
         return {
@@ -1525,6 +1548,10 @@ class Dungeon(BaseMap):
 
     def _register_actions(self):
         self._action_registry = {}
+        self.register("boss_fight_start", self._boss_fight_start)
+
+    def _boss_fight_start(self):
+        self.game._boss_fight_start()
 
     def get_ennemis(self) -> Dict[int, "Ennemi"]:
 
@@ -1536,7 +1563,7 @@ class Dungeon(BaseMap):
 
     def update(self, absolute_position: Tuple[int, int]):
 
-        pass
+        return self.check_action_tiles(absolute_position)
 
     def _room_grid_rect(self, room: DungeonRoom) -> Tuple[int, int, int, int]:
         """
@@ -1718,6 +1745,26 @@ class Dungeon(BaseMap):
         # --- Construction des matrices globales de tuiles ---
         self._build_tile_grids()
 
+        # --- Action tiles : une entrée "boss_fight_start" sur chaque IO
+        # de la dernière salle placée (= la salle boss).
+        # Les IOs sont en coordonnées locales (tuiles) ; on les convertit
+        # en coordonnées globales en ajoutant l'origine de la salle.
+        self.action_tiles = []
+        if self.rooms:
+            cell = self.dungeon_size[0] // self.tile_size[0]  # 9
+            boss_room = self.rooms[-1]
+            origin_x = int(boss_room.position[0]) * cell
+            origin_y = int(boss_room.position[1]) * cell
+            for io in boss_room.ios:
+                self.action_tiles.append(
+                    {
+                        "x": origin_x + io["x"],
+                        "y": origin_y + io["y"],
+                        "action": "boss_fight_start",
+                        "params": {},
+                    }
+                )
+
     def _build_tile_grids(self):
         """
         Construit deux matrices numpy globales (en tuiles) couvrant l'ensemble
@@ -1780,6 +1827,24 @@ class Dungeon(BaseMap):
                         )
 
         return nearby
+
+    def get_nearby_action_tiles(self, hitbox):
+        nearby_action_tiles = []
+
+        # Trouver la position du joueur dans la grille
+        tile_x = hitbox.centerx // self.tile_size[0]
+        tile_y = hitbox.centery // self.tile_size[1]
+
+        for tile in self.action_tiles:
+            if (
+                tile_x - 1 <= tile["x"] <= tile_x + 1
+                and tile_y - 1 <= tile["y"] <= tile_y + 1
+            ):
+                nearby_action_tiles.append(
+                    pygame.Rect(tile["x"] * 32, tile["y"] * 32, 32, 32)
+                )
+
+        return nearby_action_tiles
 
     def is_tile_occupied(self, tile_x: int, tile_y: int) -> bool:
         """
@@ -1872,7 +1937,7 @@ class MapManager(BaseMap):
             ),
         }
         for i in range(nb_dungeons):
-            self.maps[f"dungeon{i}"] = Dungeon(screen, 20)
+            self.maps[f"dungeon{i}"] = Dungeon(game, screen, 20)
         if len(self.maps) > 0:
             self.map_name = list(self.maps.keys())[0]
         else:
@@ -1913,6 +1978,9 @@ class MapManager(BaseMap):
     def get_nearby_obstacles(self, hitbox: pygame.Rect):
 
         return self.map.get_nearby_obstacles(hitbox)
+
+    def get_nearby_action_tiles(self, hitbox):
+        return self.map.get_nearby_action_tiles(hitbox)
 
     def initialize_var(self):
         """
