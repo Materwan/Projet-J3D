@@ -738,7 +738,7 @@ class Map(BaseMap):
         self.load_chunk_running = True
         self.last_chunk: Tuple[int, int] = (0, 0)
         self.load_chunk_position: Tuple[int, int] = self.start_position
-        self.load_chunk_thread = threading.Thread(target=self._load_chunks)
+        self.load_chunk_thread = threading.Thread(target=self._load_chunks, daemon=True)
         self.load_chunk_event = threading.Event()
 
         # -- Ajout éléments --

@@ -600,7 +600,7 @@ class Join_Multi_Menu(Menu):
         self.manager.running = True
         self.serveurs = {}
         self.serveurs: Dict[Dict]
-        self.upd_prot = threading.Thread(target=self.recieve_udp)
+        self.upd_prot = threading.Thread(target=self.recieve_udp, daemon=True)
         self.udp_event = threading.Event()
         self.upd_prot.start()
 
