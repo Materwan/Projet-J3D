@@ -23,7 +23,7 @@ pygame.mixer.init()
 pygame.display.set_caption("MoleTale")
 
 FPS = 60
-TAILLE_ECRAN = (0, 0)  # (500, 500) pour petit ecran (0, 0) pour plein ecran
+TAILLE_ECRAN = (500, 500)  # (500, 500) pour petit ecran (0, 0) pour plein ecran
 
 SOUND_PATH = resource_path("Ressources/Musics/")
 MUSIC_HOLDER = os.path.join(SOUND_PATH, "placeholder.mp3")
@@ -104,12 +104,43 @@ class Manager:
                     ),
                     (10, 10),
                 )
+                if self.state == self.states["GAME"]:
+                    for key, value in self.state.map.maps.items():
+                        if value == self.state.map.map:
+                            self.screen.blit(
+                                self.font.render(key, True, (255, 255, 255)), (10, 32)
+                            )
+                            pos = self.state.player_controller.position
+                            pos = (int(pos[0]), int(pos[1]))
+                            self.screen.blit(
+                                self.font.render(
+                                    str(pos),
+                                    True,
+                                    (255, 255, 255),
+                                ),
+                                (10, 54),
+                            )
+                else:
+                    for key, value in self.states.items():
+                        if value == self.state:
+                            self.screen.blit(
+                                self.font.render(key, True, (255, 255, 255)), (10, 32)
+                            )
+                            pos = pygame.mouse.get_pos()
+                            self.screen.blit(
+                                self.font.render(
+                                    str(pos),
+                                    True,
+                                    (255, 255, 255),
+                                ),
+                                (10, 54),
+                            )
 
             pygame.display.flip()
 
             self.clock.tick(FPS)  # à ne pas toucher
 
-        self.states["GAME"].close_game()
+        self.states["GAME"].close_network()
 
 
 manager = Manager()
@@ -119,7 +150,7 @@ try:
 except (Exception, KeyboardInterrupt):
     manager.running = False
     manager.states["MENU_MULTI"].udp_event.clear()
-    manager.states["GAME"].close_game()
+    manager.states["GAME"].close_network()
     logging.error(traceback.format_exc())
 finally:
     pygame.quit()
