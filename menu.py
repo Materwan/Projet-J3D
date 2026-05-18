@@ -9,7 +9,7 @@ import os
 
 import pygame as p
 import animations as a
-from utils import resource_path
+from utils import resource_path, DefaultManager
 
 if TYPE_CHECKING:
     from main import Manager
@@ -54,7 +54,7 @@ class Text:
         self.screen.blit(self.text, coordonninate)
 
 
-class Menu:
+class Menu(DefaultManager):
 
     def __init__(self, screen: p.Surface, manager: "Manager"):
         self.elttexts = []
@@ -635,10 +635,13 @@ class Join_Multi_Menu(Menu):
                         sock.bind(("", UDP_PORT))
                         print("[Guest] Écoute UDP démarrée")
 
-                    data, addr = sock.recvfrom(1024)  # buffer size is 1024 bytes
-                    data = json.loads(data.decode().strip())
-                    if addr[0] not in self.serveurs:
-                        self.serveurs[addr[0]] = data
+                    try:
+                        data, addr = sock.recvfrom(1024)
+                        data = json.loads(data.decode("utf-8").strip())
+                        if addr[0] not in self.serveurs:
+                            self.serveurs[addr[0]] = data
+                    except (UnicodeDecodeError, json.JSONDecodeError):
+                        pass
                 else:
                     if sock_set:
                         sock_set = False

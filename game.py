@@ -15,10 +15,10 @@ from player import (
     HostController,
     GuestController,
 )
-from utils import resource_path
+from utils import resource_path, DefaultManager
 from network import HostNetwork, GuestNetwork
 from moteur import Moteur
-from map import Map, Hub, Dungeon, MapManager
+from map import MapManager, STR_TYPE
 from camera_system import Camera
 from hud import HUD
 from inventory import Item, Inventaire, InventaireUI, InventaireManager
@@ -51,7 +51,7 @@ def serialize_ennemis(ennemis: Dict[int, Ennemi]) -> Dict[int, Any]:
     return dic
 
 
-class Game:
+class Game(DefaultManager):
     """Classe de gestion du jeu : joueur et carte."""
 
     def __init__(self, screen: pygame.Surface, manager: "Manager"):
@@ -158,7 +158,7 @@ class Game:
 
             # Récupération de la map envoyée par l'hôte
             map_data = self.network.get_map_data()
-            self.map = MapManager._create_map(self.screen, self, map_data)
+            self.map = MapManager.create_map(self.screen, self, map_data)
 
             # Récupération de la position initiale du guest
             initial = self.network.get_initial_state()
@@ -178,7 +178,7 @@ class Game:
         else:
 
             # -- Map --
-            self.map = MapManager(
+            self.map = MapManager.generate_maps(
                 self.screen,
                 self,
                 7,
@@ -284,6 +284,7 @@ class Game:
         elif isinstance(pc, GuestController):
             if pc.is_dead and pc.host.is_dead:
                 self.manager.change_state("DEATH_SCREEN")
+            # self._change_map(pc, STR_TYPE[type(pc.host.current_map)], False)
 
     # Réseau
 
@@ -308,7 +309,13 @@ class Game:
             "map": {
                 "name": self.map.map_name,
             },
-            "ennemis": serialize_ennemis(self.ennemis),
+            "ennemis": (
+                serialize_ennemis(
+                    self.player_controller.guest.current_map.get_ennemis()
+                )
+                if self.player_controller.guest.current_map
+                else {}
+            ),
             "close": False,
         }
 
@@ -344,13 +351,12 @@ class Game:
             hc.guest.velocity = self.moteur.verif_velocity(data["guest"]["velocity"])
             hc.guest.moving_intent = data["guest"]["moving_intent"]
             hc.guest.attaque = data["guest"]["attaque"]
-            if hc.guest.current_map != self.map.maps[data["map"]["name"]]:
-                hc.guest.current_map = self.map.maps[data["map"]["name"]]
-                new_pos = hc.guest.current_map.start_position
-                self._change_map(hc.guest, new_pos, move_camera=False)
+            if hc.guest.current_map != self.map[data["map"]["name"]]:
+                self._change_map(hc.guest, data["map"]["name"], move_camera=False)
                 if self.player_controller.hitbox.colliderect(
                     self.player_controller.guest.hitbox
                 ):
+                    new_pos = self.player_controller.guest.position
                     new_pos[0] += 50
                     self.player_controller.guest.position.update(new_pos)
                     self.player_controller.guest.hitbox.center = new_pos
@@ -507,110 +513,21 @@ class Game:
     def _change_map(
         self,
         player_controller: PlayerControllerBase,
-        new_position: Tuple[int, int],
+        new_map: str,
         move_camera: bool = True,
     ):
-        player_controller.current_map = self.map.map
-        player_controller.position.update(new_position)
-        player_controller.hitbox.center = new_position
+        player_controller.current_map = self.map[new_map]
+        player_controller.position.update(player_controller.current_map.start_position)
+        player_controller.hitbox.center = player_controller.current_map.start_position
+        self.ennemis = self.map.get_ennemis()
         if move_camera:
-            self.camera.set_position(new_position)
+            self.camera.set_position(player_controller.current_map.start_position)
         # -- Mort / Spectateur --
         self._handle_death()
 
     def _boss_fight_start(self):
         print("start boss fight")
         # self.manager.change_state("CARD")
-
-    def update_ennemis_solo(self):
-        del_key = []
-
-        for key, ennemi in self.ennemis.items():
-            self.paths.append(ennemi.update(self.player_controller))
-
-            if ennemi.attaque_rect is not None:
-                self.moteur.apply_attack(ennemi.attaque_rect, self.player_controller)
-
-            self.spawn_death_particles(ennemi)
-
-            if time.time() > ennemi.death_time:
-                del_key.append(key)
-
-        for key in del_key:
-            del self.ennemis[key]
-
-        if self.player_controller.attaque_rect is not None:
-            for ennemi in self.ennemis.values():
-                self.moteur.apply_attack(self.player_controller.attaque_rect, ennemi)
-
-    def update_ennemis_host(self):
-        del_key = []
-
-        for key, ennemi in self.ennemis.items():
-            self.paths.append(
-                ennemi.update(self.player_controller, self.player_controller.guest)
-            )
-
-            if ennemi.attaque_rect is not None:
-                if not self.player_controller.is_dead:
-                    self.moteur.apply_attack(
-                        ennemi.attaque_rect, self.player_controller
-                    )
-                if not self.player_controller.guest.is_dead:
-                    self.moteur.apply_attack(
-                        ennemi.attaque_rect, self.player_controller.guest
-                    )
-
-            self.spawn_death_particles(ennemi)
-
-            if time.time() > ennemi.death_time:
-                del_key.append(key)
-
-        for key in del_key:
-            del self.ennemis[key]
-
-        if self.player_controller.attaque_rect is not None:
-            for ennemi in self.ennemis.values():
-                self.moteur.apply_attack(self.player_controller.attaque_rect, ennemi)
-
-        if self.player_controller.guest.attaque_rect is not None:
-            for ennemi in self.ennemis.values():
-                self.moteur.apply_attack(
-                    self.player_controller.guest.attaque_rect, ennemi
-                )
-
-    def update_ennemis_guest(self, ennemis_data: Dict[str, Any]):
-        """Côté guest : les ennemis sont pilotés par les données réseau."""
-        del_key = []
-
-        for key, ennemi_data in ennemis_data.items():
-
-            if key not in self.ennemis_id:
-                if ennemi_data["dying"]:
-                    continue
-                self.ennemis[key] = Ennemi(
-                    self.screen,
-                    ennemi_data["position"],
-                    -1,
-                    -1,
-                    None,
-                    self.camera,
-                    None,
-                )
-                self.ennemis_id.append(key)
-
-            self.ennemis[key].update_variables(ennemi_data)
-            self.ennemis[key].update_animation()
-
-            self.spawn_death_particles(self.ennemis[key])
-
-            if time.time() > ennemi_data["death_time"]:
-                del_key.append(key)
-
-        for key in del_key:
-            del self.ennemis[key]
-            if key in self.ennemis_id:
-                self.ennemis_id.remove(key)
 
     def spawn_death_particles(self, ennemi: Ennemi):
         """Fait spawn des particules de mort si ennemi est mort"""
@@ -767,6 +684,50 @@ class Game:
                         + self.camera.offset_y,
                     ),
                 )
+
+    def _debug(self, font: pygame.font.Font):
+        player = self.player_controller.position
+        hitbox = self.player_controller.hitbox.center
+        left_data = {
+            "Type": self.playing_mode,
+            "FPS": int(self.manager.clock.get_fps()),
+            "Map": STR_TYPE[type(self.map.map)],
+            "Player": (int(player[0]), int(player[1])),
+            "Hitbox": (int(hitbox[0]), int(hitbox[1])),
+        }
+        right_data = {}
+
+        if self.playing_mode == "host":
+            player = self.player_controller.guest.position
+            hitbox = self.player_controller.guest.hitbox.center
+            right_data = {
+                "Type": "guest",
+                "RTT": round(self.network.guest_rtt_ms, 2),
+                "Map": STR_TYPE[type(self.player_controller.guest.current_map)],
+                "Player": (int(player[0]), int(player[1])),
+                "Hitbox": (int(hitbox[0]), int(hitbox[1])),
+            }
+
+        elif self.playing_mode == "guest":
+            player = self.player_controller.host.position
+            hitbox = self.player_controller.host.hitbox.center
+            right_data = {
+                "Type": "host",
+                "RTT": round(self.network.average_rtt_ms, 2),
+                "Map": STR_TYPE[type(self.player_controller.host.current_map)],
+                "Player": (int(player[0]), int(player[1])),
+                "Hitbox": (int(hitbox[0]), int(hitbox[1])),
+            }
+
+        for i, (key, value) in enumerate(left_data.items()):
+            text = f"{key}: {value}"
+            surface = font.render(text, True, (255, 255, 255))
+            self.screen.blit(surface, (10, 10 + i * 22))
+        screen_size = self.screen.get_size()
+        for i, (key, value) in enumerate(right_data.items()):
+            text = f"{key}: {value}"
+            surface = font.render(text, True, (255, 255, 255))
+            self.screen.blit(surface, (screen_size[0] - 150, 10 + i * 22))
 
     # Sauvegarde et reset
 

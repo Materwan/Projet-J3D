@@ -4,7 +4,7 @@ import os
 
 import pygame
 
-from utils import resource_path
+from utils import resource_path, DefaultManager
 from menu import (
     Principal_Menu,
     Setting_Menu,
@@ -59,7 +59,7 @@ class Manager:
             "MENU_MULTIPLAYER": Multiplayer_Menu(self.screen, self),
             "DEATH_SCREEN": Death_Screen(self.screen, self),
         }
-        self.state = self.states["MENU_P"]
+        self.state: DefaultManager = self.states["MENU_P"]
 
         self.fps = False
         self.font = pygame.font.SysFont(None, 24)  # texte pour fps
@@ -84,6 +84,35 @@ class Manager:
             for key in SOUND.keys():
                 SOUND[key].volume_decrease()
 
+    def debug(self):
+
+        # -- Game --
+        if self.state == self.states["GAME"]:
+            self.state._debug(self.font)
+
+        # -- Menu --
+        else:
+            self.screen.blit(
+                self.font.render(
+                    f"FPS: {int(self.clock.get_fps())}", True, (255, 255, 255)
+                ),
+                (10, 10),
+            )
+            for key, value in self.states.items():
+                if value == self.state:
+                    self.screen.blit(
+                        self.font.render(key, True, (255, 255, 255)), (10, 32)
+                    )
+                    pos = pygame.mouse.get_pos()
+                    self.screen.blit(
+                        self.font.render(
+                            str(pos),
+                            True,
+                            (255, 255, 255),
+                        ),
+                        (10, 54),
+                    )
+
     def run(self):
         while self.running:
 
@@ -97,44 +126,8 @@ class Manager:
 
             self.state.display()
 
-            if self.fps:  # fps
-                self.screen.blit(
-                    self.font.render(
-                        f"FPS: {int(self.clock.get_fps())}", True, (255, 255, 255)
-                    ),
-                    (10, 10),
-                )
-                if self.state == self.states["GAME"]:
-                    for key, value in self.state.map.maps.items():
-                        if value == self.state.map.map:
-                            self.screen.blit(
-                                self.font.render(key, True, (255, 255, 255)), (10, 32)
-                            )
-                            pos = self.state.player_controller.position
-                            pos = (int(pos[0]), int(pos[1]))
-                            self.screen.blit(
-                                self.font.render(
-                                    str(pos),
-                                    True,
-                                    (255, 255, 255),
-                                ),
-                                (10, 54),
-                            )
-                else:
-                    for key, value in self.states.items():
-                        if value == self.state:
-                            self.screen.blit(
-                                self.font.render(key, True, (255, 255, 255)), (10, 32)
-                            )
-                            pos = pygame.mouse.get_pos()
-                            self.screen.blit(
-                                self.font.render(
-                                    str(pos),
-                                    True,
-                                    (255, 255, 255),
-                                ),
-                                (10, 54),
-                            )
+            if self.fps:
+                self.debug()
 
             pygame.display.flip()
 

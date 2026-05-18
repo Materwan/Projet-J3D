@@ -63,7 +63,7 @@ def get_dungeon_tiles(
     return empty_tile_positions, occupied_tiles
 
 
-def load_dungeons_tilesets(file: str, folder: str):
+def load_dungeons_tilesets(file: str, folder: str) -> Dict:
 
     with open(file, "r") as f:
         s = f.read()
@@ -521,15 +521,42 @@ class BaseMap(ABC):
     tile_size: np.ndarray
     action_tiles: List[Dict[str, Any]]
     screen: pygame.Surface
+    game: "Game"
     ennemis: Dict[int, "Ennemi"]
     _action_registry: Dict[str, Callable]
     update_ennemis: Callable[[], List[Tuple[int, int]]]
+
+    def __init__(self, screen, game):
+        self.size = np.array([0, 0], dtype=np.int32)
+        self.start_position = (0, 0)
+        self.tile_size = np.array(TILE_SIZE, dtype=np.int32)
+        self.action_tiles = []
+        self.screen = screen
+        self.game = game
+        self.ennemis = {}
+        self.update_ennemis = self._get_update_ennemis()
+        self._register_actions()
+
+    @classmethod
+    @abstractmethod
+    def create_map(
+        screen: pygame.Surface, game: "Game", map_data: Dict[str, Any]
+    ) -> "BaseMap":
+        """Méthode alternative pour créer une carte, destiné au clients.
+
+        Args:
+            screen (pygame.Surface): l'écran.
+            game (Game): le controlleur du jeu.
+            map_dict (Dict[str, Any]): un dictionnaire qui contient toutes les variable pour la création de la carte.
+
+        Returns:
+            BaseMap: une carte en accord avec le type dans map_data.
+        """
 
     def close_map(self):
         """
         Ferme tous les processus d'une carte, et la supprime.
         """
-        pass
 
     @abstractmethod
     def get_nearby_obstacles(self, hitbox: pygame.Rect):
@@ -543,7 +570,6 @@ class BaseMap(ABC):
         Returns:
             list[pygame.Rect]: Liste des obstacles à proximité immédiate.
         """
-        pass
 
     @abstractmethod
     def get_nearby_action_tiles(self, hitbox: pygame.Rect) -> List[pygame.Rect]:
@@ -555,35 +581,15 @@ class BaseMap(ABC):
         Returns:
             list[pygame.Rect]: Liste des tuiles d'action à proximité immédiate.
         """
-        pass
-
-    @classmethod
-    @abstractmethod
-    def _create_map(
-        screen: pygame.Surface, game: "Game", map_data: Dict[str, Any]
-    ) -> "BaseMap":
-        """Méthode alternative pour créer une carte, destiné au clients.
-
-        Args:
-            screen (pygame.Surface): l'écran.
-            game (Game): le controlleur du jeu.
-            map_dict (Dict[str, Any]): un dictionnaire qui contient toutes les variable pour la création de la carte.
-
-        Returns:
-            BaseMap: une carte en accord avec le type dans map_data.
-        """
-        pass
 
     @abstractmethod
     def _get_to_send_data(self) -> Dict[str, Any]:
         """Renvoie les données correspondant à une carte,
         pour l'envoyer à un client."""
-        pass
 
     @abstractmethod
     def _register_actions(self):
         """Chaque sous-classe enregistre ses actions ici."""
-        pass
 
     def register(self, name: str, func: Callable):
         """
@@ -604,12 +610,10 @@ class BaseMap(ABC):
         Args:
             absolute_position (Tuple[int, int]): La position du joueursur la carte.
         """
-        pass
 
     @abstractmethod
     def get_ennemis(self) -> Dict[int, "Ennemi"]:
         """Retourne les ennemis actifs de cette map."""
-        pass
 
     def check_action_tiles(self, absolute_position: Tuple[int, int]) -> Any | None:
         """Appel la fonction activé par le joueur sur une tuile si besoin.
@@ -632,7 +636,6 @@ class BaseMap(ABC):
     @abstractmethod
     def _get_update_ennemis(self) -> Callable[[], List[Tuple[int, int]]]:
         """Met à jour les ennemis et retourne les paths (pour le debug)."""
-        pass
 
     @abstractmethod
     def display(self, camera: Camera):
@@ -643,7 +646,6 @@ class BaseMap(ABC):
         Args:
             camera (Camera): La camera du jeu.
         """
-        pass
 
 
 class Map(BaseMap):
@@ -684,101 +686,108 @@ class Map(BaseMap):
         _display(): affiche différents éléments de la carte, avec pyplot (pour debug).
     """
 
-    def __init__(
-        self,
-        game: "Game",
-        nb_chunks: Tuple[int, int],
-        chunk_size: Tuple[int, int],
-        octaves: Tuple[int, int],
-        nb_dungeons: int,
-        screen: pygame.Surface,
-        seed: int | None,
-    ):
-        """
-        Initialize et créer une carte procédurale.
+    nb_chunks: np.ndarray
+    chunk_size_tile: np.ndarray
+    octaves: Tuple[int, int]
+    nb_dungeons: int
+    chunk_size_pix: np.ndarray
+    asset: Dict
+    seed: int
+    map_scale: Tuple[int, int]
+    map: np.ndarray
+    chunks: Dict[Tuple[int, int], Chunk]
+    road_map: np.ndarray
+    structures: List[Tuple[int, int]]
+    loaded_chunks: Dict[Tuple[int, int], Chunk]
+    load_chunk_running: bool
+    last_chunk: Tuple[int, int]
+    load_chunk_position: Tuple[int, int]
+    load_chunk_thread: threading.Thread
+    load_chunk_event: threading.Event
 
-        Args:
-            game (Game): le controlleur du jeu.
-            nb_chunks (Tuple[int, int]): le nombre de chunk à généré en largeur/longeur.
-            chunk_size (Tuple[int, int]): la taille de chaque chunk en largeur/longeur.
-            octaves (Tuple[int, int]): l'espace entre 2 vecteur lors du bruit de perlin, abruptité du terain.
-            screen (pygame.Surface): l'écran.
-            seed (int): la graine du monde.
-        """
+    def __init__(self, screen: pygame.Surface, game: "Game"):
+        super().__init__(screen, game)
+
         # -- Valeurs initiales --
-        self.nb_chunks = np.array(nb_chunks, dtype=np.int32)
-        self.chunk_size_tile = np.array(chunk_size, dtype=np.int32)
-        self.size = self.nb_chunks * self.chunk_size_tile
-        self.octaves = octaves
-        self.nb_dungeons = nb_dungeons
+        self.nb_chunks = np.array([0, 0], dtype=np.int32)
+        self.chunk_size_tile = np.array([0, 0], dtype=np.int32)
+        self.octaves = (0, 0)
+        self.nb_dungeons = 0
         self.dungeons = 0
-        self.tile_size = np.array(TILE_SIZE, dtype=np.int32)
-        self.start_position = (self.size * self.tile_size // 2).tolist()
         self.chunk_size_pix = self.chunk_size_tile * self.tile_size
-        self.action_tiles = []
-        self.asset = load_assets(
-            os.path.join(TILESET_DIRECTORY, "tile_data.json"),
-            TILESET_DIRECTORY,
-            self.tile_size,
-        )
-        self.screen = screen
-        self.game = game
-        if seed is None:  # Si aucune graine n'est donnée, prend en une au hasard
-            self.seed = np.random.randint(0, 999999999)
-        else:
-            self.seed = seed
+        self.asset = {}
+        self.seed = -1
 
         # -- Création variables spécifique --
         self.map_scale = (0, 1)
-        self.map = self.create_map(octaves)
+        self.map = np.zeros(shape=self.nb_chunks * self.chunk_size_tile)
         self.chunks = self.create_chunks()
         self.road_map = np.where(self.map < 0.5, -np.inf, self.map)
         self.structures = []
         self.loaded_chunks = {}
         self.load_chunk_running = True
-        self.last_chunk: Tuple[int, int] = (0, 0)
-        self.load_chunk_position: Tuple[int, int] = self.start_position
+        self.last_chunk = (0, 0)
+        self.load_chunk_position = self.start_position
         self.load_chunk_thread = threading.Thread(target=self._load_chunks, daemon=True)
         self.load_chunk_event = threading.Event()
-
-        # -- Ajout éléments --
-        self._add_object_pos("place", 128, 128, 3, occupe=True)
-        self.structures.append((128, 128))
-        self._add_structure("dungeon_entrance", nb=self.nb_dungeons, z=10, distance=5)
-        self._add_structure("place", nb=3, z=3, distance=10)
-        self._generate_paths(0.3, prop=0.5)
-        self._add_road(0, 2)
-        self._add_objects("grass", prob=0.1, z=-1, occupe=True)
-        self._add_objects("tree", prob=0.01, z=2)
-        self._add_objects("bush", prob=0.1, z=0)
-        self._add_objects("rock", prob=0.01, z=1)
-
-        self._register_actions()
-
-        # -- Ennemis --
-        self.ennemis = {}
-        self.update_ennemis = self._get_update_ennemis()
 
         # -- Charge chunks --
         self.load_chunk_event.set()
         self.load_chunk_thread.start()
 
+    @staticmethod
+    def create_map(
+        screen: pygame.Surface, game: "Game", map_data: Dict[str, Any]
+    ) -> "Map":
+        return_map = Map(screen, game)
+
+        # -- Valeurs initiales --
+        return_map.nb_chunks = np.array(map_data["nb_chunks"], dtype=np.int32)
+        return_map.chunk_size_tile = np.array(map_data["chunk_size"], dtype=np.int32)
+        return_map.size = return_map.nb_chunks * return_map.chunk_size_tile
+        return_map.octaves = map_data["octaves"]
+        return_map.nb_dungeons = map_data["nb_dungeons"]
+        return_map.start_position = (
+            return_map.size * return_map.tile_size // 2
+        ).tolist()
+        return_map.chunk_size_pix = return_map.chunk_size_tile * return_map.tile_size
+        return_map.asset = load_assets(
+            os.path.join(TILESET_DIRECTORY, "tile_data.json"),
+            TILESET_DIRECTORY,
+            return_map.tile_size,
+        )
+        if (
+            map_data["seed"] is None
+        ):  # Si aucune graine n'est donnée, prend en une au hasard
+            return_map.seed = np.random.randint(0, 999999999)
+        else:
+            return_map.seed = map_data["seed"]
+
+        # -- Création variables spécifique --
+        return_map.map_scale = (0, 1)
+        return_map.map = return_map.generate_map(map_data["octaves"])
+        return_map.chunks = return_map.create_chunks()
+        return_map.road_map = np.where(return_map.map < 0.5, -np.inf, return_map.map)
+
+        # -- Ajout éléments --
+        return_map._add_object_pos("place", 128, 128, 3, occupe=True)
+        return_map.structures.append((128, 128))
+        return_map._add_structure(
+            "dungeon_entrance", nb=return_map.nb_dungeons, z=10, distance=5
+        )
+        return_map._add_structure("place", nb=3, z=3, distance=10)
+        return_map._generate_paths(0.3, prop=0.5)
+        return_map._add_road(0, 2)
+        return_map._add_objects("grass", prob=0.1, z=-1, occupe=True)
+        return_map._add_objects("tree", prob=0.01, z=2)
+        return_map._add_objects("bush", prob=0.1, z=0)
+        return_map._add_objects("rock", prob=0.01, z=1)
+
+        return return_map
+
     def close_map(self):
         self.load_chunk_running = False
         self.load_chunk_event.clear()
-
-    @staticmethod
-    def _create_map(
-        screen: pygame.Surface, game: "Game", map_data: Dict[str, Any]
-    ) -> "Map":
-        return Map(
-            game,
-            map_data["nb_chunks"],
-            map_data["chunk_size"],
-            map_data["octaves"],
-            screen,
-            map_data["seed"],
-        )
 
     def _register_actions(self):
         self._action_registry = {}
@@ -790,13 +799,14 @@ class Map(BaseMap):
     def _get_to_send_data(self) -> Dict[str, Any]:
         return {
             "type": "map",
+            "nb_dungeons": self.nb_dungeons,
             "nb_chunks": self.nb_chunks.tolist(),
             "chunk_size": self.chunk_size_tile.tolist(),
             "octaves": self.octaves,
             "seed": self.seed,
         }
 
-    def create_map(
+    def generate_map(
         self,
         octaves: Tuple[int, int],
         mask_weight: float | None = 0.5,
@@ -1096,7 +1106,11 @@ class Map(BaseMap):
     def _load_chunks(self):
         """Charge les chunks au alentour d'un joueur, dans un thread parallèle."""
         while self.load_chunk_running:
-            if self.load_chunk_event.is_set():
+            if (
+                self.load_chunk_event.is_set()
+                and self.size[0] != 0
+                and self.size[1] != 0
+            ):
                 abs_position = np.array(self.load_chunk_position, dtype=np.int32)
                 if not np.less(abs_position, self.size * self.chunk_size_pix).all():
                     raise ValueError(f"La position fourni n'est pas dans la carte,\
@@ -1177,8 +1191,8 @@ class Map(BaseMap):
         for key, ennemi in self.ennemis.items():
             paths.append(
                 ennemi.update(
-                    self.game.player_controller.hitbox,
-                    self.game.player_controller.guest.hitbox,
+                    self.game.player_controller,
+                    self.game.player_controller.guest,
                 )
             )
 
@@ -1375,45 +1389,53 @@ class Map(BaseMap):
 class Hub(BaseMap):
     """Classe dédié à la carte du Hub."""
 
-    def __init__(self, screen: pygame.Surface, game: "Game"):
+    size_in_tile: np.ndarray
+    collision_tiles: np.ndarray
+    occupied_tiles: np.ndarray
+    image: pygame.Surface
 
-        self.screen = screen
-        self.game = game
+    def __init__(self, screen: pygame.Surface, game: "Game"):
+        super().__init__(screen, game)
+
+        self.size_in_tile = np.array([0, 0], dtype=np.int32)
+        self.collision_tiles = np.array([0, 0], dtype=np.int32)
+        self.occupied_tiles = np.array([0, 0], dtype=np.int32)
+        self.image = pygame.Surface(self.size)
+
+    @staticmethod
+    def create_map(
+        screen: pygame.Surface, game: "Game", map_data: Dict[str, Any]
+    ) -> "Hub":
+        return_map = Hub(screen, game)
 
         with open(os.path.join(TILEMAP_DIRECTORY, "tilemap_data.json"), "r") as file:
 
             data = json.loads(file.read())
 
-            self.tile_size = np.array(TILE_SIZE, dtype=np.int32)
-            self.size = np.array(
+            return_map.tile_size = np.array(TILE_SIZE, dtype=np.int32)
+            return_map.size = np.array(
                 (data["hub"]["width"], data["hub"]["height"]), dtype=np.int32
             )
-            self.start_position = (self.size // 2).tolist()
-            self.size_in_tile = self.size // self.tile_size
+            return_map.start_position = (return_map.size // 2).tolist()
+            return_map.size_in_tile = return_map.size // return_map.tile_size
 
-            self.collision_tiles = np.zeros(shape=(self.size // self.tile_size))
+            return_map.collision_tiles = np.zeros(
+                shape=(return_map.size // return_map.tile_size)
+            )
             rows, cols = zip(*data["hub"]["collision_tiles"])
-            self.collision_tiles[rows, cols] = 1
+            return_map.collision_tiles[rows, cols] = 1
 
-            self.occupied_tiles = np.zeros(shape=(self.size // self.tile_size))
+            return_map.occupied_tiles = np.zeros(
+                shape=(return_map.size // return_map.tile_size)
+            )
             rows, cols = zip(*data["hub"]["occupied_tiles"])
-            self.occupied_tiles[rows, cols] = 1
+            return_map.occupied_tiles[rows, cols] = 1
 
-            self.action_tiles: List[Dict[str, Any]] = data["hub"]["action_tiles"]
+            return_map.action_tiles = data["hub"]["action_tiles"]
 
-        self.image = pygame.image.load(os.path.join(TILEMAP_DIRECTORY, "hub.png"))
+        return_map.image = pygame.image.load(os.path.join(TILEMAP_DIRECTORY, "hub.png"))
 
-        self._register_actions()
-
-        # -- Ennemis --
-        self.ennemis = {}
-        self.update_ennemis = self._get_update_ennemis()
-
-    @staticmethod
-    def _create_map(
-        screen: pygame.Surface, game: "Game", map_data: Dict[str, Any]
-    ) -> "Hub":
-        return Hub(screen, game)
+        return return_map
 
     def _change_map(self, **map_name: str):
         return map_name["target"]
@@ -1503,28 +1525,35 @@ class Hub(BaseMap):
 
 class Dungeon(BaseMap):
 
-    def __init__(self, game: "Game", screen: pygame.Surface, nb_rooms: int):
+    tile_maps: Dict
+    dungeon_size: np.ndarray
+    nb_rooms: int
+    rooms: List[DungeonRoom]
 
-        self.game = game
-        self.screen = screen
-        self.start_position = [0, 0]
-        self.action_tiles = []
-        self.ennemis = {}
+    def __init__(self, screen: pygame.Surface, game: "Game"):
+        super().__init__(screen, game)
 
-        self.tile_maps = load_dungeons_tilesets(
+        self.tile_maps = {}
+        self.dungeon_size = np.array([0, 0], dtype=np.int32)
+        self.nb_rooms = 0
+        self.rooms = []
+
+    def create_map(
+        screen: pygame.Surface, game: "Game", map_data: Dict[str, Any]
+    ) -> "BaseMap":
+        return_map = Dungeon(screen, game)
+
+        return_map.tile_maps = load_dungeons_tilesets(
             os.path.join(DUNGEON_TILEMAP_DIRECTORY, "dungeon_data.json"),
             DUNGEON_TILEMAP_DIRECTORY,
         )
 
-        self.tile_size = np.array(TILE_SIZE)
-        self.dungeon_size = 9 * self.tile_size
+        return_map.dungeon_size = 9 * return_map.tile_size
+        return_map.nb_rooms = map_data["nb_rooms"]
 
-        self.nb_rooms = nb_rooms
-        self.rooms: List[DungeonRoom] = []
+        return_map.generate_dungeon()
 
-        self.generate_dungeon()
-        self.update_ennemis = self._get_update_ennemis()
-        self._register_actions()
+        return return_map
 
     def _get_to_send_data(self) -> Dict[str, Any]:
         return {
@@ -1539,12 +1568,6 @@ class Dungeon(BaseMap):
     def get_nearby_obstacles(self, hitbox: pygame.Rect):
 
         return []
-
-    def _create_map(
-        screen: pygame.Surface, game: "Game", map_data: Dict[str, Any]
-    ) -> "BaseMap":
-
-        return Dungeon(screen, map_data["nb_rooms"])
 
     def _register_actions(self):
         self._action_registry = {}
@@ -1765,6 +1788,8 @@ class Dungeon(BaseMap):
                     }
                 )
 
+        self.size = self.get_size()
+
     def _build_tile_grids(self):
         """
         Construit deux matrices numpy globales (en tuiles) couvrant l'ensemble
@@ -1778,7 +1803,7 @@ class Dungeon(BaseMap):
             occupied_tiles  (np.ndarray[uint8]) : 1 là où une tuile est déjà occupée.
         """
         cell = self.dungeon_size[0] // self.tile_size[0]  # 9 tuiles par cellule
-        total_w, total_h = self.size  # en tuiles (via property)
+        total_w, total_h = self.get_size()  # en tuiles (via property)
 
         self.collision_tiles = np.zeros((total_w, total_h), dtype=np.uint8)
         self.occupied_tiles = np.zeros((total_w, total_h), dtype=np.uint8)
@@ -1860,8 +1885,7 @@ class Dungeon(BaseMap):
             return True  # hors-limites = occupé par convention
         return bool(self.occupied_tiles[tile_x, tile_y])
 
-    @property
-    def size(self) -> np.ndarray:
+    def get_size(self) -> np.ndarray:
         """Taille totale du donjon en tuiles (bounding box de toutes les salles)."""
         if not self.rooms:
             return np.array([0, 0])
@@ -1902,7 +1926,10 @@ class Dungeon(BaseMap):
 TYPE_STR: Dict[str, BaseMap] = {
     "map": Map,
     "hub": Hub,
+    "dungeon": Dungeon,
 }
+
+STR_TYPE: Dict[BaseMap, str] = {value: key for key, value in TYPE_STR.items()}
 
 
 class MapManager(BaseMap):
@@ -1919,48 +1946,81 @@ class MapManager(BaseMap):
         change_map(name): change la map et met à jour le joueur et le game.
     """
 
+    map: BaseMap | None
+    maps: Dict[str, BaseMap]
+    map_name: str
+
     def __init__(
         self,
         screen: pygame.Surface,
         game: "Game",
-        nb_dungeons,
+    ):
+        self.maps = {}
+        self.map_name = ""
+        self.initialize_var()
+
+        super().__init__(screen, game)
+
+    def __getitem__(self, key):
+        return self.maps[key]
+
+    def initialize_var(self):
+        """
+        Initialise les différentes variables liée à une carte.
+        """
+
+        if self.map_name and self.map_name in self.maps:
+            self.map = self.maps[self.map_name]
+            self.size = self.map.size
+            self.tile_size = self.map.tile_size
+            self.start_position = self.map.start_position
+            self.action_tiles = self.map.action_tiles
+            self.update_ennemis = self._get_update_ennemis()
+
+            # -- Ennemis --
+            self.ennemis = self.map.ennemis
+
+        else:
+            self.map = None
+
+    @staticmethod
+    def generate_maps(
+        screen: pygame.Surface,
+        game: "Game",
+        nb_dungeons: int,
         nb_chunks: Tuple[int, int],
         chunk_size: Tuple[int, int],
         octaves: Tuple[int, int],
         seed: int,
     ):
-
-        self.maps: Dict[str, BaseMap] = {
-            "hub": Hub(screen, game),
-            "principal_map": Map(
-                game, nb_chunks, chunk_size, octaves, nb_dungeons, screen, seed
-            ),
+        prams = {
+            "hub": {"type": "hub"},
+            "principal_map": {
+                "type": "map",
+                "nb_dungeons": nb_dungeons,
+                "nb_chunks": nb_chunks,
+                "chunk_size": chunk_size,
+                "octaves": octaves,
+                "seed": seed,
+            },
         }
         for i in range(nb_dungeons):
-            self.maps[f"dungeon{i}"] = Dungeon(game, screen, 20)
-        if len(self.maps) > 0:
-            self.map_name = list(self.maps.keys())[0]
-        else:
-            self.map_name = None
-        self.initialize_var()
+            prams[f"dungeon{i}"] = {"type": "dungeon", "nb_rooms": 20}
 
-        self.game = game
-
-    def __getitem__(self, key):
-        return self.maps[key]
+        return MapManager.create_map(screen, game, prams)
 
     @staticmethod
-    def _create_map(
+    def create_map(
         screen: pygame.Surface, game: "Game", map_data: Dict[str, Any]
     ) -> "MapManager":
-        temp = MapManager(game)
+        temp = MapManager(screen, game)
         for name, map in map_data.items():
-            temp.maps[name] = TYPE_STR[map["type"]]._create_map(screen, game, map)
+            temp.maps[name] = TYPE_STR[map["type"]].create_map(screen, game, map)
 
         if len(temp.maps) > 0:
             temp.map_name = list(temp.maps.keys())[0]
         else:
-            temp.map_name = None
+            temp.map_name = ""
 
         temp.initialize_var()
         return temp
@@ -1982,22 +2042,6 @@ class MapManager(BaseMap):
     def get_nearby_action_tiles(self, hitbox):
         return self.map.get_nearby_action_tiles(hitbox)
 
-    def initialize_var(self):
-        """
-        Initialise les différentes variables liée à une carte.
-        """
-
-        if self.map_name:
-            self.map = self.maps[self.map_name]
-            self.size = self.map.size
-            self.tile_size = self.map.tile_size
-            self.start_position = self.map.start_position
-            self.action_tiles = self.map.action_tiles
-            self.update_ennemis = self._get_update_ennemis()
-
-            # -- Ennemis --
-            self.ennemis = self.map.ennemis
-
     def change_map(self, name: str):
         """
         Change de map en précisant son nom et en vérifant
@@ -2009,13 +2053,22 @@ class MapManager(BaseMap):
             )
         self.map_name = name
         self.initialize_var()
-        self.game._change_map(self.game.player_controller, self.map.start_position)
+        self.game._change_map(self.game.player_controller, self.map_name)
 
     def get_ennemis(self) -> Dict[int, "Ennemi"]:
-        return self.map.get_ennemis()
+        if self.map:
+            return self.map.get_ennemis()
+        else:
+            return {}
 
     def _get_update_ennemis(self) -> List[Tuple[int, int]]:
-        return self.map.update_ennemis
+        def return_fn():
+            res = []
+            for map in self.maps.values():
+                res = res + map.update_ennemis()
+            return res
+
+        return return_fn
 
     def update(self, absolute_position: Tuple[int, int]):
 
