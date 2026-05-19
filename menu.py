@@ -9,27 +9,28 @@ import os
 
 import pygame as p
 import animations as a
+from utils import resource_path, DefaultManager
 
 if TYPE_CHECKING:
     from main import Manager
 
-MENU_ASSET_DIRECTORY = "Ressources/UIAsset/"
-BACKGROUND = MENU_ASSET_DIRECTORY + "fond ecran menu.png"
-PLAY_BUTTON = MENU_ASSET_DIRECTORY + "PLAY.png"
-SETTING_BUTTON = MENU_ASSET_DIRECTORY + "SETTINGS.png"
-EXIT_BUTTON = MENU_ASSET_DIRECTORY + "EXIT.png"
-EMPTY_BUTTON = MENU_ASSET_DIRECTORY + "EMPTY.png"
-TITLE = MENU_ASSET_DIRECTORY + "logo.png"
+MENU_ASSET_DIRECTORY = resource_path(r"Ressources\UIAsset")
+BACKGROUND = os.path.join(MENU_ASSET_DIRECTORY, "fond ecran menu.png")
+PLAY_BUTTON = os.path.join(MENU_ASSET_DIRECTORY, "PLAY.png")
+SETTING_BUTTON = os.path.join(MENU_ASSET_DIRECTORY, "SETTINGS.png")
+EXIT_BUTTON = os.path.join(MENU_ASSET_DIRECTORY, "EXIT.png")
+EMPTY_BUTTON = os.path.join(MENU_ASSET_DIRECTORY, "EMPTY.png")
+TITLE = os.path.join(MENU_ASSET_DIRECTORY, "logo.png")
 
-SAVE_FILE = "save/"
-SAVE_MULTI = SAVE_FILE + "multiplayer"
-SAVE_SOLO = SAVE_FILE + "solo"
+SAVE_FILE = resource_path(r"save")
+SAVE_MULTI = os.path.join(SAVE_FILE, "multiplayer")
+SAVE_SOLO = os.path.join(SAVE_FILE, "solo")
 
 UDP_IP = "0.0.0.0"
 UDP_PORT = 9999
 
 
-class Menu:
+class Menu(DefaultManager):
 
     def __init__(self, screen: p.Surface, manager: "Manager"):
         self.eltpages = []
@@ -71,6 +72,9 @@ class Menu:
             self.manager.change_state("GAME")
             self.manager.state.initialize()
 
+        # =======================Function Button End=======================
+
+        # =======================Button End=======================
         def no_function():
             pass
 
@@ -81,6 +85,9 @@ class Menu:
         # =======================Button Start=======================
         self.retour = a.Button(EMPTY_BUTTON, self.screen, (170, 67), retour, text="<--")
         # =======================Button End=======================
+
+    def set_screen(self, screen: p.Surface):
+        self.screen = screen
 
     def change_button_text(
         self,
@@ -485,7 +492,7 @@ class Join_Multi_Menu(Menu):
         self.manager.running = True
         self.serveurs = {}
         self.serveurs: Dict[Dict]
-        self.upd_prot = threading.Thread(target=self.recieve_udp)
+        self.upd_prot = threading.Thread(target=self.recieve_udp, daemon=True)
         self.udp_event = threading.Event()
         self.upd_prot.start()
 
@@ -528,10 +535,13 @@ class Join_Multi_Menu(Menu):
                         sock.bind(("", UDP_PORT))
                         print("[Guest] Écoute UDP démarrée")
 
-                    data, addr = sock.recvfrom(1024)  # buffer size is 1024 bytes
-                    data = json.loads(data.decode().strip())
-                    if addr[0] not in self.serveurs:
-                        self.serveurs[addr[0]] = data
+                    try:
+                        data, addr = sock.recvfrom(1024)
+                        data = json.loads(data.decode("utf-8").strip())
+                        if addr[0] not in self.serveurs:
+                            self.serveurs[addr[0]] = data
+                    except (UnicodeDecodeError, json.JSONDecodeError):
+                        pass
                 else:
                     if sock_set:
                         sock_set = False
@@ -632,7 +642,7 @@ class Pause_Menu(Menu):
             game = self.manager.states["GAME"]
             if isinstance(game.player_controller, GuestController):
                 game._send_close_and_disconnect()
-            game.close_network()
+            game.close_game()
             game.reset()
             self.manager.change_state("MENU_P")
 
@@ -841,6 +851,13 @@ class Death_Screen(Menu):
             if event.type == p.QUIT:
                 self.manager.running = False
             if event.type == p.KEYDOWN or event.type == p.MOUSEBUTTONDOWN:
+                # TEMPO car il faudra envoyer vers le HUB
+                if isinstance(
+                    self.manager.states["GAME"].player_controller, GuestController
+                ):
+                    self.manager.states["GAME"]._send_close_and_disconnect()
+                self.manager.states["GAME"].close_network()
+                self.manager.states["GAME"].reset()
                 self.manager.change_state("MENU_P")
 
     def update(self):
@@ -856,7 +873,11 @@ def get_all_saves(mode: str) -> List[Dict[str, str]] | List[str]:
 
     L = []
     list_file = []
-    folder = r"save" + r"\solo" if mode == "solo" else r"save" + r"\multiplayer"
+    folder = (
+        os.path.join(resource_path(r"save"), r"solo")
+        if mode == "solo"
+        else os.path.join(resource_path(r"save"), r"multiplayer")
+    )
 
     for file in os.listdir(folder):
         list_file.append(file)

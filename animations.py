@@ -16,13 +16,17 @@ def load_image(
     return image
 
 
-def display_directory(directory: str, indent: int | None = 0):
+def display_directory(directory: str, depth: int, indent: int | None = 0):
     """Affiche la structure d'un dossier avec fichiers et sous-dossiers."""
 
-    for dirs in os.listdir(directory):
-        print("| " * indent, dirs, sep="")
-        if os.path.isdir(os.path.join(directory, dirs)):
-            display_directory(os.path.join(directory, dirs), indent + 1)
+    if depth > 0:
+        for dirs in os.listdir(directory):
+            if os.path.isdir(os.path.join(directory, dirs)):
+                print("| " * indent, dirs, "\\", sep="")
+            else:
+                print("| " * indent, dirs, sep="")
+            if os.path.isdir(os.path.join(directory, dirs)):
+                display_directory(os.path.join(directory, dirs), depth - 1, indent + 1)
 
 
 def load_animations(directory: str, size: Tuple[int, int] | None = None):

@@ -1,8 +1,10 @@
 import logging
 import traceback
+import os
 
 import pygame
 
+from utils import resource_path, DefaultManager
 from menu import (
     Principal_Menu,
     Setting_Menu,
@@ -23,11 +25,11 @@ pygame.display.set_caption("MoleTale")
 FPS = 60
 TAILLE_ECRAN = (500, 500)  # (500, 500) pour petit ecran (0, 0) pour plein ecran
 
-SOUND_PATH = "Ressources/Musics/"
-MUSIC_HOLDER = SOUND_PATH + "placeholder.mp3"
-SOUND_AMBIANCE = SOUND_PATH + "ambiance.mp3"
-SOUND_FOOTSTEP = SOUND_PATH + "footstep.mp3"
-SOUND_ATTACK = SOUND_PATH + "attack.mp3"
+SOUND_PATH = resource_path("Ressources/Musics/")
+MUSIC_HOLDER = os.path.join(SOUND_PATH, "placeholder.mp3")
+SOUND_AMBIANCE = os.path.join(SOUND_PATH, "ambiance.mp3")
+SOUND_FOOTSTEP = os.path.join(SOUND_PATH, "footstep.mp3")
+SOUND_ATTACK = os.path.join(SOUND_PATH, "attack.mp3")
 SOUND = {
     "main_music": SoundController(MUSIC_HOLDER),
     "ambiance": SoundController(SOUND_AMBIANCE),
@@ -57,12 +59,11 @@ class Manager:
             "MENU_MULTIPLAYER": Multiplayer_Menu(self.screen, self),
             "DEATH_SCREEN": Death_Screen(self.screen, self),
         }
-        self.state = self.states["MENU_P"]
+        self.state: DefaultManager = self.states["MENU_P"]
 
         self.fps = False
         self.font = pygame.font.SysFont(None, 24)  # texte pour fps
         self.clock = pygame.time.Clock()
-        SOUND["main_music"].plays_sound()
 
     def resize(self, size, current):
         self.screen = pygame.display.set_mode(size)
@@ -101,6 +102,35 @@ class Manager:
             for key in SOUND.keys():
                 SOUND[key].volume_decrease()
 
+    def debug(self):
+
+        # -- Game --
+        if self.state == self.states["GAME"]:
+            self.state._debug(self.font)
+
+        # -- Menu --
+        else:
+            self.screen.blit(
+                self.font.render(
+                    f"FPS: {int(self.clock.get_fps())}", True, (255, 255, 255)
+                ),
+                (10, 10),
+            )
+            for key, value in self.states.items():
+                if value == self.state:
+                    self.screen.blit(
+                        self.font.render(key, True, (255, 255, 255)), (10, 32)
+                    )
+                    pos = pygame.mouse.get_pos()
+                    self.screen.blit(
+                        self.font.render(
+                            str(pos),
+                            True,
+                            (255, 255, 255),
+                        ),
+                        (10, 54),
+                    )
+
     def run(self):
         while self.running:
 
@@ -114,13 +144,8 @@ class Manager:
 
             self.state.display()
 
-            if self.fps:  # fps
-                self.screen.blit(
-                    self.font.render(
-                        f"FPS: {int(self.clock.get_fps())}", True, (255, 255, 255)
-                    ),
-                    (10, 10),
-                )
+            if self.fps:
+                self.debug()
 
             pygame.display.flip()
 
@@ -130,6 +155,47 @@ class Manager:
 
 
 manager = Manager()
+
+# écran de chargement
+police_text = pygame.font.SysFont("segoeui", 40, bold=True)
+larg, haut = screen.get_size()
+fond_noir = pygame.Surface((larg, haut))
+fond_noir.fill((0, 0, 0))
+
+title = police_text.render("MoleTale", True, (230, 210, 160))
+pos_title = (larg // 2 - title.get_width() // 2, haut // 2 - 30)
+
+for alpha in range(255, -1, -4):
+    screen.fill((14, 14, 22))
+    screen.blit(title, pos_title)
+
+    fond_noir.set_alpha(alpha)
+    screen.blit(fond_noir, (0, 0))
+    pygame.display.flip()
+    manager.clock.tick(60)
+
+pygame.time.delay(1000)
+
+for alpha in range(0, 256, 4):
+    screen.fill((14, 14, 22))
+    screen.blit(title, pos_title)
+
+    fond_noir.set_alpha(alpha)
+    screen.blit(fond_noir, (0, 0))
+    pygame.display.flip()
+    manager.clock.tick(60)
+
+SOUND["main_music"].plays_sound()
+
+for alpha in range(255, -1, -4):
+    manager.states["MENU_P"].display()
+
+    fond_noir.set_alpha(alpha)
+    screen.blit(fond_noir, (0, 0))
+    pygame.display.flip()
+    manager.clock.tick(60)
+
+pygame.event.clear()
 
 try:
     manager.run()
