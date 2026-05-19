@@ -88,6 +88,15 @@ class Menu(DefaultManager):
 
     def set_screen(self, screen: p.Surface):
         self.screen = screen
+        self.WINDOWS = screen.get_size()
+        self.half = (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2)
+        self.blackscreen = p.Surface(self.WINDOWS, p.SRCALPHA)
+        p.draw.rect(
+            self.blackscreen,
+            (10, 10, 22, 100),
+            (0, 0, self.WINDOWS[0], self.WINDOWS[1]),
+        )
+        self.retour.set_screen(screen, (170, 67))
 
     def change_button_text(
         self,
@@ -108,7 +117,7 @@ class Menu(DefaultManager):
         self.change_button_text(changetext, button)
         self.key[direction] = bool
 
-    def create_list_save_and_button(self, mode: str):
+    def create_list_save_and_button(self, mode: str) -> Tuple[List[a.Button], Dict]:
         list_button = []
         list_save = []
         count = 0
@@ -186,6 +195,13 @@ class Principal_Menu(Menu):
         # =======================Button End=======================
 
         self.eltpages = [self.titre, self.start, self.settings, self.quit]
+
+    def set_screen(self, screen: p.Surface):
+        super().set_screen(screen)
+        self.start.set_screen(screen, (self.half[0], self.half[1] - 100))
+        self.settings.set_screen(screen, (self.half[0], self.half[1] + 50))
+        self.quit.set_screen(screen, (self.half[0], self.half[1] + 200))
+        self.titre.set_screen(screen, (self.half[0], self.half[1] // 3))
 
     def event(self, events: list[p.event.Event]):
         coord = p.mouse.get_pos()
@@ -327,6 +343,31 @@ class Setting_Menu(Menu):
         ]
         self.textpages = [self.volume]
 
+    def set_screen(self, screen: p.Surface):
+        super().set_screen(screen)
+        self.changeup.set_screen(
+            screen, (self.WINDOWS[0] // 2 - 400, self.WINDOWS[1] // 2 - 70)
+        )
+        self.changedown.set_screen(
+            screen, (self.WINDOWS[0] // 2 - 400, self.WINDOWS[1] // 2 + 70)
+        )
+        self.changeleft.set_screen(
+            screen, (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 70)
+        )
+        self.changeright.set_screen(
+            screen, (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 70)
+        )
+        self.changeattack.set_screen(
+            screen, (self.WINDOWS[0] // 2 - 200, self.WINDOWS[1] // 2 + 200)
+        )
+        self.volume_up.set_screen(
+            screen, (self.WINDOWS[0] // 2 + 400, self.WINDOWS[1] // 2 - 70)
+        )
+        self.volume_down.set_screen(
+            screen, (self.WINDOWS[0] // 2 + 400, self.WINDOWS[1] // 2 + 70)
+        )
+        self.changewindow.set_screen(screen, (self.WINDOWS[0] - 170, 67))
+
     def changekey(self, event: p.event.Event):
         """take the last keybind to replace the old one"""
         for elt in self.key.keys():
@@ -459,6 +500,14 @@ class Play_Menu(Menu):
 
         self.eltpages = [self.retour, self.solo, self.multiplayer, self.joinmultiplayer]
 
+    def set_screen(self, screen: p.Surface):
+        super().set_screen(screen)
+        self.multiplayer.set_screen(screen, self.half)
+        self.solo.set_screen(screen, (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 150))
+        self.joinmultiplayer.set_screen(
+            screen, (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 150)
+        )
+
     def event(self, events: list[p.event.Event]):
         coord = p.mouse.get_pos()
         for event in events:
@@ -488,7 +537,7 @@ class Join_Multi_Menu(Menu):
     def __init__(self, screen: p.Surface, manager: "Manager"):
         super().__init__(screen, manager)
         self.serveurs_save = 0
-        self.list_button = []
+        self.list_button: List[a.Button] = []
         self.manager.running = True
         self.serveurs = {}
         self.serveurs: Dict[Dict]
@@ -513,6 +562,13 @@ class Join_Multi_Menu(Menu):
         # =======================Function Button End=======================
 
         self.eltpages = [self.retour]
+
+    def set_screen(self, screen: p.Surface):
+        super().set_screen(screen)
+        for count, button in enumerate(self.list_button):
+            button.set_screen(
+                screen, (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 200 + count * 150)
+            )
 
     def initialize_udp(self):
 
@@ -677,6 +733,13 @@ class Pause_Menu(Menu):
 
         self.eltpages = [self.resume, self.save, self.settings, self.quit]
 
+    def set_screen(self, screen: p.Surface):
+        super().set_screen(screen)
+        self.resume.set_screen(self.screen, (self.half[0], self.half[1] - 220))
+        self.save.set_screen(self.screen, (self.half[0], self.half[1] - 70))
+        self.settings.set_screen(self.screen, (self.half[0], self.half[1] + 70))
+        self.quit.set_screen(self.screen, (self.half[0], self.half[1] + 220))
+
     def event(self, events: list[p.event.Event]):
         coord = p.mouse.get_pos()
         for event in events:
@@ -737,6 +800,18 @@ class Solo_Menu(Menu):
         self.textpages = [self.solo]
         for elt in self.list_button:
             self.eltpages.append(elt)
+
+    def set_screen(self, screen: p.Surface):
+        super().set_screen(screen)
+        self.solo.set_screen(self.screen, (self.WINDOWS[0] // 2, self.WINDOWS[1] // 10))
+        self.create.set_screen(
+            self.screen, (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 70)
+        )
+        for count, button in enumerate(self.list_button):
+            button.set_screen(
+                self.screen,
+                (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 200 + count * 150),
+            )
 
     def event(self, events: list[p.event.Event]):
         coord = p.mouse.get_pos()
@@ -799,6 +874,20 @@ class Multiplayer_Menu(Menu):
         for elt in self.list_button:
             self.eltpages.append(elt)
 
+    def set_screen(self, screen: p.Surface):
+        super().set_screen(screen)
+        self.multiplayer.set_screen(
+            self.screen, (self.WINDOWS[0] // 2, self.WINDOWS[1] // 10)
+        )
+        self.create.set_screen(
+            self.screen, (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 70)
+        )
+        for count, button in enumerate(self.list_button):
+            button.set_screen(
+                self.screen,
+                (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 200 + count * 150),
+            )
+
     def event(self, events: list[p.event.Event]):
         coord = p.mouse.get_pos()
         for event in events:
@@ -845,6 +934,13 @@ class Death_Screen(Menu):
         # =======================Button End=======================
 
         self.eltpages = [self.death, self.death2]
+
+    def set_screen(self, screen: p.Surface):
+        super().set_screen(screen)
+        self.death.set_screen(self.screen, (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2))
+        self.death2.set_screen(
+            self.screen, (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 200)
+        )
 
     def event(self, events: list[p.event.Event]):
         for event in events:

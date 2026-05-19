@@ -37,7 +37,7 @@ SOUND = {
     "attack": SoundController(SOUND_ATTACK, 1),
 }
 
-screen = pygame.display.set_mode(TAILLE_ECRAN)
+screen = pygame.display.set_mode(TAILLE_ECRAN, pygame.RESIZABLE)
 
 
 class Manager:
@@ -64,22 +64,15 @@ class Manager:
         self.fps = False
         self.font = pygame.font.SysFont(None, 24)  # texte pour fps
         self.clock = pygame.time.Clock()
+        self.last_screen_size = TAILLE_ECRAN
 
-    def resize(self, size, current):
-        self.screen = pygame.display.set_mode(size)
-        self.states = {
-            "MENU_P": Principal_Menu(self.screen, self),
-            "MENU_SETTING": Setting_Menu(self.screen, self),
-            "MENU_SETTING_PAUSE": Setting_Menu(self.screen, self, "MENU_PAUSE"),
-            "GAME": Game(self.screen, self),
-            "MENU_PLAY": Play_Menu(self.screen, self),
-            "MENU_MULTI": Join_Multi_Menu(self.screen, self),
-            "MENU_PAUSE": Pause_Menu(self.screen, self),
-            "MENU_SOLO": Solo_Menu(self.screen, self),
-            "MENU_MULTIPLAYER": Multiplayer_Menu(self.screen, self),
-            "DEATH_SCREEN": Death_Screen(self.screen, self),
-        }
-        if current == "MENU_PAUSE":
+    def resize(self, size, current: str | None = None):
+        self.screen = pygame.display.set_mode(size, pygame.RESIZABLE)
+        for value in self.states.values():
+            value.set_screen(screen)
+        if current is None:
+            pass
+        elif current == "MENU_PAUSE":
             self.state = self.states["MENU_SETTING_PAUSE"]
         else:
             self.state = self.states["MENU_SETTING"]
@@ -140,6 +133,9 @@ class Manager:
                     self.fps = not self.fps
             self.state.event(events)
 
+            if self.last_screen_size != self.screen.get_size():
+                self.resize(self.screen.get_size())
+                self.last_screen_size = self.screen.get_size()
             self.state.update()
 
             self.state.display()

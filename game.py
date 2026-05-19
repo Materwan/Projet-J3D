@@ -141,13 +141,15 @@ class Game(DefaultManager):
 
     def set_screen(self, screen: pygame.Surface):
         self.screen = screen
-        self.map.set_screen(screen)
+        if self.map:
+            self.map.set_screen(screen)
+        if self.player_controller:
+            self.player_controller.set_screen(screen)
         self.camera.width, self.camera.height = screen.get_size()
         self.hud.screen = screen
         self.ui_joueur.screen = screen
         self.drag_mgr.screen = screen
         self.pnj_manager.screen = screen
-        self.player_controller.set_screen(screen)
 
     def _on_use(self, item: Item, slot: Tuple[int, int], ui: InventaireUI):
         """Inventaire : Appelé au clic droit sur un consommable."""

@@ -195,6 +195,18 @@ class Text:
             self.center_position[1] - self.text_size[1] // 2,
         )
 
+    def set_screen(
+        self,
+        screen: pygame.Surface,
+        position: Tuple[int, int],
+    ):
+        self.screen = screen
+        self.center_position = position
+        self.display_position = (
+            self.center_position[0] - self.text_size[0] // 2,
+            self.center_position[1] - self.text_size[1] // 2,
+        )
+
     def update(
         self,
         text: str | None = None,
@@ -325,6 +337,40 @@ class Button:
             )
         else:
             self.text = None
+
+    def set_screen(
+        self,
+        screen: pygame.Surface,
+        position: Tuple[int, int],
+        text_position: Tuple[int, int] | None = None,
+    ):
+        self.screen = screen
+        button_size = self.rec.size
+        self.rec = pygame.Rect(
+            position[0] - button_size[0] // 2,
+            position[1] - button_size[1] // 2,
+            button_size[0],
+            button_size[1],
+        )
+        self.display_pos = (
+            position[0] - (button_size[0] // 2),
+            position[1] - (button_size[1] // 2),
+        )
+        clicked_size = self.clicked_image.get_size()
+        self.clicked_display_pos = (
+            position[0] - (clicked_size[0] // 2),
+            position[1] - (clicked_size[1] // 2),
+        )
+        if not text_position:
+            text_position = (button_size[0] // 2, button_size[1] // 2)
+        if self.text:
+            self.text.set_screen(
+                screen,
+                (
+                    self.display_pos[0] + text_position[0],
+                    self.display_pos[1] + text_position[1],
+                ),
+            )
 
     def event(
         self,
