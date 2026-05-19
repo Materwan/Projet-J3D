@@ -97,6 +97,9 @@ class Menu(DefaultManager):
         )
         # =======================Button End=======================
 
+    def set_screen(self, screen: p.Surface):
+        self.screen = screen
+
     def recalculcoord(
         self, text: List | Text | Tuple[int, int], button: a.Button
     ) -> Tuple[int, int]:

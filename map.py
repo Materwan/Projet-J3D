@@ -537,6 +537,9 @@ class BaseMap(ABC):
         self.update_ennemis = self._get_update_ennemis()
         self._register_actions()
 
+    def set_screen(self, screen: pygame.Surface):
+        self.screen = screen
+
     @classmethod
     @abstractmethod
     def create_map(
@@ -1961,6 +1964,11 @@ class MapManager(BaseMap):
         self.initialize_var()
 
         super().__init__(screen, game)
+
+    def set_screen(self, screen: pygame.Surface):
+        self.screen = screen
+        for map in self.maps.values():
+            map.set_screen(screen)
 
     def __getitem__(self, key):
         return self.maps[key]
