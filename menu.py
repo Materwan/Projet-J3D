@@ -33,6 +33,7 @@ class Menu:
 
     def __init__(self, screen: p.Surface, manager: "Manager"):
         self.eltpages = []
+        self.textpages = []
         self.list_file = []
         self.WINDOWS = screen.get_size()
         self.half = (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2)
@@ -62,9 +63,11 @@ class Menu:
         def retour(mode: str):
             self.manager.change_state(mode)
 
-        def reprendre(mode: str):
+        def reprendre(mode: str, partie: int):
             self.manager.states["GAME"].playing_mode = mode
-            self.manager.states["GAME"].game.load(self.list_file)
+            self.manager.states["GAME"].load_save(
+                SAVE_FILE + mode + "/" + self.list_file[partie]
+            )
             self.manager.change_state("GAME")
             self.manager.state.initialize()
 
@@ -119,6 +122,8 @@ class Menu:
     def pagedisplay(self):
         for elt in self.eltpages:
             elt.display()
+        for elt in self.textpages:
+            elt.draw_text()
 
     def dehover_all(self):
         for button in self.eltpages:
@@ -225,6 +230,12 @@ class Setting_Menu(Menu):
         def volume(choise: bool):
             self.manager.change_volume(choise)
 
+        def window():
+            if self.changewindow.text.to_display_text == "FULL SCREEN":
+                manager.resize((500, 500), menu_appel)
+            else:
+                manager.resize((0, 0), menu_appel)
+
         # =======================Function Button End=======================
 
         # =======================Button Start=======================
@@ -278,12 +289,21 @@ class Setting_Menu(Menu):
             volume,
             text="-",
         )
-        self.volume = a.Button(
-            EMPTY_BUTTON,
+        self.volume = a.Text(
+            "Sounds volume",
             self.screen,
             (self.WINDOWS[0] // 2 + 400, self.WINDOWS[1] // 2 - 180),
-            self.no_function,
-            text="Sounds volume",
+        )
+        self.changewindow = a.Button(
+            EMPTY_BUTTON,
+            self.screen,
+            (self.WINDOWS[0] - 170, 67),
+            window,
+            text=(
+                "NOT FULL SCREEN"
+                if self.screen.get_size() == (500, 500)
+                else "FULL SCREEN"
+            ),
         )
         # =======================Button End=======================
 
@@ -295,9 +315,10 @@ class Setting_Menu(Menu):
             self.changeattack,
             self.volume_up,
             self.volume_down,
-            self.volume,
             self.retour,
+            self.changewindow,
         ]
+        self.textpages = [self.volume]
 
     def changekey(self, event: p.event.Event):
         """take the last keybind to replace the old one"""
@@ -365,6 +386,9 @@ class Setting_Menu(Menu):
             self.changeattack.event(events, coord)
             self.volume_up.event(events, coord, True)
             self.volume_down.event(events, coord, False)
+            self.changewindow.event(events, coord)
+            if self.manager.states["GAME"].keybinds != self.keybinds:
+                self.manager.states["GAME"].keybinds = self.keybinds
 
     def update(self):
         if (
@@ -682,13 +706,11 @@ class Solo_Menu(Menu):
         # =======================Function Button End=======================
 
         # =======================Button Start=======================
-        self.solo = a.Button(
-            EMPTY_BUTTON,
+        self.solo = a.Text(
+            "SOLO",
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 10),
-            self.no_function,
-            text="SOLO",
-            text_size=100,
+            font_size=100,
         )
         self.create = a.Button(
             EMPTY_BUTTON,
@@ -698,9 +720,11 @@ class Solo_Menu(Menu):
             text="CREATE",
         )
         self.list_button, self.list_file = self.create_list_save_and_button("solo")
+        self.len_save = len(self.list_button)
         # =======================Button End=======================
 
-        self.eltpages = [self.retour, self.solo, self.create]
+        self.eltpages = [self.retour, self.create]
+        self.textpages = [self.solo]
         for elt in self.list_button:
             self.eltpages.append(elt)
 
@@ -713,8 +737,8 @@ class Solo_Menu(Menu):
                 self.manager.change_state("MENU_PLAY")
         self.retour.event(events, coord, "MENU_PLAY")
         self.create.event(events, coord)
-        for elt in self.list_button:
-            elt.event(events, coord, "solo")
+        for ind in range(self.len_save):
+            self.list_button[ind].event(events, coord, "solo", ind)
 
     def update(self):
         pass
@@ -741,13 +765,11 @@ class Multiplayer_Menu(Menu):
         # =======================Function Button End=======================
 
         # =======================Button Start=======================
-        self.multiplayer = a.Button(
-            EMPTY_BUTTON,
+        self.multiplayer = a.Text(
+            "MULTIPLAYER",
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 10),
-            self.no_function,
-            text="MULTIPLAYER",
-            text_size=100,
+            font_size=100,
         )
         self.create = a.Button(
             EMPTY_BUTTON,
@@ -759,9 +781,11 @@ class Multiplayer_Menu(Menu):
         self.list_button, self.list_file = self.create_list_save_and_button(
             "multiplayer"
         )
+        self.len_save = len(self.list_button)
         # =======================Button End=======================
 
-        self.eltpages = [self.retour, self.multiplayer, self.create]
+        self.eltpages = [self.retour, self.create]
+        self.textpages = [self.multiplayer]
         for elt in self.list_button:
             self.eltpages.append(elt)
 
@@ -774,8 +798,8 @@ class Multiplayer_Menu(Menu):
                 self.manager.change_state("MENU_PLAY")
         self.retour.event(events, coord, "MENU_PLAY")
         self.create.event(events, coord)
-        for elt in self.list_button:
-            elt.event(events, coord, "multiplayer")
+        for ind in range(self.len_save):
+            self.list_button[ind].event(events, coord, "multiplayer", ind)
 
     def update(self):
         pass
@@ -796,21 +820,17 @@ class Death_Screen(Menu):
         # =======================Function Button End=======================
 
         # =======================Button Start=======================
-        self.death = a.Button(
-            EMPTY_BUTTON,
+        self.death = a.Text(
+            "Game Over",
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2),
-            self.no_function,
-            text="Game Over",
-            text_size=150,
+            font_size=150,
         )
-        self.death2 = a.Button(
-            EMPTY_BUTTON,
+        self.death2 = a.Text(
+            "Press any keybind to continu",
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 200),
-            self.no_function,
-            text="Press any keybind to continu",
-            text_size=50,
+            font_size=50,
         )
         # =======================Button End=======================
 

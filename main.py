@@ -64,6 +64,25 @@ class Manager:
         self.clock = pygame.time.Clock()
         SOUND["main_music"].plays_sound()
 
+    def resize(self, size, current):
+        self.screen = pygame.display.set_mode(size)
+        self.states = {
+            "MENU_P": Principal_Menu(self.screen, self),
+            "MENU_SETTING": Setting_Menu(self.screen, self),
+            "MENU_SETTING_PAUSE": Setting_Menu(self.screen, self, "MENU_PAUSE"),
+            "GAME": Game(self.screen, self),
+            "MENU_PLAY": Play_Menu(self.screen, self),
+            "MENU_MULTI": Join_Multi_Menu(self.screen, self),
+            "MENU_PAUSE": Pause_Menu(self.screen, self),
+            "MENU_SOLO": Solo_Menu(self.screen, self),
+            "MENU_MULTIPLAYER": Multiplayer_Menu(self.screen, self),
+            "DEATH_SCREEN": Death_Screen(self.screen, self),
+        }
+        if current == "MENU_PAUSE":
+            self.state = self.states["MENU_SETTING_PAUSE"]
+        else:
+            self.state = self.states["MENU_SETTING"]
+
     def change_state(self, name: str):
         self.state = self.states[name]
         if name == "GAME":
