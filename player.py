@@ -85,6 +85,10 @@ class PlayerControllerBase:
         self.position.update(position)
         self.hitbox.center = self.position
         self.hitbox_damage.midbottom = self.position
+        # On remet l'attaque en ordre pour éviter un état fantôme
+        self.attaque = False
+        self.attaque_rect = None
+        self.velocity.update(0, 0)
 
     def event(self, keys: Tuple[bool]):
         """Détermine le vecteur de mouvement à partir des entrées clavier."""
@@ -103,6 +107,9 @@ class PlayerControllerBase:
             self.direction = "right"
 
     def authority_update(self, collision_hitbox: list[pygame.Rect]):
+
+        if self.is_dead:
+            return
 
         if self.velocity.length_squared() > 0:
             self.update_direction()
@@ -124,6 +131,9 @@ class PlayerControllerBase:
 
     def update_animation(self):
         """Logique d'animation partagée par les deux méthodes."""
+
+        if self.is_dead:
+            return
 
         state = "run" if self.moving_intent else "idle"
 
@@ -241,7 +251,7 @@ class GuestController(PlayerControllerBase):
         # -- Ennemie --
         ennemis_hitboxes = [e.hitbox for e in ennemis.values() if e.hitbox]
 
-        # -- Guest : Client-Side Prediction--
+        # -- Guest : Client-Side Prediction --
         if not self.is_dead:
             self.moving_intent = self.velocity.length_squared() > 0
             host_hitbox = [self.host.hitbox] if not self.host.is_dead else []
@@ -251,7 +261,7 @@ class GuestController(PlayerControllerBase):
                 else ennemis_hitboxes
             )
 
-        if self.target_pos is not None:
+        if self.target_pos is not None and not self.is_dead:
             delta = (self.target_pos - self.position).length()
             if delta > SPEED * 4:  # téléport si désync > 4 frames de mouvement
                 self.position.update(self.target_pos)
@@ -260,20 +270,26 @@ class GuestController(PlayerControllerBase):
                 self.position += (self.target_pos - self.position) * lerp
             self.hitbox.center = self.position
             self.hitbox_damage.midbottom = self.position
-            self.target_pos = None
+        # On vide toujours target_pos pour ne pas accumuler de positions obsolètes
+        self.target_pos = None
 
-        # -- Host --
-        self.host.update_animation()
+        # -- Host répliqué --
+        if not self.host.is_dead:
+            self.host.update_animation()
 
-        if self.host_target_pos is not None:
-            delta = (self.host_target_pos - self.host.position).length()
-            if delta > SPEED * 1.5:
-                self.host.position += (self.host_target_pos - self.host.position) * 0.3
-            else:
-                self.host.position.update(self.host_target_pos)
-            self.host.hitbox.center = self.host.position
-            self.host.hitbox_damage.midbottom = self.host.position
-            self.host_target_pos = None
+            if self.host_target_pos is not None:
+                delta = (self.host_target_pos - self.host.position).length()
+                if delta > SPEED * 1.5:
+                    self.host.position += (
+                        self.host_target_pos - self.host.position
+                    ) * 0.3
+                else:
+                    self.host.position.update(self.host_target_pos)
+                self.host.hitbox.center = self.host.position
+                self.host.hitbox_damage.midbottom = self.host.position
+
+        # On vide toujours host_target_pos
+        self.host_target_pos = None
 
     def display(self):
         """Affiche l'hôte puis le joueur"""

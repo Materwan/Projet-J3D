@@ -1930,6 +1930,7 @@ TYPE_STR: Dict[str, BaseMap] = {
 }
 
 STR_TYPE: Dict[BaseMap, str] = {value: key for key, value in TYPE_STR.items()}
+STR_TYPE[type(None)] = "None"
 
 
 class MapManager(BaseMap):
@@ -2042,16 +2043,22 @@ class MapManager(BaseMap):
     def get_nearby_action_tiles(self, hitbox):
         return self.map.get_nearby_action_tiles(hitbox)
 
-    def change_map(self, name: str):
+    def change_map(self, map: str | BaseMap):
         """
         Change de map en précisant son nom et en vérifant
         que cette carte existe bien.
         """
-        if name not in self.maps:
-            raise AttributeError(
-                f"La map '{name}' n'est pas dans la liste des map : {list(self.maps.keys())}"
-            )
-        self.map_name = name
+        if isinstance(map, str):
+            if map not in self.maps:
+                raise AttributeError(
+                    f"La map '{map}' n'est pas dans la liste des map : {list(self.maps.keys())}"
+                )
+            self.map_name = map
+        elif isinstance(map, BaseMap):
+            for key, value in self.maps.items():
+                if value == map:
+                    self.map_name = key
+                    break
         self.initialize_var()
         self.game._change_map(self.game.player_controller, self.map_name)
 

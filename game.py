@@ -6,6 +6,7 @@ import json
 from random import randint
 from typing import Dict, List, Any, Tuple, TYPE_CHECKING
 import os
+import pprint
 
 import pygame
 
@@ -64,6 +65,7 @@ class Game(DefaultManager):
             SoloPlayerController | HostController | GuestController | None
         ) = None
         self.network: HostNetwork | GuestNetwork | None = None
+        self.print_send_data: bool = False
         self.game_name = "tt"
 
         # -- Raccourcis --
@@ -101,7 +103,6 @@ class Game(DefaultManager):
         # -- Ennemis --
         self.paths = [[]]
         self.ennemis: Dict[int, Ennemi] = {}
-        self.ennemis_id: List[int] = []
 
         # -- Réseau --
         self.address = "0.0.0.0"
@@ -228,7 +229,6 @@ class Game(DefaultManager):
                 self.camera,
                 self.moteur,
             )
-            self.ennemis_id.append(0)
             self.map["principal_map"].ennemis[0] = ennemi
 
         # -- Keybinds --
@@ -248,37 +248,61 @@ class Game(DefaultManager):
         self.player_controller.current_map = self.map.map
 
     def get_camera_target(self) -> pygame.Rect:
-        """Renvoie la hitbox cible pour la caméra."""
-        if self.player_controller.is_dead:
-            if isinstance(self.player_controller, HostController):
-                return self.player_controller.guest.hitbox
-            if isinstance(self.player_controller, GuestController):
-                return self.player_controller.host.hitbox
-        return self.player_controller.hitbox
+        """Renvoie la hitbox cible pour la caméra.
 
-    def get_position_target(self) -> pygame.Rect:
-        """Renvoie la position cible pour la map."""
-        if self.player_controller.is_dead:
-            if isinstance(self.player_controller, HostController):
-                return self.player_controller.guest.position
-            if isinstance(self.player_controller, GuestController):
-                return self.player_controller.host.position
-        return self.player_controller.position
-
-    def _handle_death(self):
-        """Gère la mort des joueurs : spectateur 30 s puis respawn, ou écran de mort."""
+        Si le joueur local est mort, on suit le partenaire — mais seulement
+        s'il est lui-même vivant et que sa hitbox est valide. Sinon on
+        renvoie la dernière hitbox connue du joueur local pour éviter un crash.
+        """
         pc = self.player_controller
 
+        if pc.is_dead:
+            if isinstance(pc, HostController):
+                if not pc.guest.is_dead and pc.guest.hitbox:
+                    return pc.guest.hitbox
+            elif isinstance(pc, GuestController):
+                if not pc.host.is_dead and pc.host.hitbox:
+                    return pc.host.hitbox
+
+        # Fallback : hitbox du joueur local (toujours valide, même après mort)
+        return pc.hitbox
+
+    def get_position_target(self) -> pygame.Vector2:
+        """Renvoie la position cible pour la map.
+
+        Même logique de fallback que get_camera_target.
+        """
+        pc = self.player_controller
+
+        if pc.is_dead:
+            if isinstance(pc, HostController):
+                if not pc.guest.is_dead:
+                    return pc.guest.position
+            elif isinstance(pc, GuestController):
+                if not pc.host.is_dead:
+                    return pc.host.position
+
+        return pc.position
+
+    def _handle_death(self):
+        """Gère la mort des joueurs : spectateur SPECTATE_DURATION s puis respawn,
+        ou écran de mort si les deux sont morts simultanément."""
+        pc = self.player_controller
+
+        # -- Solo --
         if isinstance(pc, SoloPlayerController):
             if pc.is_dead:
                 self.manager.change_state("DEATH_SCREEN")
 
+        # -- Host --
         elif isinstance(pc, HostController):
 
+            # Les deux sont morts → écran de mort
             if pc.is_dead and pc.guest.is_dead:
                 self.spectate_start = None
                 self.manager.change_state("DEATH_SCREEN")
 
+            # Un seul est mort → mode spectateur puis respawn
             elif pc.is_dead or pc.guest.is_dead:
                 if self.spectate_start is None:
                     self.spectate_start = time.time()
@@ -294,10 +318,43 @@ class Game(DefaultManager):
                         )
                     self.spectate_start = None
 
+            else:
+                # Plus personne n'est mort : on reset le timer au cas où
+                self.spectate_start = None
+
+        # -- Guest --
         elif isinstance(pc, GuestController):
+
             if pc.is_dead and pc.host.is_dead:
+                self.spectate_start = None
                 self.manager.change_state("DEATH_SCREEN")
-            # self._change_map(pc, STR_TYPE[type(pc.host.current_map)], False)
+
+            elif pc.is_dead or pc.host.is_dead:
+                if self.spectate_start is None:
+                    if pc.is_dead and pc.host.current_map is not None:
+                        if pc.host.current_map is not None:
+                            self.map.change_map(pc.host.current_map)
+                    self.spectate_start = time.time()
+
+                elif time.time() - self.spectate_start >= SPECTATE_DURATION:
+                    if pc.is_dead:
+                        respawn_pos = (
+                            pc.host.position.x + RESPAWN_OFFSET,
+                            pc.host.position.y,
+                        )
+                        pc.respawn(respawn_pos, RESPAWN_PV)
+
+                        if pc.host.current_map is not None:
+                            if pc.host.current_map is not None:
+                                self.map.change_map(pc.host.current_map)
+                    else:
+                        pc.host.respawn(
+                            (pc.position.x + RESPAWN_OFFSET, pc.position.y), RESPAWN_PV
+                        )
+                    self.spectate_start = None
+
+            else:
+                self.spectate_start = None
 
     # Réseau
 
@@ -381,22 +438,45 @@ class Game(DefaultManager):
         gc = self.player_controller  # gc pour GuestController
 
         if "guest" in data:
-            gc.target_pos = pygame.Vector2(data["guest"]["position"])
+            new_is_dead = data["guest"]["is_dead"]
             gc.pv = data["guest"]["pv"]
-            gc.is_dead = data["guest"]["is_dead"]
+
+            if gc.is_dead and not new_is_dead:
+                gc.position.update(data["guest"]["position"])
+                gc.hitbox.center = gc.position
+                gc.hitbox_damage.midbottom = gc.position
+                gc.target_pos = None
+                self.spectate_start = None  # reset du timer spectateur
+            elif not new_is_dead:
+                gc.target_pos = pygame.Vector2(data["guest"]["position"])
+
+            gc.is_dead = new_is_dead
 
         if "host" in data:
-            gc.host_target_pos = pygame.Vector2(data["host"]["position"])
+            host_map_name = data["map"]["name"]
+
+            gc.host.current_map = self.map.maps.get(host_map_name)
+
+            new_host_is_dead = data["host"]["is_dead"]
             gc.host.moving_intent = data["host"]["moving_intent"]
             gc.host.direction = data["host"]["direction"]
             gc.host.attaque = data["host"]["attaque"]
-            gc.host.current_map = self.map.maps[data["map"]["name"]]
-            gc.host.is_dead = data["host"]["is_dead"]
+
+            if gc.host.is_dead and not new_host_is_dead:
+                gc.host.position.update(data["host"]["position"])
+                gc.host.hitbox.center = gc.host.position
+                gc.host.hitbox_damage.midbottom = gc.host.position
+                gc.host_target_pos = None
+                self.spectate_start = None  # reset du timer spectateur
+            elif not new_host_is_dead:
+                gc.host_target_pos = pygame.Vector2(data["host"]["position"])
+
+            gc.host.is_dead = new_host_is_dead
 
         # Ennemis
         for key, ennemi_data in data["ennemis"].items():
 
-            if key not in self.ennemis_id:
+            if key not in self.ennemis.keys():
                 if ennemi_data["dying"]:
                     continue
                 self.ennemis[key] = Ennemi(
@@ -408,7 +488,6 @@ class Game(DefaultManager):
                     self.camera,
                     None,
                 )
-                self.ennemis_id.append(key)
 
             self.ennemis[key].update_variables(ennemi_data)
             self.ennemis[key].update_animation()
@@ -463,6 +542,8 @@ class Game(DefaultManager):
                     self.save()
                 elif event.key == pygame.K_F2:  # Debug F2
                     self.show_hitbox = not self.show_hitbox
+                elif event.key == pygame.K_F3:  # Debug F2
+                    self.print_send_data = not self.print_send_data
                 elif event.key == pygame.K_i:  # Ouvre inventaire
                     self.ui_joueur.is_visible = not self.ui_joueur.is_visible
 
@@ -472,7 +553,6 @@ class Game(DefaultManager):
         self.player_controller.velocity.update(0, 0)
         if self.pnj_manager.mode is None:
             self.player_controller.event(pygame.key.get_pressed())
-            
 
     def update(self):
         """Met à jour le jeu."""
@@ -486,10 +566,24 @@ class Game(DefaultManager):
                     self.network.update(self.get_to_send_data_host())
                 )
 
+                if self.print_send_data:
+                    print("Sended :")
+                    pprint.pp(self.get_to_send_data_host())
+                    print("Last recieved :")
+                    pprint.pp(self.network._incoming_back)
+                    self.print_send_data = False
+
             elif isinstance(self.player_controller, GuestController):
+
                 self.update_variables_guest(
                     self.network.update(self.get_to_send_data_guest())
                 )
+                if self.print_send_data:
+                    print("Sended :")
+                    pprint.pp(self.get_to_send_data_guest())
+                    print("Last recieved :")
+                    pprint.pp(self.network._incoming_back)
+                    self.print_send_data = False
 
             # Host : si le guest s'est déconnecté on remet en écoute
             if (
@@ -507,7 +601,7 @@ class Game(DefaultManager):
                 return
 
         # -- Map --
-        self.map.update(self.player_controller.position)
+        self.map.update(self.get_position_target())
 
         # -- Joueur --
         self.player_controller.update(self.ennemis)
@@ -543,10 +637,15 @@ class Game(DefaultManager):
         new_map: str,
         move_camera: bool = True,
     ):
+        print(new_map)
         player_controller.current_map = self.map[new_map]
         player_controller.position.update(player_controller.current_map.start_position)
         player_controller.hitbox.center = player_controller.current_map.start_position
-        self.ennemis = self.map.get_ennemis()
+        if player_controller == self.player_controller:
+            self.ennemis = self.map.get_ennemis()
+            print(self.ennemis)
+        elif isinstance(self.player_controller, HostController):
+            pass  # L'hôte garde self.ennemis de sa propre map, rien à faire.
         if move_camera:
             self.camera.set_position(player_controller.current_map.start_position)
 
@@ -804,11 +903,13 @@ class Game(DefaultManager):
         # -- Ennemis --
         self.paths = [[]]
         self.ennemis: Dict[int, Ennemi] = {}
-        self.ennemis_id: List[int] = []
 
         # -- Réseau --
         self.address = "0.0.0.0"
         self.port = 8888
+
+        # -- Mort / Spectateur --
+        self.spectate_start = None
 
         # -- Inventaire -- : touche I pour ouvrir et fermer l'inventaire
         largeur, hauteur = self.screen.get_size()
