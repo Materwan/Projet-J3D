@@ -64,7 +64,6 @@ class Manager:
         self.fps = False
         self.font = pygame.font.SysFont(None, 24)  # texte pour fps
         self.clock = pygame.time.Clock()
-        SOUND["main_music"].plays_sound()
 
     def change_state(self, name: str):
         self.state = self.states[name]
@@ -137,6 +136,47 @@ class Manager:
 
 
 manager = Manager()
+
+# écran de chargement
+police_text = pygame.font.SysFont("segoeui", 40, bold=True)
+larg, haut = screen.get_size()
+fond_noir = pygame.Surface((larg, haut))
+fond_noir.fill((0, 0, 0))
+
+title = police_text.render("MoleTale", True, (230, 210, 160))
+pos_title = (larg // 2 - title.get_width() // 2, haut // 2 - 30)
+
+for alpha in range(255, -1, -4):
+    screen.fill((14, 14, 22))
+    screen.blit(title, pos_title)
+
+    fond_noir.set_alpha(alpha)
+    screen.blit(fond_noir, (0, 0))
+    pygame.display.flip()
+    manager.clock.tick(60)
+
+pygame.time.delay(1000)
+
+for alpha in range(0, 256, 4):
+    screen.fill((14, 14, 22))
+    screen.blit(title, pos_title)
+
+    fond_noir.set_alpha(alpha)
+    screen.blit(fond_noir, (0, 0))
+    pygame.display.flip()
+    manager.clock.tick(60)
+
+SOUND["main_music"].plays_sound()
+
+for alpha in range(255, -1, -4):
+    manager.states["MENU_P"].display()
+
+    fond_noir.set_alpha(alpha)
+    screen.blit(fond_noir, (0, 0))
+    pygame.display.flip()
+    manager.clock.tick(60)
+
+pygame.event.clear()
 
 try:
     manager.run()
