@@ -203,7 +203,8 @@ class HostController(PlayerControllerBase):
         """Affiche l'invité puis le joueur"""
 
         # -- Client --
-        self.guest.display()
+        if self.current_map == self.guest.current_map:
+            self.guest.display()
 
         # -- Host --
         super().display()
@@ -269,7 +270,8 @@ class GuestController(PlayerControllerBase):
         """Affiche l'hôte puis le joueur"""
 
         # -- Host --
-        self.host.display()
+        if self.current_map == self.host.current_map:
+            self.host.display()
 
         # -- Guest --
         super().display()
