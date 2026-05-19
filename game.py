@@ -139,6 +139,16 @@ class Game(DefaultManager):
         self.pnj_manager.add(PNJ.create("Marchande Isabelle", pos=[4000, 3800]))
         self.pnj_manager.add(PNJ.create("Forgeron Otto", pos=[4200, 3800]))
 
+    def set_screen(self, screen: pygame.Surface):
+        self.screen = screen
+        self.map.set_screen(screen)
+        self.camera.width, self.camera.height = screen.get_size()
+        self.hud.screen = screen
+        self.ui_joueur.screen = screen
+        self.drag_mgr.screen = screen
+        self.pnj_manager.screen = screen
+        self.player_controller.set_screen(screen)
+
     def _on_use(self, item: Item, slot: Tuple[int, int], ui: InventaireUI):
         """Inventaire : Appelé au clic droit sur un consommable."""
 

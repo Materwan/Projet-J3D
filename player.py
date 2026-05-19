@@ -68,6 +68,9 @@ class PlayerControllerBase:
         self.timer: float | None = 0.0
         self.attack_duration = 0.2
 
+    def set_screen(self, screen: pygame.Surface):
+        self.screen = screen
+
     def update_pv(self, modif: int):
         """Met à jour les PV et tue le joueur si besoin."""
         if self.last_hit + self.hit_interval < time.time():
@@ -192,6 +195,10 @@ class HostController(PlayerControllerBase):
             screen, camera, moteur, (start_pos[0] + 50, start_pos[1])
         )
 
+    def set_screen(self, screen: pygame.Surface):
+        self.screen = screen
+        self.guest.screen = screen
+
     def update(self, ennemis):
         """Met à jour les éléments nécessaire du joueur et du client."""
 
@@ -244,6 +251,10 @@ class GuestController(PlayerControllerBase):
         # -- Interpolation --
         self.target_pos: pygame.Vector2 = None
         self.host_target_pos: pygame.Vector2 = None
+
+    def set_screen(self, screen: pygame.Surface):
+        self.screen = screen
+        self.host.screen = screen
 
     def update(self, ennemis):
         """Met à jour les éléments nécessaire du joueur et de l'hôte."""
