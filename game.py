@@ -610,13 +610,14 @@ class Game(DefaultManager):
         Affiche l'hitbox des joueurs et des ennemies ainsi que leur hitbox
         d'attaque et les obstacles proches de toutes les entités vivantes.
         """
-        entities = [self.player_controller]
+        pc = self.player_controller
+        entities = [pc]
 
         # En multi on rajoute l'autre joueur
-        if isinstance(self.player_controller, HostController):
-            entities.append(self.player_controller.guest)
-        elif isinstance(self.player_controller, GuestController):
-            entities.append(self.player_controller.host)
+        if isinstance(pc, HostController) and pc.current_map == pc.guest.current_map:
+            entities.append(pc.guest)
+        elif isinstance(pc, GuestController) and pc.current_map == pc.host.current_map:
+            entities.append(pc.host)
 
         # Affichage des hitbox et des zones d'attaque
         for entity in entities:

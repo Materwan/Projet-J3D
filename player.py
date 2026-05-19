@@ -192,7 +192,11 @@ class HostController(PlayerControllerBase):
         if not self.is_dead:
             self.moving_intent = self.velocity.length_squared() > 0
             guest_hitbox = [self.guest.hitbox] if not self.guest.is_dead else []
-            self.authority_update(ennemis_hitboxes + guest_hitbox)
+            self.authority_update(
+                ennemis_hitboxes + guest_hitbox
+                if self.current_map == self.guest.current_map
+                else ennemis_hitboxes
+            )
 
         # -- Update Client --
         if not self.guest.is_dead:
@@ -234,12 +238,17 @@ class GuestController(PlayerControllerBase):
     def update(self, ennemis):
         """Met à jour les éléments nécessaire du joueur et de l'hôte."""
 
+        # -- Ennemie --
+        ennemis_hitboxes = [e.hitbox for e in ennemis.values() if e.hitbox]
+
         # -- Guest : Client-Side Prediction--
         if not self.is_dead:
             self.moving_intent = self.velocity.length_squared() > 0
             host_hitbox = [self.host.hitbox] if not self.host.is_dead else []
             self.authority_update(
-                [e.hitbox for e in ennemis.values() if e.hitbox] + host_hitbox
+                ennemis_hitboxes + host_hitbox
+                if self.current_map == self.host.current_map
+                else ennemis_hitboxes
             )
 
         if self.target_pos is not None:
