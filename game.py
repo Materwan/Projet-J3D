@@ -510,6 +510,9 @@ class Game(DefaultManager):
         # -- HUD --
         self.hud.update(self.manager.clock.get_time() / 1000)
 
+        # -- Mort / Spectateur --
+        self._handle_death()
+
     def _change_map(
         self,
         player_controller: PlayerControllerBase,
@@ -522,8 +525,6 @@ class Game(DefaultManager):
         self.ennemis = self.map.get_ennemis()
         if move_camera:
             self.camera.set_position(player_controller.current_map.start_position)
-        # -- Mort / Spectateur --
-        self._handle_death()
 
     def _boss_fight_start(self):
         print("start boss fight")
