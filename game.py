@@ -24,6 +24,7 @@ from hud import HUD
 from inventory import Item, Inventaire, InventaireUI, InventaireManager
 from ennemis import Ennemi
 from particule import spawn_local_particle
+from pnj import PNJ, PNJManager
 
 if TYPE_CHECKING:
     from main import Manager
@@ -124,6 +125,18 @@ class Game(DefaultManager):
 
         # Items de départ :
         self.inv_joueur.add_item(Item.create("Potion Rouge", 3))
+
+        # PNJ :
+        self.pnj_manager = PNJManager(self.screen, self.camera)
+        self.money: int = 500
+
+        # on donne l'inventaire du joueur et son argent
+        self.pnj_manager.set_inventaire(self.inv_joueur, self.money)
+
+        # on ajoute des pnj au pnj_manager
+        self.pnj_manager.add(PNJ.create("Vieux Taupier", pos=[3800, 3800]))
+        self.pnj_manager.add(PNJ.create("Marchande Isabelle", pos=[4000, 3800]))
+        self.pnj_manager.add(PNJ.create("Forgeron Otto", pos=[4200, 3800]))
 
     def _on_use(self, item: Item, slot: Tuple[int, int], ui: InventaireUI):
         """Inventaire : Appelé au clic droit sur un consommable."""
@@ -453,13 +466,13 @@ class Game(DefaultManager):
                 elif event.key == pygame.K_i:  # Ouvre inventaire
                     self.ui_joueur.is_visible = not self.ui_joueur.is_visible
 
-                # TEMPORAIRE !
-                elif event.key == pygame.K_h:
-                    self.player_controller.update_pv(-1)
+            if not self.pnj_manager.handle_event(event, mouse_pos):
+                self.drag_mgr.handle_event(event, mouse_pos, on_use=self._on_use)
 
-            self.drag_mgr.handle_event(event, mouse_pos, on_use=self._on_use)
-
-        self.player_controller.event(pygame.key.get_pressed())
+        self.player_controller.velocity.update(0, 0)
+        if self.pnj_manager.mode is None:
+            self.player_controller.event(pygame.key.get_pressed())
+            
 
     def update(self):
         """Met à jour le jeu."""
@@ -503,6 +516,17 @@ class Game(DefaultManager):
         # -- Ennemis --
         self.paths = self.map.update_ennemis()
         # Guest : gerer dans update_ennemis_guest() et appeler via update_variables_guest
+
+        # PNJ
+        self.pnj_manager.set_inventaire(self.inv_joueur, self.money)
+        self.pnj_manager.update(
+            (
+                int(self.player_controller.position.x),
+                int(self.player_controller.position.y),
+            ),
+            self.manager.clock.get_time(),
+        )
+        self.money = self.pnj_manager.money
 
         # -- Particules --
         self.update_particles()
@@ -596,12 +620,19 @@ class Game(DefaultManager):
         for sprite in self.particles:
             self.screen.blit(sprite.image, self.camera.apply(sprite.rect))"""
 
+        # -- PNJ --
+        self.pnj_manager.draw_pnj()
+
         # -- F2 : TOUTES les hitboxes --
         if self.show_hitbox:
             self.draw_debug_hitboxes()
 
-        # -- Inventaire --
-        self.drag_mgr.draw(pygame.mouse.get_pos())
+        # -- Inventaire -- seulement si pas d'UI PNJ
+        if self.pnj_manager.mode is None:
+            self.drag_mgr.draw(pygame.mouse.get_pos())
+
+        # -- PNJ UI --
+        self.pnj_manager.draw_ui(pygame.mouse.get_pos())
 
         # -- HUD --
         self.hud.draw()
@@ -794,6 +825,10 @@ class Game(DefaultManager):
 
         # Items de départ :
         self.inv_joueur.add_item(Item.create("Potion Rouge", 3))
+
+        # PNJ :
+        self.pnj_manager = PNJManager(self.screen, self.camera)
+        self.money: int = 500
 
     def save(self, file: str | None = "save.json"):
 

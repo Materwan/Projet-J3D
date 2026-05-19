@@ -73,7 +73,7 @@ pnj_dic: dict[str, dict] = {
         "quests": [
             {
                 "titre": "Les matériaux du forgeron",
-                "description": "Otto a besoin de 5 Bûches et 3 Charbons pour forger une arme légendaire.Otto a besoin de 5 Bûches et 3 Charbons pour forger une arme légendaire.Otto a besoin de 5 Bûches et 3 Charbons pour forger une arme légendaire.Otto a besoin de 5 Bûches et 3 Charbons pour forger une arme légendaire.Otto a besoin de 5 Bûches et 3 Charbons pour forger une arme légendaire.Otto a besoin de 5 Bûches et 3 Charbons pour forger une arme légendaire.",
+                "description": "Otto a besoin de 5 Bûches et 3 Charbons pour forger une arme légendaire.",
                 "objectifs": [
                     {"item": "Bûche", "quantite": 5},
                     {"item": "Charbon", "quantite": 3},
@@ -982,14 +982,14 @@ class PNJManager:
 
         # crée une surface pour mettre sur le screen plus tard : [E]
         self.e_bubble_text = pygame.font.SysFont("trebuchetms", 14, bold=True).render(
-            "[E]", True, (230, 210, 160)
+            "[E]", True, (240, 220, 170)
         )
         self.surface_bubble = pygame.Surface((25, 25), pygame.SRCALPHA)
         pygame.draw.rect(
-            self.surface_bubble, (18, 18, 32, 215), (0, 0, 25, 25), border_radius=5
+            self.surface_bubble, (18, 18, 32, 180), (0, 0, 25, 25), border_radius=5
         )
         pygame.draw.rect(
-            self.surface_bubble, (120, 120, 168, 255), (0, 0, 25, 25), 1, 5
+            self.surface_bubble, (170, 170, 218, 255), (0, 0, 25, 25), 1, 5
         )
         self.surface_bubble.blit(self.e_bubble_text, (3, 3))
 
@@ -1085,7 +1085,7 @@ class PNJManager:
 
         for pnj in self.pnjs:
             screen_hitbox = self.camera.apply(pnj.hitbox)
-            pygame.draw.rect(self.screen, "red", screen_hitbox, 2)
+            # pygame.draw.rect(self.screen, "red", screen_hitbox, 2)
 
             if screen_rect.colliderect(screen_hitbox):
                 self.screen.blit(
