@@ -256,8 +256,10 @@ class Setting_Menu(Menu):
         def window():
             if self.changewindow.text.to_display_text == "FULL SCREEN":
                 manager.resize((500, 500), menu_appel)
+                self.change_button_text("NOT FULL SCREEN", self.changewindow)
             else:
                 manager.resize((0, 0), menu_appel)
+                self.change_button_text("FULL SCREEN", self.changewindow)
 
         # =======================Function Button End=======================
 
@@ -365,6 +367,9 @@ class Setting_Menu(Menu):
         )
         self.volume_down.set_screen(
             screen, (self.WINDOWS[0] // 2 + 400, self.WINDOWS[1] // 2 + 70)
+        )
+        self.volume.set_screen(
+            self.screen, (self.WINDOWS[0] // 2 + 400, self.WINDOWS[1] // 2 - 180)
         )
         self.changewindow.set_screen(screen, (self.WINDOWS[0] - 170, 67))
 
