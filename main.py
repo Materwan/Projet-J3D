@@ -1,7 +1,7 @@
 import logging
 import traceback
 import os
-
+import sys
 import pygame
 
 from utils import resource_path, DefaultManager
@@ -138,15 +138,23 @@ class Manager:
 manager = Manager()
 
 # écran de chargement
-police_text = pygame.font.SysFont("segoeui", 40, bold=True)
+police_text = pygame.font.SysFont("segoeui", 100, bold=True)
 larg, haut = screen.get_size()
 fond_noir = pygame.Surface((larg, haut))
 fond_noir.fill((0, 0, 0))
 
 title = police_text.render("MoleTale", True, (230, 210, 160))
-pos_title = (larg // 2 - title.get_width() // 2, haut // 2 - 30)
+pos_title = (larg // 2 - title.get_width() // 2, haut // 2 - title.get_height() + 40)
+
+def check_quit_during_loading():
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
 
 for alpha in range(255, -1, -4):
+    check_quit_during_loading()
+
     screen.fill((14, 14, 22))
     screen.blit(title, pos_title)
 
@@ -155,9 +163,13 @@ for alpha in range(255, -1, -4):
     pygame.display.flip()
     manager.clock.tick(60)
 
-pygame.time.delay(1000)
+for _ in range(60): 
+    check_quit_during_loading()
+    manager.clock.tick(60)
 
 for alpha in range(0, 256, 4):
+    check_quit_during_loading()
+
     screen.fill((14, 14, 22))
     screen.blit(title, pos_title)
 
@@ -169,6 +181,8 @@ for alpha in range(0, 256, 4):
 SOUND["main_music"].plays_sound()
 
 for alpha in range(255, -1, -4):
+    check_quit_during_loading()
+
     manager.states["MENU_P"].display()
 
     fond_noir.set_alpha(alpha)
