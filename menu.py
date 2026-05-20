@@ -707,8 +707,10 @@ class Join_Multi_Menu(Menu):
                             self.udp_event.clear()
                             self.manager.states["GAME"].playing_mode = "guest"
                             self.manager.states["GAME"].address = elt[1][0].caractere
-                            self.manager.change_state("GAME")
-                            self.manager.state.initialize()
+
+                            # pour l'écran de chargement !
+                            self.manager.change_state("LOADING")
+                            self.manager.states["LOADING"].start("guest")
                             break
             else:
                 self.dehover_all()
@@ -867,8 +869,10 @@ class Solo_Menu(Menu):
             self.create.hover = False
             self.nbr_file_solo += 1
             self.manager.states["GAME"].playing_mode = "solo"
-            self.manager.change_state("GAME")
-            self.manager.state.initialize()
+            
+            # pour l'écran de chargement !
+            self.manager.change_state("LOADING")
+            self.manager.states["LOADING"].start("solo")
 
         def no_function():
             pass
@@ -970,8 +974,10 @@ class Multiplayer_Menu(Menu):
             self.create.hover = False
             self.nbr_file_multi += 1
             self.manager.states["GAME"].playing_mode = "host"
-            self.manager.change_state("GAME")
-            self.manager.state.initialize()
+
+            # pour l'écran de chargement !
+            self.manager.change_state("LOADING")
+            self.manager.states["LOADING"].start("host")
 
         def no_function():
             pass

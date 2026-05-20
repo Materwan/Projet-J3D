@@ -17,13 +17,14 @@ from menu import (
 )
 from game import Game
 from sound import SoundController
+from loading import GameLoadingScreen
 
 pygame.init()
 pygame.mixer.init()
 pygame.display.set_caption("MoleTale")
 
 FPS = 60
-TAILLE_ECRAN = (500, 500)  # (500, 500) pour petit ecran (0, 0) pour plein ecran
+TAILLE_ECRAN = (0, 0)  # (500, 500) pour petit ecran (0, 0) pour plein ecran
 
 SOUND_PATH = resource_path("Ressources/Musics/")
 MUSIC_HOLDER = os.path.join(SOUND_PATH, "placeholder.mp3")
@@ -58,6 +59,7 @@ class Manager:
             "MENU_SOLO": Solo_Menu(self.screen, self),
             "MENU_MULTIPLAYER": Multiplayer_Menu(self.screen, self),
             "DEATH_SCREEN": Death_Screen(self.screen, self),
+            "LOADING": GameLoadingScreen(self.screen, self),
         }
         self.state: DefaultManager = self.states["MENU_P"]
 
@@ -189,8 +191,6 @@ for alpha in range(255, -1, -4):
     screen.blit(fond_noir, (0, 0))
     pygame.display.flip()
     manager.clock.tick(60)
-
-pygame.event.clear()
 
 try:
     manager.run()
