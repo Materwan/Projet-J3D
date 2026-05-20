@@ -247,8 +247,11 @@ class Game(DefaultManager):
         self.player_controller.keybinds = self.keybinds
 
         # -- Finition de la caméra grâce à la map. --
-        self.camera.map_width = self.map.size[0] * self.map.tile_size[0]
-        self.camera.map_height = self.map.size[1] * self.map.tile_size[1]
+        sizes = [map.size for map in self.map.maps.values()]
+        self.camera.map_width = max([size[0] for size in sizes]) * self.map.tile_size[0]
+        self.camera.map_height = (
+            max([size[1] for size in sizes]) * self.map.tile_size[1]
+        )
 
         # -- HUD --
         self.hud.player_controller = self.player_controller
@@ -649,13 +652,11 @@ class Game(DefaultManager):
         new_map: str,
         move_camera: bool = True,
     ):
-        print(new_map)
         player_controller.current_map = self.map[new_map]
         player_controller.position.update(player_controller.current_map.start_position)
         player_controller.hitbox.center = player_controller.current_map.start_position
         if player_controller == self.player_controller:
             self.ennemis = self.map.get_ennemis()
-            print(self.ennemis)
         elif isinstance(self.player_controller, HostController):
             pass  # L'hôte garde self.ennemis de sa propre map, rien à faire.
         if move_camera:
