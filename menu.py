@@ -559,8 +559,10 @@ class Join_Multi_Menu(Menu):
             self.udp_event.clear()
             self.manager.states["GAME"].playing_mode = "guest"
             self.manager.states["GAME"].address = address
-            self.manager.change_state("GAME")
-            self.manager.state.initialize()
+
+            # pour l'écran de chargement !
+            self.manager.change_state("LOADING")
+            self.manager.states["LOADING"].start("guest")
 
         self.rejoindre = rejoindre
         self.retour.clicked_function = retour
@@ -648,36 +650,6 @@ class Join_Multi_Menu(Menu):
             elif event.type == p.KEYDOWN and event.key == p.K_ESCAPE:
                 self.udp_event.clear()
                 self.manager.change_state("MENU_PLAY")
-            if event.type == p.KEYDOWN:
-                if event.key == p.K_ESCAPE:
-                    self.udp_event.clear()
-                    self.manager.change_state("MENU_PLAY")
-            if event.type == p.MOUSEBUTTONDOWN and event.button == p.BUTTON_LEFT:
-                if self.retour.rec.collidepoint(coord):
-                    self.udp_event.clear()
-                    self.retour.clicked_function("MENU_PLAY")
-                else:
-                    for elt in self.list_button:
-                        if elt[0].rec.collidepoint(coord):
-                            elt[0].clicked = True
-                            elt[0].hover = False
-                            self.udp_event.clear()
-                            self.manager.states["GAME"].playing_mode = "guest"
-                            self.manager.states["GAME"].address = elt[1][0].caractere
-
-                            # pour l'écran de chargement !
-                            self.manager.change_state("LOADING")
-                            self.manager.states["LOADING"].start("guest")
-                            break
-            else:
-                self.dehover_all()
-                if self.retour.rec.collidepoint(coord):
-                    self.retour.hover = True
-                else:
-                    for elt in self.list_button:
-                        if elt[0].rec.collidepoint(coord):
-                            elt[0].hover = True
-                            break
         self.retour.event(events, coord, "MENU_PLAY")
         for elt in self.list_button:
             elt.event(events, coord, elt.text)
