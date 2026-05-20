@@ -13,20 +13,21 @@ class GameLoadingScreen:
     Écran de chargement lors de la génération du monde.
     Lance game.initialize() en arrière-plan (dans un thread).
     """
+
     def __init__(self, screen: pygame.Surface, manager: "Manager") -> None:
         self.manager = manager
         self.screen = screen
         self.larg, self.haut = self.screen.get_size()
 
         self.chargement_fini = False
-        self.playing_mode: str = "solo" # vaut soit solo, host ou guest
+        self.playing_mode: str = "solo"  # vaut soit solo, host ou guest
 
         self.font_title = pygame.font.SysFont("segoeui", 32, bold=True)
-        self.font_body  = pygame.font.SysFont("segoeui", 18)
-        self.font_hint  = pygame.font.SysFont("segoeui", 16)
+        self.font_body = pygame.font.SysFont("segoeui", 18)
+        self.font_hint = pygame.font.SysFont("segoeui", 16)
 
-        self.progress_bar = 0.0 # fausse barre de progression du chargement
-        self.delai_time = 0.0 # fourni un delai de 500 ms pour bien voir le 100%
+        self.progress_bar = 0.0  # fausse barre de progression du chargement
+        self.delai_time = 0.0  # fourni un delai de 500 ms pour bien voir le 100%
 
         self.steps = [
             (0.08, "Initialisation..."),
@@ -36,6 +37,9 @@ class GameLoadingScreen:
             (0.72, "Finalisation de la carte..."),
             (0.82, "Dernières vérifications..."),
         ]
+
+    def set_screen(self, screen: pygame.Surface):
+        self.screen = screen
 
     def start(self, playing_mode: str):
         """Lance le chargement. playing_mode : "solo", "host" ou "guest"."""
@@ -100,7 +104,9 @@ class GameLoadingScreen:
 
         # titre
         title = self.font_title.render("MoleTale", True, (230, 210, 160))
-        self.screen.blit(title, (self.larg // 2 - title.get_width() // 2, self.haut // 2 - 90))
+        self.screen.blit(
+            title, (self.larg // 2 - title.get_width() // 2, self.haut // 2 - 90)
+        )
 
         # barre de progression :
         bx = self.larg // 2 - 200
@@ -117,13 +123,15 @@ class GameLoadingScreen:
             fill = pygame.Surface((fill_w, 18), pygame.SRCALPHA)
             for x in range(fill_w):
                 ratio = x / 400
-                r = int(60  + 140 * ratio)
-                g = int(100 + 60  * ratio)
-                b = int(220 - 60  * ratio)
+                r = int(60 + 140 * ratio)
+                g = int(100 + 60 * ratio)
+                b = int(220 - 60 * ratio)
                 pygame.draw.line(fill, (r, g, b, 230), (x, 2), (x, 18 - 2))
             # masque coins arrondis
             mask = pygame.Surface((fill_w, 18), pygame.SRCALPHA)
-            pygame.draw.rect(mask, (255, 255, 255, 255), (0, 0, fill_w, 18), border_radius=8)
+            pygame.draw.rect(
+                mask, (255, 255, 255, 255), (0, 0, fill_w, 18), border_radius=8
+            )
             fill.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
             self.screen.blit(fill, (bx, by))
 
@@ -134,16 +142,24 @@ class GameLoadingScreen:
 
         # bordure
         border = pygame.Surface((400, 18), pygame.SRCALPHA)
-        pygame.draw.rect(border, (100, 100, 160, 180), (0, 0, 400, 18), width=1, border_radius=8)
+        pygame.draw.rect(
+            border, (100, 100, 160, 180), (0, 0, 400, 18), width=1, border_radius=8
+        )
         self.screen.blit(border, (bx, by))
 
         # texte d'étape (au-dessus)
         step_txt = self.font_body.render(self.current_step_text, True, (120, 120, 170))
-        self.screen.blit(step_txt, (self.larg // 2 - step_txt.get_width() // 2, by - 34))
+        self.screen.blit(
+            step_txt, (self.larg // 2 - step_txt.get_width() // 2, by - 34)
+        )
 
         # pourcentage (en dessous)
-        pct_txt = self.font_hint.render(f"{int(self.progress_bar * 100)} %", True, (180, 180, 220))
-        self.screen.blit(pct_txt, (self.larg // 2 - pct_txt.get_width() // 2, by + 18 + 10))
+        pct_txt = self.font_hint.render(
+            f"{int(self.progress_bar * 100)} %", True, (180, 180, 220)
+        )
+        self.screen.blit(
+            pct_txt, (self.larg // 2 - pct_txt.get_width() // 2, by + 18 + 10)
+        )
 
     def chargement_monde(self) -> None:
         """Cette fonction est appelé en parrallèle pour initialiser le Game"""

@@ -39,7 +39,8 @@ SOUND = {
 }
 
 screen = pygame.display.set_mode(TAILLE_ECRAN, pygame.RESIZABLE)
-
+if TAILLE_ECRAN == (0, 0):
+    TAILLE_ECRAN = screen.get_size()
 
 class Manager:
     """Gestionnaire des états du jeu."""
