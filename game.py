@@ -468,7 +468,7 @@ class Game(DefaultManager):
             gc.is_dead = new_is_dead
 
         if "host" in data:
-            host_map_name = data["map"]["name"]
+            host_map_name = data.get("map", {}).get("name")
 
             gc.host.current_map = self.map.maps.get(host_map_name)
 
@@ -489,7 +489,7 @@ class Game(DefaultManager):
             gc.host.is_dead = new_host_is_dead
 
         # Ennemis
-        for key, ennemi_data in data["ennemis"].items():
+        for key, ennemi_data in data.get("ennemis", {}).items():
 
             if key not in self.ennemis.keys():
                 if ennemi_data["dying"]:

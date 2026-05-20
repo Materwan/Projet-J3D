@@ -32,8 +32,8 @@ class GameLoadingScreen:
         self.steps = [
             (0.08, "Initialisation..."),
             (0.22, "Génération du terrain..."),
-            (0.40, "Placement des ressources..."),
-            (0.58, "Peuplement du monde..."),
+            (0.40, "Placement des ennemis..."),
+            (0.58, "Placement des PNJ..."),
             (0.72, "Finalisation de la carte..."),
             (0.82, "Dernières vérifications..."),
         ]
@@ -189,13 +189,13 @@ class WaitingGuestScreen:
         self.font_hint = pygame.font.SysFont("segoeui", 13)
         self.font_small = pygame.font.SysFont("segoeui", 12)
 
-        self.stop_btn = pygame.Rect(self.larg // 2 - 70, self.haut // 2 + 72, 140, 30)
+        self.stop_btn = pygame.Rect(self.larg // 2 - 70, self.haut // 2 + 50, 140, 30)
         self.btn_hovered = False
 
     def set_screen(self, screen: pygame.Surface):
         self.screen = screen
         self.larg, self.haut = self.screen.get_size()
-        self.stop_btn = pygame.Rect(self.larg // 2 - 70, self.haut // 2 + 72, 140, 30)
+        self.stop_btn = pygame.Rect(self.larg // 2 - 70, self.haut // 2 + 50, 140, 30)
 
     def start(self):
         self.time = 0.0
@@ -245,7 +245,7 @@ class WaitingGuestScreen:
         self.screen.blit(ov, (0, 0))
 
         # panneau central
-        pw, ph = 290, 200
+        pw, ph = 300, 220
         px, py = self.larg // 2 - pw // 2, self.haut // 2 - ph // 2
         panel = pygame.Surface((pw, ph), pygame.SRCALPHA)
         pygame.draw.rect(panel, (16, 16, 28, 245), (0, 0, pw, ph), border_radius=10)
@@ -255,14 +255,14 @@ class WaitingGuestScreen:
         self.screen.blit(panel, (px, py))
 
         # textes du panneau
-        title = self.font_title.render("Attente d'un joueur", True, (230, 210, 160))
+        title = self.font_title.render("Attente d'un invité", True, (230, 210, 160))
         self.screen.blit(title, (self.larg // 2 - title.get_width() // 2, py + 16))
 
         ip = self.manager.states["GAME"].network.ip if self.manager.states["GAME"].network else "???"
         ip_s = self.font_body.render(f"Votre IP : {ip}", True, (120, 170, 255))
         self.screen.blit(ip_s, (self.larg // 2 - ip_s.get_width() // 2, py + 52))
 
-        dots = "  " + "● " * (int((self.time / 1000.0) * 1.5) % 4)
+        dots = " " + ". " * (int((self.time / 1000.0) * 1.5) % 4)
         wait_s = self.font_small.render(
             f"En attente de connexion{dots}", True, (140, 140, 190)
         )

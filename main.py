@@ -24,7 +24,7 @@ pygame.mixer.init()
 pygame.display.set_caption("MoleTale")
 
 FPS = 60
-TAILLE_ECRAN = (500, 500)  # (500, 500) pour petit ecran (0, 0) pour plein ecran
+TAILLE_ECRAN = (0, 0)  # (500, 500) pour petit ecran (0, 0) pour plein ecran
 
 SOUND_PATH = resource_path("Ressources/Musics/")
 MUSIC_HOLDER = os.path.join(SOUND_PATH, "placeholder.mp3")
@@ -41,6 +41,7 @@ SOUND = {
 screen = pygame.display.set_mode(TAILLE_ECRAN, pygame.RESIZABLE)
 if TAILLE_ECRAN == (0, 0):
     TAILLE_ECRAN = screen.get_size()
+
 
 class Manager:
     """Gestionnaire des états du jeu."""
@@ -165,11 +166,13 @@ fond_noir.fill((0, 0, 0))
 title = police_text.render("MoleTale", True, (230, 210, 160))
 pos_title = (larg // 2 - title.get_width() // 2, haut // 2 - title.get_height() + 40)
 
+
 def check_quit_during_loading():
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
             sys.exit()
+
 
 for alpha in range(255, -1, -4):
     check_quit_during_loading()
@@ -182,7 +185,7 @@ for alpha in range(255, -1, -4):
     pygame.display.flip()
     manager.clock.tick(60)
 
-for _ in range(60): 
+for _ in range(60):
     check_quit_during_loading()
     manager.clock.tick(60)
 

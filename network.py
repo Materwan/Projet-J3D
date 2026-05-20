@@ -132,6 +132,9 @@ class HostNetwork:
         # RTT : le host reçoit le rtt_ms moyen mesuré par le guest dans chaque paquet
         self._guest_rtt_ms: float = 0.0
 
+        # Pour le chargement d'écran
+        self._guest_ready: bool = False
+
     def start(self, initial_state: Optional[Dict[str, Any]] = None):
         """Lance TCP + UDP. initial_state doit contenir les données de map."""
         if initial_state is not None:
@@ -153,8 +156,8 @@ class HostNetwork:
             self._asyncio_loop.call_soon_threadsafe(self._server.close)
     
     def is_guest_ready(self) -> bool:
-        """True quand le guest est connecté et a envoyé son premier paquet."""
-        return self._connected and not self._stop_event.is_set()
+        """True quand le guest a fini de charger le monde"""
+        return self._guest_ready and not self._stop_event.is_set()
 
     def restart_listening(self):
         """Remet le serveur en écoute après déconnexion du guest."""
@@ -176,6 +179,9 @@ class HostNetwork:
         self._udp_thread = threading.Thread(target=self._run_udp, daemon=True)
         self._tcp_thread.start()
         self._udp_thread.start()
+
+        # pour le chargement d'écran
+        self._guest_ready = False
 
     def is_guest_disconnected(self) -> bool:
         """True si c'est le guest qui s'est déconnecté (pas un arrêt volontaire du host)."""
@@ -228,6 +234,15 @@ class HostNetwork:
         with self._lock:
             self._incoming_back = data
             self._incoming_dirty = True
+
+    def _set_incoming(self, data: Dict[str, Any]):
+        with self._lock:
+            self._incoming_back = data
+            self._incoming_dirty = True
+
+            # pour le chargement d'écran
+            if data.get("ready"):
+                self._guest_ready = True
 
     # ── TCP ───────────────────────────────────────────────────────────────────
 
@@ -374,6 +389,9 @@ class GuestNetwork:
         # RTT
         self.rtt_tracker = RttTracker(window=RTT_WINDOW)
 
+        # Pour le chargement d'écran
+        self._is_ready = False
+
     # ── Propriétés RTT ────────────────────────────────────────────────────────
 
     @property
@@ -406,9 +424,10 @@ class GuestNetwork:
         """True quand la tentative de connexion est terminée (succès ou échec)."""
         return self._loaded
 
-    def set_ready(self) -> None:
-        """Signale que le guest est prêt — la connexion est déjà établie, rien à faire."""
-        pass
+    def set_ready(self):
+        """C'est pour le chargement d'écran : Signale que le guest a fini le chargement du monde"""
+        with self._lock:
+            self._is_ready = True
 
     def get_map_data(self) -> Optional[Dict[str, Any]]:
         """Retourne les données de map reçues à la connexion initiale."""
@@ -419,6 +438,10 @@ class GuestNetwork:
         with self._lock:
             # Injecte le RTT moyen courant dans le paquet sortant
             game_state["rtt_ms"] = self.rtt_tracker.average_ms
+
+            if self._is_ready:
+                game_state["ready"] = True
+                self._is_ready = False
 
             self._outgoing_back = game_state
             self._outgoing_dirty = True
