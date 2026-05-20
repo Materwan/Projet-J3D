@@ -151,6 +151,10 @@ class HostNetwork:
             and self._server is not None
         ):
             self._asyncio_loop.call_soon_threadsafe(self._server.close)
+    
+    def is_guest_ready(self) -> bool:
+        """True quand le guest est connecté et a envoyé son premier paquet."""
+        return self._connected and not self._stop_event.is_set()
 
     def restart_listening(self):
         """Remet le serveur en écoute après déconnexion du guest."""
@@ -401,6 +405,10 @@ class GuestNetwork:
     def is_loaded(self) -> bool:
         """True quand la tentative de connexion est terminée (succès ou échec)."""
         return self._loaded
+
+    def set_ready(self) -> None:
+        """Signale que le guest est prêt — la connexion est déjà établie, rien à faire."""
+        pass
 
     def get_map_data(self) -> Optional[Dict[str, Any]]:
         """Retourne les données de map reçues à la connexion initiale."""

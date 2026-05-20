@@ -40,6 +40,7 @@ class GameLoadingScreen:
 
     def set_screen(self, screen: pygame.Surface):
         self.screen = screen
+        self.larg, self.haut = self.screen.get_size()
 
     def start(self, playing_mode: str):
         """Lance le chargement. playing_mode : "solo", "host" ou "guest"."""
@@ -168,3 +169,128 @@ class GameLoadingScreen:
         except Exception as exc:
             raise exc
         self.chargement_fini = True
+
+
+class WaitingGuestScreen:
+    """
+    Écran d'attente pour l'host uniquement, il attend
+    simplement que game.network.is_guest_ready() devienne True.
+    """
+
+    def __init__(self, screen: pygame.Surface, manager: "Manager"):
+        self.manager = manager
+        self.screen = screen
+        self.larg, self.haut = self.screen.get_size()
+
+        self.time = 0.0
+
+        self.font_title = pygame.font.SysFont("segoeui", 20, bold=True)
+        self.font_body = pygame.font.SysFont("segoeui", 15)
+        self.font_hint = pygame.font.SysFont("segoeui", 13)
+        self.font_small = pygame.font.SysFont("segoeui", 12)
+
+        self.stop_btn = pygame.Rect(self.larg // 2 - 70, self.haut // 2 + 72, 140, 30)
+        self.btn_hovered = False
+
+    def set_screen(self, screen: pygame.Surface):
+        self.screen = screen
+        self.larg, self.haut = self.screen.get_size()
+        self.stop_btn = pygame.Rect(self.larg // 2 - 70, self.haut // 2 + 72, 140, 30)
+
+    def start(self):
+        self.time = 0.0
+        self.btn_hovered = False
+
+    def event(self, events: list[pygame.event.Event]):
+        mouse_pos = pygame.mouse.get_pos()
+        self.btn_hovered = self.stop_btn.collidepoint(mouse_pos)
+
+        for event in events:
+            if event.type == pygame.QUIT:
+                self.manager.running = False
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                self.cancel()
+                return
+            if (
+                event.type == pygame.MOUSEBUTTONDOWN
+                and event.button == 1
+                and self.btn_hovered
+            ):
+                self.cancel()
+                return
+
+    def update(self):
+        self.time += self.manager.clock.get_time()
+
+        # si déconnexion réseau, on quitte
+        if self.manager.states["GAME"].network.is_closed():
+            self.cancel()
+            return
+
+        # dès que le guest a fini son chargement et a envoyé son paquet "ready"
+        if self.manager.states["GAME"].network.is_guest_ready():
+            self.manager.change_state("GAME")
+
+    def display(self):
+
+        # dessine le jeu en fond
+        try:
+            self.manager.states["GAME"].display()
+        except Exception:
+            self.screen.fill((14, 14, 22))
+
+        # filtre sombre transparent par dessus le jeu
+        ov = pygame.Surface((self.larg, self.haut), pygame.SRCALPHA)
+        ov.fill((8, 8, 20, 160))
+        self.screen.blit(ov, (0, 0))
+
+        # panneau central
+        pw, ph = 290, 200
+        px, py = self.larg // 2 - pw // 2, self.haut // 2 - ph // 2
+        panel = pygame.Surface((pw, ph), pygame.SRCALPHA)
+        pygame.draw.rect(panel, (16, 16, 28, 245), (0, 0, pw, ph), border_radius=10)
+        pygame.draw.rect(
+            panel, (70, 70, 115, 255), (0, 0, pw, ph), width=2, border_radius=10
+        )
+        self.screen.blit(panel, (px, py))
+
+        # textes du panneau
+        title = self.font_title.render("Attente d'un joueur", True, (230, 210, 160))
+        self.screen.blit(title, (self.larg // 2 - title.get_width() // 2, py + 16))
+
+        ip = self.manager.states["GAME"].network.ip if self.manager.states["GAME"].network else "???"
+        ip_s = self.font_body.render(f"Votre IP : {ip}", True, (120, 170, 255))
+        self.screen.blit(ip_s, (self.larg // 2 - ip_s.get_width() // 2, py + 52))
+
+        dots = "  " + "● " * (int((self.time / 1000.0) * 1.5) % 4)
+        wait_s = self.font_small.render(
+            f"En attente de connexion{dots}", True, (140, 140, 190)
+        )
+        self.screen.blit(wait_s, (self.larg // 2 - wait_s.get_width() // 2, py + 82))
+
+        # bouton Annuler
+        self.draw_stop_btn()
+
+    def draw_stop_btn(self):
+        btn = self.stop_btn
+        col_bg = (150, 45, 45, 220) if self.btn_hovered else (65, 22, 22, 200)
+        col_brd = (210, 70, 70, 255) if self.btn_hovered else (100, 36, 36, 255)
+        bs = pygame.Surface((btn.width, btn.height), pygame.SRCALPHA)
+        pygame.draw.rect(bs, col_bg, (0, 0, btn.width, btn.height), border_radius=6)
+        pygame.draw.rect(
+            bs, col_brd, (0, 0, btn.width, btn.height), width=2, border_radius=6
+        )
+        self.screen.blit(bs, btn.topleft)
+        ts = self.font_hint.render("Annuler", True, (240, 160, 160))
+        self.screen.blit(
+            ts,
+            (
+                btn.x + (btn.width - ts.get_width()) // 2,
+                btn.y + (btn.height - ts.get_height()) // 2,
+            ),
+        )
+
+    def cancel(self):
+        self.manager.states["GAME"].close_game()
+        self.manager.states["GAME"].reset()
+        self.manager.change_state("MENU_P")

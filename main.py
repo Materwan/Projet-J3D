@@ -17,14 +17,14 @@ from menu import (
 )
 from game import Game
 from sound import SoundController
-from loading import GameLoadingScreen
+from loading import GameLoadingScreen, WaitingGuestScreen
 
 pygame.init()
 pygame.mixer.init()
 pygame.display.set_caption("MoleTale")
 
 FPS = 60
-TAILLE_ECRAN = (0, 0)  # (500, 500) pour petit ecran (0, 0) pour plein ecran
+TAILLE_ECRAN = (500, 500)  # (500, 500) pour petit ecran (0, 0) pour plein ecran
 
 SOUND_PATH = resource_path("Ressources/Musics/")
 MUSIC_HOLDER = os.path.join(SOUND_PATH, "placeholder.mp3")
@@ -61,6 +61,7 @@ class Manager:
             "MENU_MULTIPLAYER": Multiplayer_Menu(self.screen, self),
             "DEATH_SCREEN": Death_Screen(self.screen, self),
             "LOADING": GameLoadingScreen(self.screen, self),
+            "WAITING_GUEST": WaitingGuestScreen(self.screen, self),
         }
         self.state: DefaultManager = self.states["MENU_P"]
 

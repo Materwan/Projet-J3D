@@ -637,7 +637,6 @@ class Join_Multi_Menu(Menu):
                 self.screen,
                 (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 200 + count * 150),
                 self.rejoindre,
-                text=serveur.keys(),
             )
             self.list_button.append(button)
             count += 1
