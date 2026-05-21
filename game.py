@@ -128,16 +128,8 @@ class Game(DefaultManager):
         self.inv_joueur.add_item(Item.create("Potion Rouge", 3))
 
         # PNJ :
-        self.pnj_manager = PNJManager(self.screen, self.camera)
+        self.pnj_manager: PNJManager = PNJManager(self.screen, self.camera)
         self.money: int = 500
-
-        # on donne l'inventaire du joueur et son argent
-        self.pnj_manager.set_inventaire(self.inv_joueur, self.money)
-
-        # on ajoute des pnj au pnj_manager
-        self.pnj_manager.add(PNJ.create("Vieux Taupier", pos=[3800, 3800]))
-        self.pnj_manager.add(PNJ.create("Marchande Isabelle", pos=[4000, 3800]))
-        self.pnj_manager.add(PNJ.create("Forgeron Otto", pos=[4200, 3800]))
 
     def set_screen(self, screen: pygame.Surface):
         self.screen = screen
@@ -185,7 +177,7 @@ class Game(DefaultManager):
 
             # Récupération de la map envoyée par l'hôte
             map_data = self.network.get_map_data()
-            self.map = MapManager.create_map(self.screen, self, map_data)
+            self.map = MapManager.create_map(self.screen, self, self.camera, map_data)
 
             # Récupération de la position initiale du guest
             initial = self.network.get_initial_state()
@@ -201,6 +193,8 @@ class Game(DefaultManager):
             self.player_controller.host.hitbox.center = host_start
             self.player_controller.host.hitbox_damage.midbottom = host_start
 
+            self.pnj_manager = self.map.get_pnjs()
+
         # ── Solo / Host ────────────────────────────────────────────────
         else:
 
@@ -208,6 +202,7 @@ class Game(DefaultManager):
             self.map = MapManager.generate_maps(
                 self.screen,
                 self,
+                self.camera,
                 7,
                 self.nb_chunks,
                 self.chunk_size,
@@ -243,6 +238,8 @@ class Game(DefaultManager):
                 self.moteur,
             )
             self.map["principal_map"].ennemis[0] = ennemi
+
+            self.pnj_manager = self.map.get_pnjs()
 
         # -- Keybinds --
         self.player_controller.keybinds = self.keybinds
@@ -658,6 +655,7 @@ class Game(DefaultManager):
         player_controller.hitbox.center = player_controller.current_map.start_position
         if player_controller == self.player_controller:
             self.ennemis = self.map.get_ennemis()
+            self.pnj_manager = self.map.get_pnjs()
         elif isinstance(self.player_controller, HostController):
             pass  # L'hôte garde self.ennemis de sa propre map, rien à faire.
         if move_camera:

@@ -16,6 +16,7 @@ import numpy as np
 from utils import resource_path
 from perlin_numpy import generate_perlin_noise_2d
 from camera_system import Camera
+from pnj import PNJManager, PNJ
 import pygame
 
 if TYPE_CHECKING:
@@ -525,8 +526,9 @@ class BaseMap(ABC):
     ennemis: Dict[int, "Ennemi"]
     _action_registry: Dict[str, Callable]
     update_ennemis: Callable[[], List[Tuple[int, int]]]
+    pnj_manager: PNJManager
 
-    def __init__(self, screen, game):
+    def __init__(self, screen: pygame.Surface, game: "Game", camera: Camera):
         self.size = np.array([0, 0], dtype=np.int32)
         self.start_position = (0, 0)
         self.tile_size = np.array(TILE_SIZE, dtype=np.int32)
@@ -543,7 +545,7 @@ class BaseMap(ABC):
     @classmethod
     @abstractmethod
     def create_map(
-        screen: pygame.Surface, game: "Game", map_data: Dict[str, Any]
+        screen: pygame.Surface, game: "Game", camera: Camera, map_data: Dict[str, Any]
     ) -> "BaseMap":
         """Méthode alternative pour créer une carte, destiné au clients.
 
@@ -560,6 +562,9 @@ class BaseMap(ABC):
         """
         Ferme tous les processus d'une carte, et la supprime.
         """
+
+    def get_pnjs(self) -> PNJManager:
+        return self.pnj_manager
 
     @abstractmethod
     def get_nearby_obstacles(self, hitbox: pygame.Rect):
@@ -708,8 +713,8 @@ class Map(BaseMap):
     load_chunk_thread: threading.Thread
     load_chunk_event: threading.Event
 
-    def __init__(self, screen: pygame.Surface, game: "Game"):
-        super().__init__(screen, game)
+    def __init__(self, screen: pygame.Surface, game: "Game", camera: Camera):
+        super().__init__(screen, game, camera)
 
         # -- Valeurs initiales --
         self.nb_chunks = np.array([0, 0], dtype=np.int32)
@@ -738,11 +743,14 @@ class Map(BaseMap):
         self.load_chunk_event.set()
         self.load_chunk_thread.start()
 
+        # -- PNJs --
+        self.pnj_manager = PNJManager(self.screen, camera)
+
     @staticmethod
     def create_map(
-        screen: pygame.Surface, game: "Game", map_data: Dict[str, Any]
+        screen: pygame.Surface, game: "Game", camera: Camera, map_data: Dict[str, Any]
     ) -> "Map":
-        return_map = Map(screen, game)
+        return_map = Map(screen, game, camera)
 
         # -- Valeurs initiales --
         return_map.nb_chunks = np.array(map_data["nb_chunks"], dtype=np.int32)
@@ -786,6 +794,10 @@ class Map(BaseMap):
         return_map._add_objects("bush", prob=0.1, z=0)
         return_map._add_objects("rock", prob=0.01, z=1)
 
+        # -- PNJs --
+        for pnj in map_data["pnj"]:
+            return_map.pnj_manager.add(PNJ.create(pnj["name"], pos=pnj["position"]))
+
         return return_map
 
     def close_map(self):
@@ -807,6 +819,9 @@ class Map(BaseMap):
             "chunk_size": self.chunk_size_tile.tolist(),
             "octaves": self.octaves,
             "seed": self.seed,
+            "pnj": [
+                {"name": pnj.name, "position": pnj.pos} for pnj in self.pnj_manager.pnjs
+            ],
         }
 
     def generate_map(
@@ -1242,8 +1257,8 @@ class Map(BaseMap):
 
         for key in del_key:
             del self.ennemis[key]
-            if key in self.game.ennemis_id:
-                self.game.ennemis_id.remove(key)
+            if key in self.game.ennemis.keys():
+                self.game.ennemis.pop(key)
 
         return []
 
@@ -1397,19 +1412,22 @@ class Hub(BaseMap):
     occupied_tiles: np.ndarray
     image: pygame.Surface
 
-    def __init__(self, screen: pygame.Surface, game: "Game"):
-        super().__init__(screen, game)
+    def __init__(self, screen: pygame.Surface, game: "Game", camera: Camera):
+        super().__init__(screen, game, camera)
 
         self.size_in_tile = np.array([0, 0], dtype=np.int32)
         self.collision_tiles = np.array([0, 0], dtype=np.int32)
         self.occupied_tiles = np.array([0, 0], dtype=np.int32)
         self.image = pygame.Surface(self.size)
 
+        # -- PNJs --
+        self.pnj_manager = PNJManager(self.screen, camera)
+
     @staticmethod
     def create_map(
-        screen: pygame.Surface, game: "Game", map_data: Dict[str, Any]
+        screen: pygame.Surface, game: "Game", camera: Camera, map_data: Dict[str, Any]
     ) -> "Hub":
-        return_map = Hub(screen, game)
+        return_map = Hub(screen, game, camera)
 
         with open(os.path.join(TILEMAP_DIRECTORY, "tilemap_data.json"), "r") as file:
 
@@ -1438,6 +1456,10 @@ class Hub(BaseMap):
 
         return_map.image = pygame.image.load(os.path.join(TILEMAP_DIRECTORY, "hub.png"))
 
+        # -- PNJs --
+        for pnj in map_data["pnj"]:
+            return_map.pnj_manager.add(PNJ.create(pnj["name"], pos=pnj["position"]))
+
         return return_map
 
     def _change_map(self, **map_name: str):
@@ -1446,6 +1468,9 @@ class Hub(BaseMap):
     def _get_to_send_data(self) -> Dict[str, Any]:
         return {
             "type": "hub",
+            "pnj": [
+                {"name": pnj.name, "position": pnj.pos} for pnj in self.pnj_manager.pnjs
+            ],
         }
 
     def _register_actions(self):
@@ -1533,18 +1558,21 @@ class Dungeon(BaseMap):
     nb_rooms: int
     rooms: List[DungeonRoom]
 
-    def __init__(self, screen: pygame.Surface, game: "Game"):
-        super().__init__(screen, game)
+    def __init__(self, screen: pygame.Surface, game: "Game", camera: Camera):
+        super().__init__(screen, game, camera)
 
         self.tile_maps = {}
         self.dungeon_size = np.array([0, 0], dtype=np.int32)
         self.nb_rooms = 0
         self.rooms = []
 
+        # -- PNJs --
+        self.pnj_manager = PNJManager(self.screen, camera)
+
     def create_map(
-        screen: pygame.Surface, game: "Game", map_data: Dict[str, Any]
+        screen: pygame.Surface, game: "Game", camera: Camera, map_data: Dict[str, Any]
     ) -> "BaseMap":
-        return_map = Dungeon(screen, game)
+        return_map = Dungeon(screen, game, camera)
 
         return_map.tile_maps = load_dungeons_tilesets(
             os.path.join(DUNGEON_TILEMAP_DIRECTORY, "dungeon_data.json"),
@@ -1556,12 +1584,19 @@ class Dungeon(BaseMap):
 
         return_map.generate_dungeon()
 
+        # -- PNJs --
+        for pnj in map_data["pnj"]:
+            return_map.pnj_manager.add(PNJ.create(pnj["name"], pos=pnj["position"]))
+
         return return_map
 
     def _get_to_send_data(self) -> Dict[str, Any]:
         return {
             "type": "dungeon",
             "nb_rooms": self.nb_rooms,
+            "pnj": [
+                {"name": pnj.name, "position": pnj.pos} for pnj in self.pnj_manager.pnjs
+            ],
         }
 
     def close_map(self):
@@ -1954,21 +1989,20 @@ class MapManager(BaseMap):
     maps: Dict[str, BaseMap]
     map_name: str
 
-    def __init__(
-        self,
-        screen: pygame.Surface,
-        game: "Game",
-    ):
+    def __init__(self, screen: pygame.Surface, game: "Game", camera: Camera):
         self.maps = {}
         self.map_name = ""
         self.initialize_var()
 
-        super().__init__(screen, game)
+        super().__init__(screen, game, camera)
 
     def set_screen(self, screen: pygame.Surface):
         self.screen = screen
         for map in self.maps.values():
             map.set_screen(screen)
+
+    def get_pnjs(self) -> PNJManager:
+        return self.map.get_pnjs()
 
     def __getitem__(self, key):
         return self.maps[key]
@@ -1996,6 +2030,7 @@ class MapManager(BaseMap):
     def generate_maps(
         screen: pygame.Surface,
         game: "Game",
+        camera: Camera,
         nb_dungeons: int,
         nb_chunks: Tuple[int, int],
         chunk_size: Tuple[int, int],
@@ -2003,7 +2038,10 @@ class MapManager(BaseMap):
         seed: int,
     ):
         prams = {
-            "hub": {"type": "hub"},
+            "hub": {
+                "type": "hub",
+                "pnj": [{"name": "Vieux Taupier", "position": [100, 100]}],
+            },
             "principal_map": {
                 "type": "map",
                 "nb_dungeons": nb_dungeons,
@@ -2011,20 +2049,27 @@ class MapManager(BaseMap):
                 "chunk_size": chunk_size,
                 "octaves": octaves,
                 "seed": seed,
+                "pnj": [
+                    {"name": "Vieux Taupier", "position": [3800, 3800]},
+                    {"name": "Marchande Isabelle", "position": [4000, 3800]},
+                    {"name": "Forgeron Otto", "position": [4200, 3800]},
+                ],
             },
         }
         for i in range(nb_dungeons):
-            prams[f"dungeon{i}"] = {"type": "dungeon", "nb_rooms": 20}
+            prams[f"dungeon{i}"] = {"type": "dungeon", "nb_rooms": 20, "pnj": []}
 
-        return MapManager.create_map(screen, game, prams)
+        return MapManager.create_map(screen, game, camera, prams)
 
     @staticmethod
     def create_map(
-        screen: pygame.Surface, game: "Game", map_data: Dict[str, Any]
+        screen: pygame.Surface, game: "Game", camera: Camera, map_data: Dict[str, Any]
     ) -> "MapManager":
-        temp = MapManager(screen, game)
+        temp = MapManager(screen, game, camera)
         for name, map in map_data.items():
-            temp.maps[name] = TYPE_STR[map["type"]].create_map(screen, game, map)
+            temp.maps[name] = TYPE_STR[map["type"]].create_map(
+                screen, game, camera, map
+            )
 
         if len(temp.maps) > 0:
             temp.map_name = list(temp.maps.keys())[0]
