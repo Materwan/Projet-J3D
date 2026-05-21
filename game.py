@@ -163,7 +163,8 @@ class Game(DefaultManager):
                 self.player_controller.pv += 1
 
     def initialize(self):
-        """Initialise le moteur, la map, le contrôleur et le réseau."""
+        """Initialise le moteur, la map, le contrôleur et le réseau.
+        Il est maitenant appelé dans un thread depuis GameLoadingScreen !"""
 
         # -- Moteur --
         self.moteur = Moteur()

@@ -164,10 +164,8 @@ class GameLoadingScreen:
 
     def chargement_monde(self) -> None:
         """Cette fonction est appelé en parrallèle pour initialiser le Game"""
-        try:
-            self.manager.states["GAME"].initialize()
-        except Exception as exc:
-            raise exc
+        
+        self.manager.states["GAME"].initialize()
         self.chargement_fini = True
 
 
@@ -222,22 +220,21 @@ class WaitingGuestScreen:
     def update(self):
         self.time += self.manager.clock.get_time()
 
+        network = self.manager.states["GAME"].network
+
         # si déconnexion réseau, on quitte
-        if self.manager.states["GAME"].network.is_closed():
+        if network is None or network.is_closed():
             self.cancel()
             return
 
         # dès que le guest a fini son chargement et a envoyé son paquet "ready"
-        if self.manager.states["GAME"].network.is_guest_ready():
+        if network.is_guest_ready():
             self.manager.change_state("GAME")
 
     def display(self):
 
         # dessine le jeu en fond
-        try:
-            self.manager.states["GAME"].display()
-        except Exception:
-            self.screen.fill((14, 14, 22))
+        self.manager.states["GAME"].display()
 
         # filtre sombre transparent par dessus le jeu
         ov = pygame.Surface((self.larg, self.haut), pygame.SRCALPHA)
