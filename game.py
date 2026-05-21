@@ -141,7 +141,7 @@ class Game(DefaultManager):
         self.hud.screen = screen
         self.ui_joueur.screen = screen
         self.drag_mgr.screen = screen
-        self.pnj_manager.screen = screen
+        self.pnj_manager.set_screen(screen)
 
     def _on_use(self, item: Item, slot: Tuple[int, int], ui: InventaireUI):
         """Inventaire : Appelé au clic droit sur un consommable."""

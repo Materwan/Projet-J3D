@@ -310,6 +310,18 @@ class MenuInteractionUI(PnjPanelUI):
 
         self.options = []
 
+    def set_screen(self, screen: pygame.Surface, larg, haut):
+        self.screen = screen
+        self.largeur, self.hauteur = larg, haut
+
+        self.y = self.hauteur - 190
+        self.larg = self.largeur - 50
+
+        self.btn_rects = [
+            pygame.Rect(136 + i * 162, self.y + 45, 150, 36)
+            for i in range(len(self.options))
+        ]
+
     def open(self, pnj: PNJ):
         self.pnj = pnj
         self.options = ["Parler"]
@@ -393,6 +405,13 @@ class DialogueUI(PnjPanelUI):
         self.timer = 0.0
         self.done = False  # True quand le dialogue a été entièrement affichée
         self.char_delay = 28  # le délai en ms entre chaque caractère
+
+    def set_screen(self, screen: pygame.Surface, larg, haut):
+        self.screen = screen
+        self.largeur, self.hauteur = larg, haut
+
+        self.y = self.hauteur - 190
+        self.larg = self.largeur - 50
 
     def open(self, pnj: PNJ):
         self.pnj = pnj
@@ -520,6 +539,33 @@ class BoutiqueUI(PnjPanelUI):
             150,
             34,
         )
+
+    def set_screen(self, screen: pygame.Surface, larg, haut):
+        self.screen = screen
+        self.largeur, self.hauteur = larg, haut
+
+        self.y = self.hauteur - 190
+        self.larg = self.largeur - 50
+
+        self.rect = pygame.Rect(self.x, self.y - 240, self.larg, 400)
+        self.position_inv_x = self.larg // 2 - self.larg_inv + self.x // 2
+        self.position_inv_y = self.rect.y + 55
+
+        self.btn = pygame.Rect(
+            self.rect.x + self.rect.width // 2 - 75,
+            self.rect.y + self.rect.height - 44,
+            150,
+            34,
+        )
+
+        if self.ui_joueur != None:
+            self.ui_joueur.pos = (self.position_inv_x - 10, self.position_inv_y)
+
+        if self.ui_stock != None:
+            self.ui_stock.pos = (
+                self.position_inv_x + self.larg_inv + 30,
+                self.position_inv_y,
+            )
 
     def open(self, pnj: PNJ, inv_joueur: Inventaire, money: int):
         self.pnj = pnj
@@ -765,6 +811,26 @@ class QueteUI(PnjPanelUI):
             self.rect.right - 210, self.rect.y + self.rect.height - 50, 190, 36
         )
 
+    def set_screen(self, screen: pygame.Surface, larg, haut):
+        self.screen = screen
+        self.largeur, self.hauteur = larg, haut
+
+        self.y = self.hauteur - 190
+        self.larg = self.largeur - 50
+
+        self.rect = pygame.Rect(
+            self.x,
+            self.y - 160,
+            self.larg,
+            320,
+        )
+        self.btn_action = pygame.Rect(
+            self.x + 20, self.rect.y + self.rect.height - 50, 190, 36
+        )
+        self.btn_fermer = pygame.Rect(
+            self.rect.right - 210, self.rect.y + self.rect.height - 50, 190, 36
+        )
+
     def open(self, pnj: PNJ, inv_joueur: Inventaire, money: int):
         self.pnj = pnj
         self.inv_joueur = inv_joueur
@@ -992,6 +1058,18 @@ class PNJManager:
             self.surface_bubble, (170, 170, 218, 255), (0, 0, 25, 25), 1, 5
         )
         self.surface_bubble.blit(self.e_bubble_text, (3, 3))
+
+    def set_screen(self, screen: pygame.Surface):
+        self.screen = screen
+        self.largeur, self.hauteur = self.screen.get_size()
+
+        self.menu_ui.set_screen(screen, self.largeur, self.hauteur)
+
+        self.dialogue_ui.set_screen(screen, self.largeur, self.hauteur)
+
+        self.boutique_ui.set_screen(screen, self.largeur, self.hauteur)
+
+        self.quete_ui.set_screen(screen, self.largeur, self.hauteur)
 
     def add(self, pnj: PNJ):
         self.pnjs.append(pnj)
