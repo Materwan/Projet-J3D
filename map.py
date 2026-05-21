@@ -1443,13 +1443,21 @@ class Hub(BaseMap):
             return_map.collision_tiles = np.zeros(
                 shape=(return_map.size // return_map.tile_size)
             )
-            rows, cols = zip(*data["hub"]["collision_tiles"])
+            rows, cols = (
+                zip(*data["hub"]["collision_tiles"])
+                if len(data["hub"]["collision_tiles"]) != 0
+                else ([], [])
+            )
             return_map.collision_tiles[rows, cols] = 1
 
             return_map.occupied_tiles = np.zeros(
                 shape=(return_map.size // return_map.tile_size)
             )
-            rows, cols = zip(*data["hub"]["occupied_tiles"])
+            rows, cols = (
+                zip(*data["hub"]["occupied_tiles"])
+                if len(data["hub"]["occupied_tiles"]) != 0
+                else ([], [])
+            )
             return_map.occupied_tiles[rows, cols] = 1
 
             return_map.action_tiles = data["hub"]["action_tiles"]
@@ -2040,7 +2048,7 @@ class MapManager(BaseMap):
         prams = {
             "hub": {
                 "type": "hub",
-                "pnj": [{"name": "Vieux Taupier", "position": [100, 100]}],
+                "pnj": [{"name": "Vieux Taupier", "position": [272, 256]}],
             },
             "principal_map": {
                 "type": "map",
