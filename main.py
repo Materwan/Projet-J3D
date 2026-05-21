@@ -84,7 +84,7 @@ class Manager:
 
     def change_state(self, name: str):
         self.state = self.states[name]
-        if name == "GAME":
+        if name == "GAME" or name == "WAITING_GUEST":
             SOUND["main_music"].stop_sound()
             SOUND["ambiance"].plays_sound()
         else:
