@@ -950,12 +950,6 @@ class Game(DefaultManager):
                 "last_save": str(datetime.datetime.today()),
                 "game_name": self.game_name,
                 "playing_mode": "solo",
-                "map": {
-                    "seed": self.map.seed,
-                    "nb_chunks": self.map.nb_chunks.tolist(),
-                    "chunk_size": self.map.chunk_size_tile.tolist(),
-                    "octaves": self.map.octaves,
-                },
                 "player": {
                     "position": list(self.player_controller.position),
                 },
@@ -965,12 +959,6 @@ class Game(DefaultManager):
                 "last_save": str(datetime.datetime.today()),
                 "game_name": self.game_name,
                 "playing_mode": "multi",
-                "map": {
-                    "seed": self.map.seed,
-                    "nb_chunks": self.map.nb_chunks.tolist(),
-                    "chunk_size": self.map.chunk_size_tile.tolist(),
-                    "octaves": self.map.octaves,
-                },
                 "host": {
                     "position": list(self.player_controller.position),
                 },
@@ -990,8 +978,4 @@ class Game(DefaultManager):
             data = json.loads(f.read())
 
         self.game_name = data["game_name"]
-        self.nb_chunks = data["map"]["nb_chunks"]
-        self.chunk_size = data["map"]["chunk_size"]
-        self.octaves = data["map"]["octaves"]
-        self.seed = data["map"]["seed"]
         self.playing_mode = data["playing_mode"]
