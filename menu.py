@@ -943,7 +943,8 @@ class Death_Screen(Menu):
         )
         # =======================Button End=======================
 
-        self.eltpages = [self.death, self.death2]
+        self.eltpages = []
+        self.textpages = [self.death, self.death2]
 
     def set_screen(self, screen: p.Surface):
         super().set_screen(screen)
