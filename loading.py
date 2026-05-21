@@ -164,7 +164,7 @@ class GameLoadingScreen:
 
     def chargement_monde(self) -> None:
         """Cette fonction est appelé en parrallèle pour initialiser le Game"""
-        
+
         self.manager.states["GAME"].initialize()
         self.chargement_fini = True
 
@@ -238,7 +238,7 @@ class WaitingGuestScreen:
 
         # filtre sombre transparent par dessus le jeu
         ov = pygame.Surface((self.larg, self.haut), pygame.SRCALPHA)
-        ov.fill((8, 8, 20, 160))
+        ov.fill((14, 14, 22, 160))
         self.screen.blit(ov, (0, 0))
 
         # panneau central
@@ -255,7 +255,11 @@ class WaitingGuestScreen:
         title = self.font_title.render("Attente d'un invité", True, (230, 210, 160))
         self.screen.blit(title, (self.larg // 2 - title.get_width() // 2, py + 16))
 
-        ip = self.manager.states["GAME"].network.ip if self.manager.states["GAME"].network else "???"
+        if self.manager.states["GAME"].network:
+            ip = self.manager.states["GAME"].network.ip
+        else:
+            ip = "???"
+
         ip_s = self.font_body.render(f"Votre IP : {ip}", True, (120, 170, 255))
         self.screen.blit(ip_s, (self.larg // 2 - ip_s.get_width() // 2, py + 52))
 
