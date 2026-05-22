@@ -14,6 +14,7 @@ from menu import (
     Solo_Menu,
     Multiplayer_Menu,
     Death_Screen,
+    InputBox,
 )
 from game import Game
 from sound import SoundController
@@ -63,6 +64,7 @@ class Manager:
             "DEATH_SCREEN": Death_Screen(self.screen, self),
             "LOADING": GameLoadingScreen(self.screen, self),
             "WAITING_GUEST": WaitingGuestScreen(self.screen, self),
+            "INPUTBOX": InputBox(self.screen, self),
         }
         self.state: DefaultManager = self.states["MENU_P"]
 
