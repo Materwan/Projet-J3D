@@ -2034,6 +2034,49 @@ class MapManager(BaseMap):
         else:
             self.map = None
 
+    def reset(
+        self,
+        camera: Camera,
+        nb_dungeons: int,
+        nb_chunks: Tuple[int, int],
+        chunk_size: Tuple[int, int],
+        octaves: Tuple[int, int],
+        seed: int,
+    ):
+        self.maps["principal_map"].load_chunk_running = False
+        self.maps["principal_map"].load_chunk_event.set()
+        keys = list(self.maps.keys())
+        keys.remove("hub")
+        for key in keys:
+            self.maps.pop(key)
+
+        map_data = {
+            "principal_map": {
+                "type": "map",
+                "nb_dungeons": nb_dungeons,
+                "nb_chunks": nb_chunks,
+                "chunk_size": chunk_size,
+                "octaves": octaves,
+                "seed": seed,
+                "pnj": [
+                    {"name": "Vieux Taupier", "position": [3800, 3800]},
+                    {"name": "Marchande Isabelle", "position": [4000, 3800]},
+                    {"name": "Forgeron Otto", "position": [4200, 3800]},
+                ],
+            },
+        }
+        for i in range(nb_dungeons):
+            map_data[f"dungeon{i}"] = {"type": "dungeon", "nb_rooms": 20, "pnj": []}
+
+        for name, map in map_data.items():
+            self.maps[name] = TYPE_STR[map["type"]].create_map(
+                self.screen, self.game, camera, map
+            )
+
+        self.initialize_var()
+
+        self.change_map("hub")
+
     @staticmethod
     def generate_maps(
         screen: pygame.Surface,
@@ -2086,6 +2129,39 @@ class MapManager(BaseMap):
 
         temp.initialize_var()
         return temp
+
+    def reset(
+        self,
+        camera: Camera,
+        nb_dungeons: int,
+        nb_chunks: Tuple[int, int],
+        chunk_size: Tuple[int, int],
+        octaves: Tuple[int, int],
+        seed: int,
+    ):
+        """Ferme toutes les cartes existantes et génère un nouveau monde.
+        Après le reset, la carte active est le hub (première entrée du dict maps).
+        """
+        self.close_map()
+        self.maps.clear()
+
+        new_manager = MapManager.generate_maps(
+            self.screen,
+            self.game,
+            camera,
+            nb_dungeons,
+            nb_chunks,
+            chunk_size,
+            octaves,
+            seed,
+        )
+
+        self.maps = new_manager.maps
+        self.map_name = new_manager.map_name
+        self.initialize_var()
+
+        # Met à jour le moteur avec la nouvelle map
+        self.game.moteur.map = self
 
     def close_map(self):
         for map in self.maps.values():

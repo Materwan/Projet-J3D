@@ -95,7 +95,7 @@ class Game(DefaultManager):
         self.nb_chunks = (8, 8)
         self.chunk_size = (32, 32)
         self.octaves = (8, 8)
-        self.seed = 1545
+        self.seed = randint(0, 999999999)
 
         # -- Moteur --
         self.moteur: Moteur = None
@@ -307,10 +307,10 @@ class Game(DefaultManager):
         # -- Host --
         elif isinstance(pc, HostController):
 
-            # Les deux sont morts → écran de mort
+            # Les deux sont morts → nouvelle map, retour au hub
             if pc.is_dead and pc.guest.is_dead:
                 self.spectate_start = None
-                self.manager.change_state("DEATH_SCREEN")
+                self.reset()
 
             # Un seul est mort → mode spectateur puis respawn
             elif pc.is_dead or pc.guest.is_dead:
@@ -337,7 +337,8 @@ class Game(DefaultManager):
 
             if pc.is_dead and pc.host.is_dead:
                 self.spectate_start = None
-                self.manager.change_state("DEATH_SCREEN")
+                # Le host gère la régénération ; le guest attend le paquet reset
+                pass
 
             elif pc.is_dead or pc.host.is_dead:
                 if self.spectate_start is None:
@@ -368,7 +369,9 @@ class Game(DefaultManager):
 
     # Réseau
 
-    def get_to_send_data_host(self, include_map: bool = False) -> Dict[str, Any]:
+    def get_to_send_data_host(
+        self, include_map: bool = False, reset: bool = False
+    ) -> Dict[str, Any]:
         """Construit le dictionnaire d'état envoyé par l'hôte au guest."""
         hc = self.player_controller  # hc pour HostController
 
@@ -397,6 +400,7 @@ class Game(DefaultManager):
                 else {}
             ),
             "close": False,
+            "reset": reset,
         }
 
         if include_map:
@@ -444,6 +448,11 @@ class Game(DefaultManager):
     def update_variables_guest(self, data: Dict[str, Any]):
         """Applique les données reçues de l'hôte sur le GuestController."""
         if not data:
+            return
+        if data.get("reset"):
+            # Le host a régénéré le monde : on stocke la nouvelle map et on reset
+            self.network._map_data = data["map"]
+            self.reset()
             return
         gc = self.player_controller  # gc pour GuestController
 
@@ -875,49 +884,108 @@ class Game(DefaultManager):
     # Sauvegarde et reset
 
     def reset(self):
-        self.playing_mode = None
-        self.player_controller = None
-        self.game_name = "tt"
 
-        # -- Raccourcis --
-        self.keybinds = {
-            "up": pygame.K_UP,
-            "down": pygame.K_DOWN,
-            "left": pygame.K_LEFT,
-            "right": pygame.K_RIGHT,
-            "attack": pygame.K_SPACE,
-        }
+        # -- Controlleur --
+        if self.playing_mode == "solo":
+            self.player_controller = SoloPlayerController(
+                self.screen, self.camera, self.moteur, self.map.start_position
+            )
+            self.seed = randint(0, 999999)
+            self.map.reset(
+                self.camera, 7, self.nb_chunks, self.chunk_size, self.octaves, self.seed
+            )
 
-        # -- Camera --
-        width, height = self.screen.get_size()
-        self.camera = Camera(width, height, 0, 0)
+        elif self.playing_mode == "host":
+            self.seed = randint(0, 999999)
+            self.map.reset(
+                self.camera, 7, self.nb_chunks, self.chunk_size, self.octaves, self.seed
+            )
 
-        # -- HUD --
-        self.hud = HUD(self.screen, self.camera)
+            # Mise à jour de la caméra avec les nouvelles dimensions
+            sizes = [m.size for m in self.map.maps.values()]
+            self.camera.map_width = max(s[0] for s in sizes) * self.map.tile_size[0]
+            self.camera.map_height = max(s[1] for s in sizes) * self.map.tile_size[1]
+
+            # Respawn des deux joueurs dans le hub (première map = hub)
+            hub_start = self.map.start_position
+            self.player_controller = HostController(
+                self.screen, self.camera, self.moteur, hub_start
+            )
+            self.player_controller.guest.position.update(
+                hub_start[0] + RESPAWN_OFFSET, hub_start[1]
+            )
+            self.player_controller.guest.hitbox.center = (
+                self.player_controller.guest.position
+            )
+            self.player_controller.guest.hitbox_damage.midbottom = (
+                self.player_controller.guest.position
+            )
+            self.player_controller.keybinds = self.keybinds
+            self.player_controller.current_map = self.map.map
+
+            # HUD
+            self.hud.player_controller = self.player_controller
+            self.hud.max_pv = self.player_controller.max_pv
+            self.hud.pv = self.player_controller.pv
+
+            # PNJ
+            self.pnj_manager = self.map.get_pnjs()
+
+            # Envoie la nouvelle map au guest via le slot prioritaire :
+            # send_reset() garantit que ce paquet sera transmis exactement une
+            # fois par le thread TCP, sans risque d'être écrasé par un frame
+            # de jeu normal avant d'avoir été lu.
+            self.network.send_reset(
+                self.get_to_send_data_host(include_map=True, reset=True)
+            )
+            self.player_controller.guest.position.x += 20
+
+        elif self.playing_mode == "guest":
+
+            # Récupération de la nouvelle map envoyée par l'hôte
+            map_data = self.network.get_map_data()
+            self.map.close_map()
+            self.map = MapManager.create_map(self.screen, self, self.camera, map_data)
+            self.moteur.map = self.map
+
+            # Mise à jour de la caméra avec les nouvelles dimensions
+            sizes = [m.size for m in self.map.maps.values()]
+            self.camera.map_width = max(s[0] for s in sizes) * self.map.tile_size[0]
+            self.camera.map_height = max(s[1] for s in sizes) * self.map.tile_size[1]
+
+            # Respawn dans le hub
+            hub_start = self.map.start_position
+            guest_start = (hub_start[0] + RESPAWN_OFFSET, hub_start[1])
+
+            self.player_controller = GuestController(
+                self.screen, self.camera, self.moteur, guest_start
+            )
+            self.player_controller.host.position.update(hub_start)
+            self.player_controller.host.hitbox.center = hub_start
+            self.player_controller.host.hitbox_damage.midbottom = hub_start
+            self.player_controller.keybinds = self.keybinds
+            self.player_controller.current_map = self.map.map
+
+            # HUD
+            self.hud.player_controller = self.player_controller
+            self.hud.max_pv = self.player_controller.max_pv
+            self.hud.pv = self.player_controller.pv
+
+            # PNJ
+            self.pnj_manager = self.map.get_pnjs()
+
+        # -- Keybinds --
+        self.player_controller.keybinds = self.keybinds
+
+        # -- Ennemis -- (vider les références à l'ancienne map)
+        self.ennemis = {}
+        self.paths = [[]]
 
         # -- Particules --
         self.particles = pygame.sprite.Group()
 
         # -- F2 --
         self.show_hitbox = False
-
-        # -- Map --
-        self.map: MapManager = None
-        self.nb_chunks = (8, 8)
-        self.chunk_size = (32, 32)
-        self.octaves = (8, 8)
-        self.seed = 0
-
-        # -- Moteur --
-        self.moteur: Moteur = None
-
-        # -- Ennemis --
-        self.paths = [[]]
-        self.ennemis: Dict[int, Ennemi] = {}
-
-        # -- Réseau --
-        self.address = "0.0.0.0"
-        self.port = 8888
 
         # -- Mort / Spectateur --
         self.spectate_start = None
@@ -934,13 +1002,6 @@ class Game(DefaultManager):
             is_visible=False,
         )
         self.drag_mgr = InventaireManager(self.screen, [self.ui_joueur])
-
-        # Items de départ :
-        self.inv_joueur.add_item(Item.create("Potion Rouge", 3))
-
-        # PNJ :
-        self.pnj_manager = PNJManager(self.screen, self.camera)
-        self.money: int = 500
 
     def save(self, file: str | None = "save.json"):
 
