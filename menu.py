@@ -1091,6 +1091,10 @@ class InputBox(Menu):
         self.active = False
         self.playing_mode = "solo"
 
+    def set_screen(self, screen: p.Surface):
+        super().set_screen(screen)
+        self.rect.topleft = (self.WINDOWS[0] // 2 - 150, self.WINDOWS[1] // 2 + 100)
+
     def event(self, events: list[p.event.Event]):
         for event in events:
             if event.type == p.QUIT:
