@@ -66,9 +66,9 @@ class Menu(DefaultManager):
 
         def reprendre(mode: str, partie: int):
             self.manager.states["GAME"].playing_mode = mode
-            self.manager.states["GAME"].load_save(
-                SAVE_FILE + mode + "/" + self.list_file[partie]
-            )
+            current_save = SAVE_FILE + "/" + mode + "/" + self.list_file[partie]
+            self.manager.states["MENU_PAUSE"].current_save = current_save
+            self.manager.states["GAME"].load_save(current_save)
             self.manager.change_state("GAME")
             self.manager.state.initialize()
 
@@ -678,6 +678,7 @@ class Pause_Menu(Menu):
             (10, 10, 22, 100),
             (0, 0, self.WINDOWS[0], self.WINDOWS[1]),
         )
+        self.current_save = None
         self.manager.running = True
 
         # =======================Function Button Start=======================
@@ -685,14 +686,11 @@ class Pause_Menu(Menu):
             self.manager.change_state("GAME")
 
         def save():
+            self.manager.states["GAME"].save(self.current_save)
             if self.manager.states["GAME"].playing_mode == "solo":
-                self.manager.states["GAME"].save(
-                    SAVE_SOLO + "/save_" + str(self.nbr_file_solo)
-                )
+                self.manager.states["MENU_SOLO"].reset_solo()
             else:
-                self.manager.states["GAME"].save(
-                    SAVE_MULTI + "/save_" + str(self.nbr_file_multi)
-                )
+                self.manager.states["MENU_MULTIPLAYER"].reset_multi()
 
         def settings():
             self.manager.states["MENU_SETTING_PAUSE"].keybinds = self.manager.states[
@@ -777,12 +775,20 @@ class Solo_Menu(Menu):
 
         # =======================Function Button Start=======================
         def create():
-            self.nbr_file_solo += 1
-            self.manager.states["GAME"].playing_mode = "solo"
+            if self.nbr_file_solo < 3:
+                if "save_0" not in self.list_file:
+                    current_save = SAVE_SOLO + "/save_0"
+                elif "save_1" not in self.list_file:
+                    current_save = SAVE_SOLO + "/save_1"
+                else:
+                    current_save = SAVE_SOLO + "/save_2"
+                self.nbr_file_solo += 1
+                self.manager.states["MENU_PAUSE"].current_save = current_save
+                self.manager.states["GAME"].playing_mode = "solo"
 
-            # pour l'écran de chargement !
-            self.manager.change_state("LOADING")
-            self.manager.states["LOADING"].start("solo")
+                # pour l'écran de chargement !
+                self.manager.change_state("LOADING")
+                self.manager.states["LOADING"].start("solo")
 
         # =======================Function Button End=======================
 
@@ -806,6 +812,13 @@ class Solo_Menu(Menu):
 
         self.eltpages = [self.retour, self.create]
         self.textpages = [self.solo]
+        for elt in self.list_button:
+            self.eltpages.append(elt)
+
+    def reset_solo(self):
+        self.list_button, self.list_file = self.create_list_save_and_button("solo")
+        self.len_save = len(self.list_button)
+        self.eltpages = [self.retour, self.create]
         for elt in self.list_button:
             self.eltpages.append(elt)
 
@@ -850,12 +863,20 @@ class Multiplayer_Menu(Menu):
 
         # =======================Function Button Start=======================
         def create():
-            self.nbr_file_multi += 1
-            self.manager.states["GAME"].playing_mode = "host"
+            if self.nbr_file_multi < 3:
+                if "save_0" not in self.list_file:
+                    current_save = SAVE_MULTI + "/save_0"
+                elif "save_1" not in self.list_file:
+                    current_save = SAVE_MULTI + "/save_1"
+                else:
+                    current_save = SAVE_MULTI + "/save_2"
+                self.nbr_file_multi += 1
+                self.manager.states["MENU_PAUSE"].current_save = current_save
+                self.manager.states["GAME"].playing_mode = "host"
 
-            # pour l'écran de chargement !
-            self.manager.change_state("LOADING")
-            self.manager.states["LOADING"].start("host")
+                # pour l'écran de chargement !
+                self.manager.change_state("LOADING")
+                self.manager.states["LOADING"].start("host")
 
         # =======================Function Button End=======================
 
@@ -881,6 +902,15 @@ class Multiplayer_Menu(Menu):
 
         self.eltpages = [self.retour, self.create]
         self.textpages = [self.multiplayer]
+        for elt in self.list_button:
+            self.eltpages.append(elt)
+
+    def reset_multi(self):
+        self.list_button, self.list_file = self.create_list_save_and_button(
+            "multiplayer"
+        )
+        self.len_save = len(self.list_button)
+        self.eltpages = [self.retour, self.create]
         for elt in self.list_button:
             self.eltpages.append(elt)
 
