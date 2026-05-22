@@ -253,6 +253,21 @@ class Inventaire:
                         self.remove_item(i, j, retire)
                         reste -= retire
 
+    def add_item_at_random_position(self, item: Item) -> bool:
+        """Trouve une case vide au hasard dans la grille et y place l'objet."""
+
+        # on liste toutes les slots qui sont vides
+        empty_slots = []
+        for r in range(self.rows):
+            for c in range(self.cols):
+                if self.grid[r][c] is None:
+                    empty_slots.append((r, c))
+
+        # si inventaire pas plein
+        if len(empty_slots) != 0:
+            chosen_row, chosen_col = random.choice(empty_slots)
+            self.grid[chosen_row][chosen_col] = item
+
 
 class InventaireUI:
     """
@@ -713,30 +728,122 @@ class InventaireManager:
         self.screen.blit(ghost, (icon_x, icon_y))
 
 
-# TOUCHE I ET E POUR TESTER
+class LootGenerator:
+    """
+    Génère du butin aléatoire pour remplir un inventaire (coffre, marchand...).
+
+    Cette classe se base sur le 'item_type' des objets pour déterminer les chances d'apparition.
+
+    Règles de rareté appliquées automatiquement :
+        - Légendes    : Très rare, tombe toujours en 1 seul exemplaire.
+        - Curiosités  : Rare, quantité de 1 à 2.
+        - Consommable : Atypique, quantité de 1 à 3.
+        - Bric-à-brac : Commun, grande quantité de 2 à 8.
+    """
+
+    def __init__(self, item_names: list[str], rolls_min: int, rolls_max: int):
+        self.rolls_min = rolls_min
+        self.rolls_max = rolls_max
+        self.entries = []
+
+        for name in item_names:
+            if name not in item_dic:
+                print(f"ERREUR : '{name}' n'existe pas dans item_dic. Ignoré.")
+                continue
+
+            item_type = item_dic[name]["item_type"]
+
+            # plus le 'weight' est élevé plus c'est commun !
+            if item_type == "Légendes":
+                weight = 2  # Très rare
+                qty_min, qty_max = 1, 1
+            elif item_type == "Curiosités":
+                weight = 10  # Un peu rare
+                qty_min, qty_max = 1, 2
+            elif item_type == "Consommable":
+                weight = 25  # Atypique
+                qty_min, qty_max = 1, 3
+            else:
+                weight = 50  # Commun
+                qty_min, qty_max = 2, 8
+
+            self.entries.append(
+                {"name": name, "weight": weight, "qty_min": qty_min, "qty_max": qty_max}
+            )
+
+    def fill(self, inv: Inventaire) -> None:
+        """Remplit l'inventaire fourni avec le butin généré."""
+        if len(self.entries) == 0:
+            return
+
+        nb_slots = random.randint(self.rolls_min, self.rolls_max)
+
+        weights = [e["weight"] for e in self.entries]
+        tirages = random.choices(self.entries, weights=weights, k=nb_slots)
+
+        for entry in tirages:
+            qty = random.randint(entry["qty_min"], entry["qty_max"])
+            inv.add_item_at_random_position(Item.create(entry["name"], qty))
+
+
+# TOUCHE I ET E POUR AFFICHER/CACHER, TOUCHE L POUR GENERER DU BUTIN
 if __name__ == "__main__":
+
+    # exemple de LootGenerator pour coffre de village
+    VILLAGE_CHEST = LootGenerator(
+        item_names=[
+            # Bric-à-brac : Tombe souvent
+            "Pièce de cuivre",
+            "Os",
+            "Viande de monstre",
+            # Consommables : Tombe moyennement
+            "Pain",
+            "Fromage",
+            "Potion Rouge",
+            "Petite Potion Rouge",
+            # Curiosités : Un peu rare
+            "Engrenage",
+            "Cristal",
+            "Pièce d'or",
+            # Légendes : Une chance infime
+            "Diamant",
+        ],
+        rolls_min=3,  # minimum 3 slots remplis
+        rolls_max=6,  # maximum 6 slots remplis
+    )
+    # ou un coffre de donjon :
+    DUNGEON_CHEST = LootGenerator(
+        item_names=[
+            # Consommables
+            "Grande Potion Rouge",
+            "Potion Rouge",
+            "Fromage",
+            "Pain",
+            # Bric-à-brac
+            "Pièce de cuivre",
+            "Os",
+            "Viande de monstre",
+            "Crâne",
+            # Curiosités
+            "Engrenage",
+            "Cristal",
+            "Carte Ancienne",
+            # Légendes
+            "Diamant",
+            "Bâton de Rubis",
+        ],
+        rolls_min=5,  # minimum 5 slots remplis
+        rolls_max=10,  # maximum 10 slots remplis
+    )
+
     pygame.init()
     screen = pygame.display.set_mode((1000, 700))
 
     inv_joueur = Inventaire(rows=4, cols=8)
     inv_joueur.add_item(Item.create("Potion Rouge", 5))
-    inv_joueur.add_item(Item.create("Grande Potion Rouge", 2))
-    inv_joueur.add_item(Item.create("Pain", 4))
-    inv_joueur.add_item(Item.create("Champignon", 10))
-    inv_joueur.add_item(Item.create("Pièce de cuivre", 120))
-    inv_joueur.add_item(Item.create("Os", 80))
-    inv_joueur.add_item(Item.create("Engrenage", 3))
-    inv_joueur.add_item(Item.create("Cristal", 5))
-    inv_joueur.add_item(Item.create("Crâne", 1))
-    inv_joueur.add_item(Item.create("Diamant", 1))
-    inv_joueur.add_item(Item.create("Bâton de Rubis", 1))
 
     inv_coffre = Inventaire(rows=4, cols=8)
-    inv_coffre.add_item(Item.create("Petite Potion Rouge", 8))
-    inv_coffre.add_item(Item.create("Fromage", 6))
-    inv_coffre.add_item(Item.create("Pièce d'or", 50))
-    inv_coffre.add_item(Item.create("Carte Ancienne", 1))
-    inv_coffre.add_item(Item.create("Viande de monstre", 1))
+    VILLAGE_CHEST.fill(inv_coffre)  # ICI
 
     ui_joueur = InventaireUI(
         screen,
@@ -748,7 +855,7 @@ if __name__ == "__main__":
     )
     ui_coffre = InventaireUI(
         screen,
-        name="Marchant de drogue",
+        name="Coffre de village",
         inv=inv_coffre,
         pos=(30, 400),
         is_merchant=True,
@@ -760,8 +867,7 @@ if __name__ == "__main__":
     def on_use(item: Item, slot: tuple, ui: InventaireUI):
         """Consomme 1 unité de l'item utilisé."""
         ui.inv.remove_item(*slot, 1)
-        print(f"Vous vous soigner de {item.effect} HP")
-        # self.player.hp += item.effect par exemple
+        print(f"Vous vous soignez de {item.effect} HP")
 
     running = True
     while running:
@@ -778,9 +884,16 @@ if __name__ == "__main__":
                 if event.key == pygame.K_e:
                     ui_coffre.is_visible = not ui_coffre.is_visible
 
+                if event.key == pygame.K_l:
+                    inv_coffre.grid = [
+                        [None for _ in range(inv_coffre.cols)]
+                        for _ in range(inv_coffre.rows)
+                    ]
+                    VILLAGE_CHEST.fill(inv_coffre)
+                    print("Nouveau butin généré dans le coffre !")
+
             drag_mgr.handle_event(event, mouse_pos, on_use=on_use)
 
-        # affichage
         screen.fill((20, 20, 30))
         drag_mgr.draw(mouse_pos)
         pygame.display.flip()
