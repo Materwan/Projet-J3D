@@ -1,6 +1,6 @@
 import pygame
 from typing import Tuple, List
-from menu import Text
+from animations import Text
 from random import shuffle
 
 
@@ -24,8 +24,12 @@ class Card:
     def __str__(self):
         return f"({self.type} {self.name})"
 
-    def display(self, position):
+    def display_visible(self, position):
         self.artwork = pygame.transform.scale(self.artwork, self.scale)
+        self.screen.blit(self.artwork, position) 
+    
+    def display_invisible(self, position):
+        self.artwork = pygame.transform.scale(pygame.image.load("Ressources/Cartes/PlaceHolderDeck.png"), self.scale)
         self.screen.blit(self.artwork, position)
 
 
@@ -38,12 +42,17 @@ class Hand:
         The player will be able to play the Cards contained in it and play them (they play them by putting them in other zones)
         At the beginning of each game, each player draw 5 cards, and then draw one at the start of each turn (except turn 1)
         A player can only see their own hands (even in multiplayer), but they ar able to see the number of cards in others hand"""
-    def __init__(self, screen: pygame.surface.Surface, position: Tuple[int, int]):
+    def __init__(self,
+                 screen: pygame.surface.Surface,
+                 position: Tuple[int, int],
+                 is_visible = True):
+        
         self.screen = screen
         self.position = position
         self.cards: List[Card] | None = []
         self.size = 0
         self.scale = (7 * 35 * 3.25, 47 * 3.25)
+        self.is_visible = is_visible
 
     def add2Hand(self, card: Card):
         if card:
@@ -72,8 +81,18 @@ class Hand:
 
     def display(self):
         if self.size != 0:
-            for cards in self.cards:
-                cards.display(self.position)
+            spacing = self.scale[0] * 0.1
+            total_width = spacing * (self.size - 1) + self.scale[0]
+            start_x = self.position[0] - total_width / 2
+            y = self.position[1]
+            i = 0
+            for card in self.cards:
+                x = start_x + i * spacing
+                if (self.is_visible):
+                    card.display_visible((x, y))
+                else:
+                    card.display_invisible((x, y))
+                i += 1
 
 
 class Deck:
@@ -107,7 +126,7 @@ class Deck:
         else:
             print("No card")
 
-    def rmFromTopDeck(self):
+    def rmFromTop1Deck(self):
         if self.size != 0:
             self.size -= 1
             return self.cards.pop()
@@ -245,16 +264,16 @@ class PlayerCard:
         self,
         screen: pygame.surface.Surface,
         position: Tuple[int, int],
-        hp=20,
-        mp=1,
-        ap=1,
+        hp: int,
+        mp: int,
+        ap: int,
         artwork="Ressources/Cartes/PlayerCard.png",
     ):
         self.screen = screen
         self.screenSize = self.screen.get_size()
         self.hp = hp
         self.mp = mp  # Mana
-        self.ap = ap  # Attaque
+        self.ap = ap  # Attack
         self.maxHp = hp
         self.maxMp = mp
         self.maxAp = ap
@@ -286,12 +305,12 @@ class PlayerCard:
 
     def display(self):
         self.artwork = pygame.transform.scale(self.artworkBase, self.scale)
-        self.hpDisplay = Text("Impact", 12, str(self.hp), "#FFFFFF", self.artwork)
-        self.mpDisplay = Text("Impact", 12, str(self.mp), "#FFFFFF", self.artwork)
-        self.apDisplay = Text("Impact", 12, str(self.ap), "#FFFFFF", self.artwork)
-        self.hpDisplay.draw_text((18, 125))
-        self.mpDisplay.draw_text((54, 125))
-        self.apDisplay.draw_text((86, 125))
+        self.hpDisplay = Text(str(self.hp), self.artwork ,(18, 125), "Impact", 14, "#FFFFFF")
+        self.mpDisplay = Text(str(self.mp), self.artwork ,(54, 125), "Impact", 14, "#FFFFFF")
+        self.apDisplay = Text(str(self.ap), self.artwork ,(86, 125), "Impact", 14, "#FFFFFF")
+        self.hpDisplay.draw_text()
+        self.mpDisplay.draw_text()
+        self.apDisplay.draw_text()
         self.screen.blit(self.artwork, self.position)
 
         if self.biggerpicture == True:
@@ -340,31 +359,114 @@ class Game:
     """This is how the game works"""
     def __init__(
         self,
-        pCard: PlayerCard,
-        pDeck: Deck,
+        p1HP: int,
+        p1MP : int,
+        p1AP : int,
+        p1DL: List[Card],
         bCard: PlayerCard,
         bDeck: Deck,
+        is_multiplayer : bool = False,
+        p2HP: int | None = None,
+        p2MP: int | None = None,
+        p2AP: int | None = None,
+        p2DL: List[Card] | None = None,
     ):
+        
         self.screen = screen
         self.screenSize = self.screen.get_size()
         self.artworkBG = pygame.image.load("Ressources/Cartes/ecran_tcg.png")
+        self.is_multiplayer = is_multiplayer
 
-        self.pCard = pCard
-        self.pDeck = pDeck
-        self.pDiscard = DiscardPile(
-            screen,
-            (
-                (screenSize[0] - (35 * 3.25)) * 34 / 35,
-                (screenSize[1] - (47 * 3.25)) * 6.5 / 7
+        if not self.is_multiplayer:
+
+            self.p1Card = PlayerCard(
+                screen,
+                (
+                    (screenSize[0] - (35 * 3.25)) / 2,
+                    (screenSize[1] - (47 * 3.25)) / 1.25
+                ),
+                p1HP,
+                p1MP,
+                p1AP
             )
-        )
-        self.pHand = Hand(
-            screen,
-            (
-                (screenSize[0] - (35 * 3.25)) * 9 / 35,
-                (screenSize[1] - (47 * 3.25)) * 1 / 7
+
+            self.p1Deck = Deck(
+                screen,
+                (
+                    (screenSize[0] - (35 * 3.25)) * 34 / 35,
+                    (screenSize[1] - (47 * 3.25)) * 5.1 / 7
+                ),
+                p1DL
             )
-        )
+
+            self.p1Discard = DiscardPile(
+                screen,
+                (
+                    (screenSize[0] - (35 * 3.25)) * 34 / 35,
+                    (screenSize[1] - (47 * 3.25)) * 6.5 / 7
+                )
+            )
+
+            self.p1Hand = Hand(
+                screen,
+                (
+                    (screenSize[0] - (35 * 3.25)) * 3 / 4,
+                    (screenSize[1] - (47 * 3.25)) * 34 / 35
+                )
+            )
+
+        else:
+            if None in (p2HP, p2MP, p2AP, p2DL):
+                raise ValueError("No P2 in Multiplayer mode")
+            
+            self.p1Card = PlayerCard(
+                screen,
+                (
+                    (screenSize[0] - (35 * 3.25)) / 3,
+                    (screenSize[1] - (47 * 3.25)) / 1.25
+                ),
+                p1HP,
+                p1MP,
+                p1AP
+            )
+
+            self.p1Deck = Deck(
+                screen,
+                (
+                    (screenSize[0] - (35 * 3.25)) * 34 / 35,
+                    (screenSize[1] - (47 * 3.25)) * 5.1 / 7
+                ),
+                p1DL
+            )
+
+            self.p1Discard = DiscardPile(
+                screen,
+                (
+                    (screenSize[0] - (35 * 3.25)) * 34 / 35,
+                    (screenSize[1] - (47 * 3.25)) * 6.5 / 7
+                )
+            )
+
+            self.p1Hand = Hand(
+                screen,
+                (
+                    (screenSize[0] - (35 * 3.25)) * 3 / 4,
+                    (screenSize[1] - (47 * 3.25)) * 34 / 35
+                )
+            )
+
+
+            self.p2Card = PlayerCard(
+                screen,
+                (
+                    (screenSize[0] - (35 * 3.25)) * 2 / 3,
+                    (screenSize[1] - (47 * 3.25)) / 1.25
+                ),
+                p2HP,
+                p2MP,
+                p2AP
+            )
+
         self.bCard = bCard
         self.bDeck = bDeck
         self.bDiscard = DiscardPile(
@@ -377,30 +479,31 @@ class Game:
         self.bHand = Hand(
             screen,
             (
-                (screenSize[0] - (35 * 3.25)) * 9 / 35,
-                (screenSize[1] - (47 * 3.25)) * 1 / 7
-            )
+                (screenSize[0] - (35 * 3.25)) * 3 / 4,
+                (screenSize[1] - (47 * 3.25)) * 1 / 35
+            ),
+            False
         )
 
         self.running = True
-        print(self.pDeck, self.pHand)
+        print(self.p1Deck, self.p1Hand)
     
     def GameStart(self):
         for _ in range(5):
-            self.pHand.add2Hand(self.pDeck.rmFromTopDeck())
-            self.bHand.add2Hand(self.bDeck.rmFromTopDeck())
+            self.p1Hand.add2Hand(self.p1Deck.rmFromTop1Deck())
+            self.bHand.add2Hand(self.bDeck.rmFromTop1Deck())
     
     def TurnEnd(self):
-        self.bCard.hp -= self.pCard.ap
+        self.bCard.hp -= self.p1Card.ap
         if (self.bCard.hp > 0):
-            self.pCard.hp -= self.bCard.ap
+            self.p1Card.hp -= self.bCard.ap
         else:
             self.win()
             return 0
-        if (self.pCard.hp > 0):
+        if (self.p1Card.hp > 0):
                 self.bCard.mp, self.bCard.ap = self.bCard.maxMp, self.bCard.maxAp
-                self.pHand.add2Hand(self.pDeck.rmFromTopDeck())
-                self.bHand.add2Hand(self.bDeck.rmFromTopDeck())
+                self.p1Hand.add2Hand(self.p1Deck.rmFromTop1Deck())
+                self.bHand.add2Hand(self.bDeck.rmFromTop1Deck())
         else:
             self.lose()
             return 0
@@ -414,13 +517,20 @@ class Game:
         print("You Lose !")
         self.running = False
 
+    def get_to_send_data_host(self):
+        return {"host" : {"Card" : self.p1Card
+                          },
+                "boss" : {""}}
+
     def display(self):
         self.artworkBG = pygame.transform.scale(self.artworkBG, self.screenSize)
         self.screen.blit(self.artworkBG, (0, 0))
-        self.pDeck.display()
-        self.pDiscard.display()
-        self.pHand.display()
-        self.pCard.display()
+        self.p1Deck.display()
+        self.p1Discard.display()
+        self.p1Hand.display()
+        self.p1Card.display()
+        if self.is_multiplayer:
+            self.p2Card.display()
         self.bDeck.display()
         self.bDiscard.display()
         self.bHand.display()
@@ -428,7 +538,7 @@ class Game:
         pygame.display.flip()
 
     def event(self):
-        self.pCard.event()
+        self.p1Card.event()
         self.bCard.event()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -449,24 +559,15 @@ if __name__ == "__main__":
     screen = pygame.display.set_mode((0, 0))
     running = True
     screenSize = screen.get_size()
-
-    player = PlayerCard(
-        screen,
-        ((screenSize[0] - (35 * 3.25)) / 2, (screenSize[1] - (47 * 3.25)) / 1.25),
-    )
+    
     decklistP = [Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3")]
-    deckP = Deck(
-        screen,
-        (
-            (screenSize[0] - (35 * 3.25)) * 34 / 35,
-            (screenSize[1] - (47 * 3.25)) * 5.1 / 7,
-        ),
-        decklistP,
-    )
 
     boss = PlayerCard(
         screen,
         ((screenSize[0] - (35 * 3.25)) / 2, (screenSize[1] - (47 * 3.25)) / 3.75),
+        20,
+        10,
+        1
     )
     decklistB = [Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3"), Card(screen, "Dmg2"), Card(screen, "HpUp3")]
     deckB = Deck(
@@ -478,5 +579,5 @@ if __name__ == "__main__":
         decklistB,
     )
 
-    test = Game(player, deckP, boss, deckB)
+    test = Game(20, 10, 1, decklistP, boss, deckB, True, 40, 2, 1, decklistP)
     test.run()
