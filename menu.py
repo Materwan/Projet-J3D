@@ -29,6 +29,8 @@ SAVE_SOLO = os.path.join(SAVE_FILE, "solo")
 UDP_IP = "0.0.0.0"
 UDP_PORT = 9999
 
+FULLSCREEN_SIZE = p.display.Info().current_w, p.display.Info().current_h
+
 
 """----------------------------------------"""
 
@@ -316,11 +318,14 @@ class Setting_Menu(Menu):
             self.manager.change_volume(choise)
 
         def window():
-            if self.changewindow.text.to_display_text == "FULL SCREEN":
-                manager.resize((500, 500), menu_appel)
+            current = self.changewindow.text.to_display_text
+            if current == "FULL SCREEN":
+                # Borderless fullscreen : fenêtre sans bordure à la taille du bureau
+                manager.resize(FULLSCREEN_SIZE, menu_appel)
                 self.change_button_text("NOT FULL SCREEN", self.changewindow)
             else:
-                manager.resize((0, 0), menu_appel)
+                # Retour en mode fenêtré
+                manager.resize((1080, 780), menu_appel)
                 self.change_button_text("FULL SCREEN", self.changewindow)
 
         # =======================Function Button End=======================
@@ -386,11 +391,7 @@ class Setting_Menu(Menu):
             self.screen,
             (self.WINDOWS[0] - 170, 67),
             window,
-            text=(
-                "NOT FULL SCREEN"
-                if self.screen.get_size() == (500, 500)
-                else "FULL SCREEN"
-            ),
+            text=("NOT FULL SCREEN" if self.manager.fullscreen else "FULL SCREEN"),
         )
         # =======================Button End=======================
 

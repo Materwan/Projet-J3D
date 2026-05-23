@@ -3,6 +3,11 @@ import traceback
 import os
 import sys
 import pygame
+from pygame._sdl2.video import Window
+
+pygame.init()
+pygame.mixer.init()
+pygame.display.init()
 
 from utils import resource_path, DefaultManager
 from menu import (
@@ -15,17 +20,16 @@ from menu import (
     Multiplayer_Menu,
     Death_Screen,
     InputBox,
+    FULLSCREEN_SIZE,
 )
 from game import Game
 from sound import SoundController
 from loading import GameLoadingScreen, WaitingGuestScreen
 
-pygame.init()
-pygame.mixer.init()
 pygame.display.set_caption("MoleTale")
 
 FPS = 60
-TAILLE_ECRAN = (500, 500)  # (500, 500) pour petit ecran (0, 0) pour plein ecran
+TAILLE_ECRAN = (1080, 780)  # (500, 500) pour petit ecran (0, 0) pour plein ecran
 
 SOUND_PATH = resource_path("Ressources/Musics/")
 MUSIC_HOLDER = os.path.join(SOUND_PATH, "placeholder.mp3")
@@ -43,6 +47,8 @@ screen = pygame.display.set_mode(TAILLE_ECRAN, pygame.RESIZABLE)
 if TAILLE_ECRAN == (0, 0):
     TAILLE_ECRAN = screen.get_size()
 
+WINDOW = Window.from_display_module()
+
 
 class Manager:
     """Gestionnaire des états du jeu."""
@@ -50,6 +56,7 @@ class Manager:
     def __init__(self):
         self.screen = screen
         self.running = True
+        self.fullscreen: bool = False
 
         self.states = {
             "MENU_P": Principal_Menu(self.screen, self),
@@ -74,9 +81,26 @@ class Manager:
         self.last_screen_size = TAILLE_ECRAN
 
     def resize(self, size, current: str | None = None):
-        self.screen = pygame.display.set_mode(size, pygame.RESIZABLE)
+        if size == (0, 0) or size == FULLSCREEN_SIZE:
+            WINDOW.position = (0, 0)
+            self.screen = pygame.display.set_mode(
+                FULLSCREEN_SIZE, pygame.NOFRAME | pygame.RESIZABLE
+            )
+            self.fullscreen = True
+        else:
+            if size[0] < 500:
+                size = (500, size[1])
+            if size[1] < 500:
+                size = (size[0], 500)
+            WINDOW.position = (
+                (FULLSCREEN_SIZE[0] - size[0]) // 2,
+                (FULLSCREEN_SIZE[1] - size[1]) // 2,
+            )
+            self.screen = pygame.display.set_mode(size, pygame.RESIZABLE)
+            self.fullscreen = False
+
         for value in self.states.values():
-            value.set_screen(screen)
+            value.set_screen(self.screen)
         if current is None:
             pass
         elif current == "MENU_PAUSE":
@@ -136,8 +160,14 @@ class Manager:
 
             events = pygame.event.get()
             for event in events:
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_F1:
-                    self.fps = not self.fps
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_F1:
+                        self.fps = not self.fps
+                    if event.key == pygame.K_F11:
+                        if self.fullscreen:
+                            self.resize((1080, 780))
+                        else:
+                            self.resize((0, 0))
             self.state.event(events)
 
             if self.last_screen_size != self.screen.get_size():
