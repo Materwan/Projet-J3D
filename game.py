@@ -5,7 +5,6 @@ import datetime
 import json
 from random import randint
 from typing import Dict, List, Any, Tuple, TYPE_CHECKING
-import os
 import pprint
 
 import pygame
@@ -19,13 +18,13 @@ from player import (
 from utils import resource_path, DefaultManager
 from network import HostNetwork, GuestNetwork
 from moteur import Moteur
-from map import MapManager, STR_TYPE
+from map import MapManager, STR_TYPE, Hub
 from camera_system import Camera
 from hud import HUD
 from inventory import Item, Inventaire, InventaireUI, InventaireManager
 from ennemis import Ennemi
 from particule import spawn_local_particle
-from pnj import PNJ, PNJManager
+from pnj import PNJManager
 
 if TYPE_CHECKING:
     from main import Manager
@@ -134,6 +133,7 @@ class Game(DefaultManager):
         # Stats de run
         self.run_stats = RunStats()
         self.permanent_xp = 0  # à inclure dans save/load !!!!!!!!!!!!!!!!!!!!!!!!!
+        self.font_xp = pygame.font.SysFont("segoeui", 18, bold=True)
 
     def set_screen(self, screen: pygame.Surface):
         self.screen = screen
@@ -826,8 +826,32 @@ class Game(DefaultManager):
         # -- PNJ UI --
         self.pnj_manager.draw_ui(pygame.mouse.get_pos())
 
+        # -- XP Hub --
+        self.draw_xp_hub()
+
         # -- HUD --
         self.hud.draw()
+
+    def draw_xp_hub(self):
+        """Affiche l'XP permanente en bas à droite — Hub uniquement."""
+        if not isinstance(self.map.map, Hub):
+            return
+
+        label = f"XP : {self.permanent_xp}"
+        text_surf = self.font_xp.render(label, True, (255, 215, 0))
+
+        margin = 12
+        pad_x, pad_y = 10, 6
+        w = text_surf.get_width() + pad_x * 2
+        h = text_surf.get_height() + pad_y * 2
+        x = self.screen.get_width() - w - margin
+        y = self.screen.get_height() - h - margin
+
+        bg = pygame.Surface((w, h), pygame.SRCALPHA)
+        pygame.draw.rect(bg, (14, 14, 26, 210), (0, 0, w, h), border_radius=7)
+        pygame.draw.rect(bg, (180, 150, 0, 200), (0, 0, w, h), width=1, border_radius=7)
+        self.screen.blit(bg, (x, y))
+        self.screen.blit(text_surf, (x + pad_x, y + pad_y))
 
     def draw_debug_hitboxes(self):
         """
@@ -1024,9 +1048,10 @@ class Game(DefaultManager):
             # send_reset() garantit que ce paquet sera transmis exactement une
             # fois par le thread TCP, sans risque d'être écrasé par un frame
             # de jeu normal avant d'avoir été lu.
-            self.network.send_reset(
-                self.get_to_send_data_host(include_map=True, reset=True)
-            )
+            if self.network is not None:
+                self.network.send_reset(
+                    self.get_to_send_data_host(include_map=True, reset=True)
+                )
             self.player_controller.guest.position.x += 20
 
         elif self.playing_mode == "guest":
