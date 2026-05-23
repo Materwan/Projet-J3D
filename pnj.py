@@ -1157,18 +1157,17 @@ class PNJManager:
         if self.mode is None:
             self.neary_pnj = next((p for p in self.pnjs if p.is_near(player_pos)), None)
 
-    def draw_pnj(self):
-        """Dessine les PNJ si il sont sur le screen"""
-        screen_rect = pygame.Rect(0, 0, self.largeur, self.hauteur)
+    def draw_pnj(self, pnj):
+        """Dessine le PNJ"""
+        screen_hitbox = self.camera.apply(pnj.hitbox)
+        self.screen.blit(pnj.sprite, (screen_hitbox.centerx - 50, screen_hitbox.y - 50))
 
+    def draw_pnj_bubble(self):
+        """Dessine uniquement la bulle [E] au-dessus du PNJ proche."""
+        screen_rect = pygame.Rect(0, 0, self.largeur, self.hauteur)
         for pnj in self.pnjs:
             screen_hitbox = self.camera.apply(pnj.hitbox)
-            # pygame.draw.rect(self.screen, "red", screen_hitbox, 2)
-
             if screen_rect.colliderect(screen_hitbox):
-                self.screen.blit(
-                    pnj.sprite, (screen_hitbox.centerx - 50, screen_hitbox.y - 50)
-                )
                 if pnj is self.neary_pnj and self.mode is None:
                     self.screen.blit(
                         self.surface_bubble,

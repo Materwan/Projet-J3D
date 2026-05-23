@@ -748,19 +748,56 @@ class Game(DefaultManager):
         # -- Map --
         self.map.display(self.camera)
 
-        # -- Joueur --
-        self.player_controller.display()
+        # -- Entités triées par Painter's Algorithm --
+        drawables = []
+        pc = self.player_controller
+
+        # -- Players --
+        if not pc.is_dead:
+            drawables.append((pc.hitbox.bottom, PlayerControllerBase.display, pc))
+        partner = None
+        if (
+            isinstance(pc, HostController)
+            and not pc.guest.is_dead
+            and pc.current_map == pc.guest.current_map
+        ):
+            partner = pc.guest
+        elif (
+            isinstance(pc, GuestController)
+            and not pc.host.is_dead
+            and pc.current_map == pc.host.current_map
+        ):
+            partner = pc.host
+        if partner:
+            drawables.append(
+                (partner.hitbox.bottom, PlayerControllerBase.display, partner)
+            )
 
         # -- Ennemis --
         for ennemi in self.map.ennemis.values():
-            ennemi.display()
+            if ennemi.hitbox:
+                drawables.append((ennemi.hitbox.bottom, Ennemi.display, ennemi))
+
+        # -- PNJ --
+        screen_rect = pygame.Rect(
+            0, 0, self.screen.get_width(), self.screen.get_height()
+        )
+        for pnj in self.pnj_manager.pnjs:
+            screen_hitbox = self.camera.apply(pnj.hitbox)
+            if screen_rect.colliderect(screen_hitbox):
+                drawables.append((pnj.hitbox.bottom, self.pnj_manager.draw_pnj, pnj))
+
+        for _, fn, entity in sorted(drawables, key=lambda x: x[0]):
+            fn(entity)
+
+        # -- Bulle [E] PNJ (toujours au-dessus) --
+        self.pnj_manager.draw_pnj_bubble()
+
+        # Puis on affiche par dessus toute les entitées ceci :
 
         # -- Particules --
         for sprite in self.particles:
             self.screen.blit(sprite.image, self.camera.apply(sprite.rect))
-
-        # -- PNJ --
-        self.pnj_manager.draw_pnj()
 
         # -- F2 : TOUTES les hitboxes --
         if self.show_hitbox:
