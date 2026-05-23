@@ -910,13 +910,25 @@ class Game(DefaultManager):
 
         # -- Controlleur --
         if self.playing_mode == "solo":
-            self.player_controller = SoloPlayerController(
-                self.screen, self.camera, self.moteur, self.map.start_position
-            )
             self.seed = randint(0, 999999)
             self.map.reset(
                 self.camera, 7, self.nb_chunks, self.chunk_size, self.octaves, self.seed
             )
+            self.player_controller = SoloPlayerController(
+                self.screen, self.camera, self.moteur, self.map.start_position
+            )
+            self.player_controller.current_map = self.map.map
+
+            sizes = [m.size for m in self.map.maps.values()]
+            self.camera.map_width = max(s[0] for s in sizes) * self.map.tile_size[0]
+            self.camera.map_height = max(s[1] for s in sizes) * self.map.tile_size[1]
+            self.camera.set_position(self.map.start_position)
+
+            self.hud.player_controller = self.player_controller
+            self.hud.max_pv = self.player_controller.max_pv
+            self.hud.pv = self.player_controller.pv
+
+            self.pnj_manager = self.map.get_pnjs()
 
         elif self.playing_mode == "host":
             self.seed = randint(0, 999999)
