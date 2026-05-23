@@ -2149,7 +2149,7 @@ class MapManager(BaseMap):
         prams = {
             "hub": {
                 "type": "hub",
-                "pnj": [{"name": "Vieux Taupier", "position": [272, 256]}],
+                "pnj": [{"name": "Archiviste des Ames", "position": [272, 256]}],
             },
             "principal_map": {
                 "type": "map",

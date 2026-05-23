@@ -10,8 +10,8 @@ from map import BaseMap
 from utils import resource_path
 
 SPEED = 3
-MAX_PV = 10
-PV = 3
+MAX_PV = 6
+PV = 6
 
 
 class PlayerControllerBase:
