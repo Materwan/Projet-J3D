@@ -5,7 +5,6 @@ import datetime
 import json
 from random import randint
 from typing import Dict, List, Any, Tuple, TYPE_CHECKING
-import os
 import pprint
 
 import pygame
@@ -19,13 +18,13 @@ from player import (
 from utils import resource_path, DefaultManager
 from network import HostNetwork, GuestNetwork
 from moteur import Moteur
-from map import MapManager, STR_TYPE
+from map import MapManager, STR_TYPE, Hub
 from camera_system import Camera
 from hud import HUD
 from inventory import Item, Inventaire, InventaireUI, InventaireManager
 from ennemis import Ennemi
 from particule import spawn_local_particle
-from pnj import PNJ, PNJManager
+from pnj import PNJManager
 
 if TYPE_CHECKING:
     from main import Manager
@@ -95,7 +94,7 @@ class Game(DefaultManager):
         self.nb_chunks = (8, 8)
         self.chunk_size = (32, 32)
         self.octaves = (8, 8)
-        self.seed = 1545
+        self.seed = randint(0, 999999999)
 
         # -- Moteur --
         self.moteur: Moteur = None
@@ -128,8 +127,14 @@ class Game(DefaultManager):
         self.inv_joueur.add_item(Item.create("Potion Rouge", 3))
 
         # PNJ :
-        self.pnj_manager: PNJManager = PNJManager(self.screen, self.camera)
+        self.pnj_manager = PNJManager(self.screen, self.camera)
         self.money: int = 500
+
+        # Stats de run
+        self.run_stats = RunStats()
+        self.permanent_xp = 1000  # à inclure dans save/load !!!!!!!!!!!!!!!!!!!!!!!!!
+        self.font_xp = pygame.font.SysFont("segoeui", 18, bold=True)
+        self.permanent_max_pv_bonus = 0
 
     def set_screen(self, screen: pygame.Surface):
         self.screen = screen
@@ -248,6 +253,12 @@ class Game(DefaultManager):
         self.camera.map_width = self.map.size[0] * self.map.tile_size[0]
         self.camera.map_height = self.map.size[1] * self.map.tile_size[1]
 
+        # Applique le bonus permanent de PV Max
+        self.player_controller.max_pv += self.permanent_max_pv_bonus
+        # Synchronise le pnj_manager avec les valeurs courantes
+        self.pnj_manager.permanent_xp = self.permanent_xp
+        self.pnj_manager.permanent_max_pv_bonus = self.permanent_max_pv_bonus
+
         # -- HUD --
         self.hud.player_controller = self.player_controller
         self.hud.max_pv = self.player_controller.max_pv
@@ -297,20 +308,26 @@ class Game(DefaultManager):
     def _handle_death(self):
         """Gère la mort des joueurs : spectateur SPECTATE_DURATION s puis respawn,
         ou écran de mort si les deux sont morts simultanément."""
+        # Si déjà sur RECAP, ne pas re-déclencher !
+        if self.manager.state == self.manager.states["RECAP"]:
+            return
+
         pc = self.player_controller
 
         # -- Solo --
         if isinstance(pc, SoloPlayerController):
             if pc.is_dead:
-                self.manager.change_state("DEATH_SCREEN")
+                self.manager.states["RECAP"].start(self.run_stats)
+                self.manager.change_state("RECAP")
 
         # -- Host --
         elif isinstance(pc, HostController):
 
-            # Les deux sont morts → écran de mort
+            # Les deux sont morts → nouvelle map, retour au hub
             if pc.is_dead and pc.guest.is_dead:
                 self.spectate_start = None
-                self.manager.change_state("DEATH_SCREEN")
+                self.manager.states["RECAP"].start(self.run_stats)
+                self.manager.change_state("RECAP")
 
             # Un seul est mort → mode spectateur puis respawn
             elif pc.is_dead or pc.guest.is_dead:
@@ -337,7 +354,8 @@ class Game(DefaultManager):
 
             if pc.is_dead and pc.host.is_dead:
                 self.spectate_start = None
-                self.manager.change_state("DEATH_SCREEN")
+                self.manager.states["RECAP"].start(self.run_stats)
+                self.manager.change_state("RECAP")
 
             elif pc.is_dead or pc.host.is_dead:
                 if self.spectate_start is None:
@@ -368,7 +386,9 @@ class Game(DefaultManager):
 
     # Réseau
 
-    def get_to_send_data_host(self, include_map: bool = False) -> Dict[str, Any]:
+    def get_to_send_data_host(
+        self, include_map: bool = False, reset: bool = False
+    ) -> Dict[str, Any]:
         """Construit le dictionnaire d'état envoyé par l'hôte au guest."""
         hc = self.player_controller  # hc pour HostController
 
@@ -397,6 +417,7 @@ class Game(DefaultManager):
                 else {}
             ),
             "close": False,
+            "reset": reset,
         }
 
         if include_map:
@@ -444,6 +465,12 @@ class Game(DefaultManager):
     def update_variables_guest(self, data: Dict[str, Any]):
         """Applique les données reçues de l'hôte sur le GuestController."""
         if not data:
+            return
+        if data.get("reset"):
+            # Le host a régénéré le monde : on stocke la nouvelle map et on reset
+            self.network._map_data = data["map"]
+            self.reset()
+            self.manager.change_state("GAME")
             return
         gc = self.player_controller  # gc pour GuestController
 
@@ -528,6 +555,10 @@ class Game(DefaultManager):
         if self.map:
             self.map.close_map()
 
+    def on_chest_opened(self):
+        """Appeler depuis le système de coffres lors de l'ouverture."""
+        self.run_stats.chests_opened += 1
+
     # Game basic
 
     def event(self, events: List[pygame.event.Event]) -> bool:
@@ -564,10 +595,7 @@ class Game(DefaultManager):
         if self.pnj_manager.mode is None:
             self.player_controller.event(pygame.key.get_pressed())
 
-    def update(self):
-        """Met à jour le jeu."""
-
-        # -- Réseau --
+    def reseau(self):
         if self.network is not None:
 
             if isinstance(self.player_controller, HostController):
@@ -606,9 +634,16 @@ class Game(DefaultManager):
             # Si l'hôte quitte alors fermeture totale
             elif self.network.is_closed():
                 self.close_game()
-                self.reset()
+                if self.playing_mode != "guest":
+                    self.reset()
                 self.manager.change_state("MENU_P")
                 return
+
+    def update(self):
+        """Met à jour le jeu."""
+
+        # -- Réseau --
+        self.reseau()
 
         # -- Map --
         self.map.update(self.get_position_target())
@@ -619,9 +654,12 @@ class Game(DefaultManager):
 
         # -- Ennemis --
         self.paths = self.map.update_ennemis()
+        """for ennemi in self.ennemis.values():
+            print(ennemi.death_time, time.time())"""
         # Guest : gerer dans update_ennemis_guest() et appeler via update_variables_guest
 
         # PNJ
+        old_max_pv_bonus = self.permanent_max_pv_bonus
         self.pnj_manager.set_inventaire(self.inv_joueur, self.money)
         self.pnj_manager.update(
             (
@@ -631,6 +669,15 @@ class Game(DefaultManager):
             self.manager.clock.get_time(),
         )
         self.money = self.pnj_manager.money
+        self.permanent_xp = self.pnj_manager.permanent_xp
+        self.permanent_max_pv_bonus = self.pnj_manager.permanent_max_pv_bonus
+
+        # Mise à jour des permanent_max_pv_bonus
+        delta = self.permanent_max_pv_bonus - old_max_pv_bonus
+        if delta > 0:
+            self.player_controller.max_pv += delta
+            self.player_controller.pv = self.player_controller.max_pv
+            self.hud.max_pv = self.player_controller.max_pv
 
         # -- Particules --
         self.update_particles()
@@ -653,6 +700,8 @@ class Game(DefaultManager):
         if player_controller == self.player_controller:
             self.ennemis = self.map.get_ennemis()
             self.pnj_manager = self.map.get_pnjs()
+            self.pnj_manager.permanent_xp = self.permanent_xp
+            self.pnj_manager.permanent_max_pv_bonus = self.permanent_max_pv_bonus
             self.camera.map_width = self.map.size[0] * self.map.tile_size[0]
             self.camera.map_height = self.map.size[1] * self.map.tile_size[1]
         elif isinstance(self.player_controller, HostController):
@@ -679,7 +728,6 @@ class Game(DefaultManager):
 
     def update_particles(self):
         if len(self.particles) < 50:  # Limite pour les performances
-
             # On récupère les coordonnées du monde actuellement à l'écran
             # On prend une marge de 100 pixels pour que les particules
             # n'apparaissent pas "magiquement" sur le bord
@@ -711,31 +759,84 @@ class Game(DefaultManager):
             )
         self.particles.update(self.manager.clock.get_time() / 1000)
 
+    def _draw_decor(self, args: Tuple[pygame.Surface, Tuple[int, int]]):
+        self.screen.blit(args[0], args[1])
+
     def display(self):
         """Affiche tout les éléments."""
         # -- Reset --
         self.screen.fill((32, 35, 32))
 
-        # -- Map --
+        # -- Map -- affiche uniquement le sol !
         self.map.display(self.camera)
 
-        # -- Joueur --
-        self.player_controller.display()
+        # -- Entités triées par Painter's Algorithm --
+        drawables = []
+
+        # -- Objets de décor --
+        for (
+            world_bottom_y,
+            surface,
+            (world_x, world_y),
+        ) in self.map.get_visible_objects():
+            screen_x = world_x + self.camera.camera.x + self.camera.offset_x
+            screen_y = world_y + self.camera.camera.y + self.camera.offset_y
+            drawables.append(
+                (world_bottom_y, self._draw_decor, (surface, (screen_x, screen_y)))
+            )
+
+        # -- Players --
+        pc = self.player_controller
+        if not pc.is_dead:
+            drawables.append((pc.hitbox.bottom, PlayerControllerBase.display, pc))
+        partner = None
+        if (
+            isinstance(pc, HostController)
+            and not pc.guest.is_dead
+            and pc.current_map == pc.guest.current_map
+        ):
+            partner = pc.guest
+        elif (
+            isinstance(pc, GuestController)
+            and not pc.host.is_dead
+            and pc.current_map == pc.host.current_map
+        ):
+            partner = pc.host
+        if partner:
+            drawables.append(
+                (partner.hitbox.bottom, PlayerControllerBase.display, partner)
+            )
 
         # -- Ennemis --
         for ennemi in self.map.ennemis.values():
-            ennemi.display()
-
-        """ # -- Particules --
-        for sprite in self.particles:
-            self.screen.blit(sprite.image, self.camera.apply(sprite.rect))"""
+            if ennemi.hitbox:
+                drawables.append((ennemi.hitbox.bottom, Ennemi.display, ennemi))
 
         # -- PNJ --
-        self.pnj_manager.draw_pnj()
+        screen_rect = pygame.Rect(
+            0, 0, self.screen.get_width(), self.screen.get_height()
+        )
+        for pnj in self.pnj_manager.pnjs:
+            screen_hitbox = self.camera.apply(pnj.hitbox)
+            if screen_rect.colliderect(screen_hitbox):
+                drawables.append((pnj.hitbox.bottom, self.pnj_manager.draw_pnj, pnj))
+
+        # Tri et rendu
+        for _, fn, entity in sorted(drawables, key=lambda x: x[0]):
+            fn(entity)
+
+        # Puis on affiche par dessus toute les entitées ceci :
+
+        # -- Bulle [E] PNJ (toujours au-dessus) --
+        self.pnj_manager.draw_pnj_bubble()
 
         # -- F2 : TOUTES les hitboxes --
         if self.show_hitbox:
             self.draw_debug_hitboxes()
+
+        # -- Particules --
+        for sprite in self.particles:
+            self.screen.blit(sprite.image, self.camera.apply(sprite.rect))
 
         # -- Inventaire -- seulement si pas d'UI PNJ
         if self.pnj_manager.mode is None:
@@ -744,8 +845,52 @@ class Game(DefaultManager):
         # -- PNJ UI --
         self.pnj_manager.draw_ui(pygame.mouse.get_pos())
 
+        # -- XP Hub --
+        self.draw_xp_hub()
+
         # -- HUD --
-        self.hud.draw()
+        if self.pnj_manager.mode == "amelioration":
+            bonus = (
+                self.pnj_manager.upgrade_ui.max_pv_bonus - self.permanent_max_pv_bonus
+            )
+            self.hud.draw(
+                pv=self.player_controller.pv + bonus,
+                max_pv=self.player_controller.max_pv + bonus,
+            )
+        else:
+            self.hud.draw()
+
+    def draw_xp_hub(self):
+        """Affiche l'XP permanente en bas à droite — Hub uniquement."""
+        if not isinstance(self.map.map, Hub):
+            return
+
+        # Lecture en temps réel si l'UI d'amélioration est ouverte
+        if self.pnj_manager.mode == "amelioration":
+            xp = self.pnj_manager.upgrade_ui.xp
+            bonus = self.pnj_manager.upgrade_ui.max_pv_bonus
+        else:
+            xp = self.permanent_xp
+            bonus = self.permanent_max_pv_bonus
+
+        lines = [
+            (f"XP  {xp}", (255, 215, 0)),
+            (f"PV Max  +{bonus}", (100, 220, 100)),
+        ]
+        margin, pad_x, pad_y, gap = 12, 10, 6, 4
+        rendered = [self.font_xp.render(t, True, c) for t, c in lines]
+        w = max(s.get_width() for s in rendered) + pad_x * 2
+        h = sum(s.get_height() for s in rendered) + pad_y * 2 + gap
+        x = self.screen.get_width() - w - margin
+        y = self.screen.get_height() - h - margin
+        bg = pygame.Surface((w, h), pygame.SRCALPHA)
+        pygame.draw.rect(bg, (14, 14, 26, 210), (0, 0, w, h), border_radius=7)
+        pygame.draw.rect(bg, (180, 150, 0, 200), (0, 0, w, h), width=1, border_radius=7)
+        self.screen.blit(bg, (x, y))
+        cy = y + pad_y
+        for surf in rendered:
+            self.screen.blit(surf, (x + pad_x, cy))
+            cy += surf.get_height() + gap
 
     def draw_debug_hitboxes(self):
         """
@@ -875,49 +1020,142 @@ class Game(DefaultManager):
     # Sauvegarde et reset
 
     def reset(self):
-        self.playing_mode = None
-        self.player_controller = None
-        self.game_name = "tt"
 
-        # -- Raccourcis --
-        self.keybinds = {
-            "up": pygame.K_UP,
-            "down": pygame.K_DOWN,
-            "left": pygame.K_LEFT,
-            "right": pygame.K_RIGHT,
-            "attack": pygame.K_SPACE,
-        }
+        # ajoute l'exp gagner et reset les stats pour la prochaine partie
+        self.permanent_xp += self.run_stats.xp_gained
+        self.run_stats.reset()
 
-        # -- Camera --
-        width, height = self.screen.get_size()
-        self.camera = Camera(width, height, 0, 0)
+        # -- Controlleur --
+        if self.playing_mode == "solo":
+            self.seed = randint(0, 999999)
+            self.map.reset(
+                self.camera, 7, self.nb_chunks, self.chunk_size, self.octaves, self.seed
+            )
 
-        # -- HUD --
-        self.hud = HUD(self.screen, self.camera)
+            # Mise à jour de la caméra avec les nouvelles dimensions
+            sizes = [m.size for m in self.map.maps.values()]
+            self.camera.map_width = max(s[0] for s in sizes) * self.map.tile_size[0]
+            self.camera.map_height = max(s[1] for s in sizes) * self.map.tile_size[1]
+            self.camera.set_position(self.map.start_position)
+
+            # Respawn le joueur dans le hub
+            self.player_controller = SoloPlayerController(
+                self.screen, self.camera, self.moteur, self.map.start_position
+            )
+            self.player_controller.current_map = self.map.map
+
+            # HUD
+            self.hud.player_controller = self.player_controller
+            self.player_controller.max_pv += self.permanent_max_pv_bonus
+            self.player_controller.pv = self.player_controller.max_pv
+            self.hud.max_pv = self.player_controller.max_pv
+            self.hud.pv = self.player_controller.pv
+
+            # PNJ
+            self.pnj_manager = self.map.get_pnjs()
+            self.pnj_manager.permanent_xp = self.permanent_xp
+            self.pnj_manager.permanent_max_pv_bonus = self.permanent_max_pv_bonus
+
+        elif self.playing_mode == "host":
+            self.seed = randint(0, 999999)
+            self.map.reset(
+                self.camera, 7, self.nb_chunks, self.chunk_size, self.octaves, self.seed
+            )
+
+            # Mise à jour de la caméra avec les nouvelles dimensions
+            sizes = [m.size for m in self.map.maps.values()]
+            self.camera.map_width = max(s[0] for s in sizes) * self.map.tile_size[0]
+            self.camera.map_height = max(s[1] for s in sizes) * self.map.tile_size[1]
+            self.camera.set_position(self.map.start_position)
+
+            # Respawn des deux joueurs dans le hub (première map = hub)
+            hub_start = self.map.start_position
+            self.player_controller = HostController(
+                self.screen, self.camera, self.moteur, hub_start
+            )
+            self.player_controller.guest.position.update(
+                hub_start[0] + RESPAWN_OFFSET, hub_start[1]
+            )
+            self.player_controller.guest.hitbox.center = (
+                self.player_controller.guest.position
+            )
+            self.player_controller.guest.hitbox_damage.midbottom = (
+                self.player_controller.guest.position
+            )
+            self.player_controller.current_map = self.map.map
+
+            # HUD
+            self.hud.player_controller = self.player_controller
+            self.player_controller.max_pv += self.permanent_max_pv_bonus
+            self.player_controller.pv = self.player_controller.max_pv
+            self.hud.max_pv = self.player_controller.max_pv
+            self.hud.pv = self.player_controller.pv
+
+            # PNJ
+            self.pnj_manager = self.map.get_pnjs()
+            self.pnj_manager.permanent_xp = self.permanent_xp
+            self.pnj_manager.permanent_max_pv_bonus = self.permanent_max_pv_bonus
+
+            # Envoie la nouvelle map au guest via le slot prioritaire :
+            # send_reset() garantit que ce paquet sera transmis exactement une
+            # fois par le thread TCP, sans risque d'être écrasé par un frame
+            # de jeu normal avant d'avoir été lu.
+            if self.network is not None:
+                self.network.send_reset(
+                    self.get_to_send_data_host(include_map=True, reset=True)
+                )
+            self.player_controller.guest.position.x += 20
+
+        elif self.playing_mode == "guest":
+
+            # Récupération de la nouvelle map envoyée par l'hôte
+            map_data = self.network.get_map_data()
+            self.map.close_map()
+            self.map = MapManager.create_map(self.screen, self, self.camera, map_data)
+            self.moteur.map = self.map
+
+            # Mise à jour de la caméra avec les nouvelles dimensions
+            sizes = [m.size for m in self.map.maps.values()]
+            self.camera.map_width = max(s[0] for s in sizes) * self.map.tile_size[0]
+            self.camera.map_height = max(s[1] for s in sizes) * self.map.tile_size[1]
+            self.camera.set_position(self.map.start_position)
+
+            # Respawn dans le hub
+            hub_start = self.map.start_position
+            guest_start = (hub_start[0] + RESPAWN_OFFSET, hub_start[1])
+
+            self.player_controller = GuestController(
+                self.screen, self.camera, self.moteur, guest_start
+            )
+            self.player_controller.host.position.update(hub_start)
+            self.player_controller.host.hitbox.center = hub_start
+            self.player_controller.host.hitbox_damage.midbottom = hub_start
+            self.player_controller.current_map = self.map.map
+
+            # HUD
+            self.hud.player_controller = self.player_controller
+            self.player_controller.max_pv += self.permanent_max_pv_bonus  # ← ajoute
+            self.player_controller.pv = self.player_controller.max_pv  # ← ajoute
+            self.hud.max_pv = self.player_controller.max_pv
+            self.hud.pv = self.player_controller.pv
+
+            # PNJ
+            self.pnj_manager = self.map.get_pnjs()
+            self.pnj_manager.permanent_xp = self.permanent_xp
+            self.pnj_manager.permanent_max_pv_bonus = self.permanent_max_pv_bonus
+
+        # -- Keybinds --
+        self.player_controller.keybinds = self.keybinds
+
+        # -- Ennemis -- (vider les références à l'ancienne map)
+        self.ennemis = {}
+        self.paths = [[]]
 
         # -- Particules --
         self.particles = pygame.sprite.Group()
 
         # -- F2 --
         self.show_hitbox = False
-
-        # -- Map --
-        self.map: MapManager = None
-        self.nb_chunks = (8, 8)
-        self.chunk_size = (32, 32)
-        self.octaves = (8, 8)
-        self.seed = 0
-
-        # -- Moteur --
-        self.moteur: Moteur = None
-
-        # -- Ennemis --
-        self.paths = [[]]
-        self.ennemis: Dict[int, Ennemi] = {}
-
-        # -- Réseau --
-        self.address = "0.0.0.0"
-        self.port = 8888
 
         # -- Mort / Spectateur --
         self.spectate_start = None
@@ -934,13 +1172,6 @@ class Game(DefaultManager):
             is_visible=False,
         )
         self.drag_mgr = InventaireManager(self.screen, [self.ui_joueur])
-
-        # Items de départ :
-        self.inv_joueur.add_item(Item.create("Potion Rouge", 3))
-
-        # PNJ :
-        self.pnj_manager = PNJManager(self.screen, self.camera)
-        self.money: int = 500
 
     def save(self, file: str | None = "save.json"):
 
@@ -978,3 +1209,242 @@ class Game(DefaultManager):
 
         self.game_name = data["game_name"]
         self.playing_mode = data["playing_mode"]
+
+
+"""
+Code sur les Stats de la partie et le RecapScreen quand on meurt
+"""
+
+XP_PER_KILL = 10
+XP_PER_CHEST = 25
+XP_PER_BOSS = 100
+GUEST_TIMEOUT_S = 60
+
+
+class RunStats:
+    """Statistiques collectées pendant une run. Remise à zéro à chaque nouvelle partie."""
+
+    def __init__(self):
+        self.reset()
+
+    def update_xp_gained(self):
+        self.xp_gained = (
+            self.enemies_killed * XP_PER_KILL
+            + self.boss_killed * XP_PER_BOSS
+            + self.chests_opened * XP_PER_CHEST
+        )
+
+    def reset(self):
+        self.enemies_killed = 0
+        self.boss_killed = 0
+        self.chests_opened = 0
+        self.xp_gained = 0
+
+
+class RecapScreen:
+    """
+    Écran récapitulatif de fin de run.
+
+    Interface identique à DefaultManager (event / update / display / set_screen)
+    sans héritage pour éviter la dépendance circulaire avec main.py.
+    """
+
+    def __init__(self, screen: pygame.Surface, manager: "Manager"):
+        self.screen = screen
+        self.larg, self.haut = self.screen.get_size()
+        self.manager = manager
+
+        self.stats = RunStats()
+        self.guest_btn_clicked = False  # seulement pour le guest pour l'affichage
+        self.time = 0.0
+        self.btn_close_hovered = False
+
+        # si True alors on est GAME_OVER sinon on est au RECAP
+        self.phase = True
+
+        self.f_death = pygame.font.SysFont("segoeui", 90, bold=True)
+        self.f_title = pygame.font.SysFont("segoeui", 34, bold=True)
+        self.f_stat = pygame.font.SysFont("segoeui", 22)
+        self.f_xp = pygame.font.SysFont("segoeui", 28, bold=True)
+        self.f_btn = pygame.font.SysFont("segoeui", 20, bold=True)
+
+        self.btn_rect = pygame.Rect(
+            self.larg // 2 - 155,
+            self.haut // 2 + 168,
+            310,
+            48,
+        )
+
+    def set_screen(self, screen: pygame.Surface):
+        self.screen = screen
+        self.larg, self.haut = self.screen.get_size()
+        self.btn_rect = pygame.Rect(
+            self.larg // 2 - 155,
+            self.haut // 2 + 168,
+            310,
+            48,
+        )
+
+    def start(self, run_stats: RunStats):
+        run_stats.update_xp_gained()
+        self.stats = run_stats
+        self.guest_btn_clicked = False
+        self.time = 0.0
+        self.phase = True
+
+    def return_HUB(self):
+
+        if self.manager.states["GAME"].playing_mode == "guest":
+            self.guest_btn_clicked = True
+        else:
+            self.manager.states["GAME"].reset()
+            self.manager.change_state("GAME")
+
+    def event(self, events: list[pygame.event.Event]):
+        mouse = pygame.mouse.get_pos()
+        self.btn_close_hovered = self.phase == False and self.btn_rect.collidepoint(
+            mouse
+        )
+
+        for event in events:
+            if event.type == pygame.QUIT:
+                self.manager.running = False
+
+            if self.phase == False:
+                pressed_key = event.type == pygame.KEYDOWN and (
+                    event.key == pygame.K_RETURN or event.key == pygame.K_ESCAPE
+                )
+                pressed_btn = (
+                    event.type == pygame.MOUSEBUTTONDOWN
+                    and event.button == 1
+                    and self.btn_close_hovered
+                )
+                if pressed_key or pressed_btn:
+                    self.return_HUB()
+
+    def update(self):
+        self.time += self.manager.clock.get_time() / 1000.0
+        game = self.manager.states["GAME"]
+
+        if self.phase == True:
+            game.update()
+            if self.time >= 3:
+                if self.time >= 4:  # on attend 1s de plus
+                    self.phase = False
+                    self.time = 0.0
+        else:
+            if game.playing_mode in ("host", "guest") and game.network is not None:
+                game.reseau()
+
+    def display(self):
+        self.manager.states["GAME"].display()
+
+        if self.phase == True:
+            # PHASE DE GAME_OVER
+
+            progress = min(self.time / 3, 1.0)
+            overlay_alpha = int(200 * progress)
+            overlay = pygame.Surface((self.larg, self.haut))
+            overlay.fill((8, 8, 18))
+            overlay.set_alpha(overlay_alpha)
+            self.screen.blit(overlay, (0, 0))
+
+            text_progress = max(0.0, (progress - 0.1) / 0.9)
+            if text_progress > 0:
+                text_alpha = int(255 * text_progress)
+                surf = self.f_death.render("GAME OVER", True, (220, 60, 60))
+                surf.set_alpha(text_alpha)
+                self.screen.blit(
+                    surf,
+                    (
+                        self.larg // 2 - surf.get_width() // 2,
+                        self.haut // 2 - surf.get_height() // 2,
+                    ),
+                )
+        else:
+            # PHASE DE RECAP
+            overlay = pygame.Surface((self.larg, self.haut), pygame.SRCALPHA)
+            overlay.fill((8, 8, 18, 200))
+            self.screen.blit(overlay, (0, 0))
+
+            # Affiche le Panel
+            pw, ph = 440, 310
+            px = self.larg // 2 - pw // 2
+            py = self.haut // 2 - ph // 2 - 44
+
+            surf = pygame.Surface((pw, ph), pygame.SRCALPHA)
+            pygame.draw.rect(surf, (14, 14, 26, 245), (0, 0, pw, ph), border_radius=12)
+            pygame.draw.rect(
+                surf, (70, 70, 115, 255), (0, 0, pw, ph), width=2, border_radius=12
+            )
+            self.screen.blit(surf, (px, py))
+
+            cx = self.larg // 2
+            y = py + 22
+
+            title = self.f_title.render("Run terminée !", True, (230, 210, 160))
+            self.screen.blit(title, (cx - title.get_width() // 2, y))
+            y += title.get_height() + 18
+
+            pygame.draw.line(self.screen, (55, 55, 95), (px + 20, y), (px + pw - 20, y))
+            y += 16
+
+            rows = (
+                ("Ennemis éliminés", self.stats.enemies_killed),
+                ("Boss éliminés", self.stats.boss_killed),
+                ("Coffres ouverts", self.stats.chests_opened),
+            )
+            for label, value in rows:
+                lbl = self.f_stat.render(label, True, (200, 200, 215))
+                val = self.f_stat.render(str(value), True, (85, 195, 215))
+                self.screen.blit(lbl, (px + 24, y))
+                self.screen.blit(val, (px + pw - val.get_width() - 24, y))
+                y += lbl.get_height() + 12
+
+            y += 4
+            pygame.draw.line(self.screen, (55, 55, 95), (px + 20, y), (px + pw - 20, y))
+            y += 14
+
+            xp_l = self.f_xp.render("XP Gagnée", True, (255, 210, 60))
+            xp_v = self.f_xp.render(f"+{self.stats.xp_gained}", True, (255, 230, 100))
+            self.screen.blit(xp_l, (px + 24, y))
+            self.screen.blit(xp_v, (px + pw - xp_v.get_width() - 24, y))
+
+            # Affiche le bouton "Continuer"
+            mode = self.manager.states["GAME"].playing_mode
+            waiting_for_host = mode == "guest" and self.guest_btn_clicked
+
+            label = (
+                f"En attente de l'hôte{'.' * (int(self.time * 2) % 4)}"
+                if waiting_for_host
+                else "Continuer  →"
+            )
+            enabled = not waiting_for_host
+            btn = self.btn_rect
+            hovered = self.btn_close_hovered and enabled
+
+            s = pygame.Surface((btn.width, btn.height), pygame.SRCALPHA)
+            pygame.draw.rect(
+                s,
+                (55, 85, 155, 220) if hovered else (22, 22, 44, 200),
+                (0, 0, btn.width, btn.height),
+                border_radius=8,
+            )
+            pygame.draw.rect(
+                s,
+                (120, 150, 225, 255) if hovered else (50, 50, 95, 255),
+                (0, 0, btn.width, btn.height),
+                width=2,
+                border_radius=8,
+            )
+            self.screen.blit(s, btn.topleft)
+
+            col = (240, 240, 255) if enabled else (100, 100, 140)
+            ts = self.f_btn.render(label, True, col)
+            self.screen.blit(
+                ts,
+                (
+                    btn.x + (btn.width - ts.get_width()) // 2,
+                    btn.y + (btn.height - ts.get_height()) // 2,
+                ),
+            )

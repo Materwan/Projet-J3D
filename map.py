@@ -30,6 +30,8 @@ TILESET_DIRECTORY = resource_path(r"Ressources\TileSet")
 TILEMAP_DIRECTORY = resource_path(r"Ressources\TileMap")
 DUNGEON_TILEMAP_DIRECTORY = resource_path(r"Ressources\TileMap")
 
+YSORT_TYPES = {"tree", "bush", "rock"}
+
 
 def get_dungeon_tiles(
     tmx_filepath,
@@ -412,6 +414,57 @@ class Chunk:
 
         ground_sur.blit(asset_sur, (0, 0))
         return ground_sur
+
+    def render_ground(self) -> pygame.Surface:
+        """Pre-render sol + tous les objets NON Y-sortés — mis en cache."""
+        ground_sur = pygame.Surface(
+            (self.chunk_size + 5) * self.tile_size, pygame.SRCALPHA
+        )
+        blit_sequence = [
+            (
+                self.asset["ground"]["image"],
+                (x * self.tile_size[0], y * self.tile_size[1]),
+            )
+            for x, y in zip(*np.where(self.ground))
+        ]
+        ground_sur.blits(blit_sequence)
+
+        for obj in sorted(self.object, key=lambda o: o["z"]):
+            if obj["type"] in YSORT_TYPES:
+                continue  # sera géré par le Y-sort
+            asset = self.asset[obj["type"]]
+            surface = (
+                asset["image"]
+                if obj["variant"] == -1
+                else asset[obj["variant"]]["image"]
+            )
+            ground_sur.blit(
+                surface, (obj["x"] * self.tile_size[0], obj["y"] * self.tile_size[1])
+            )
+
+        return ground_sur
+
+    def get_objects_surfaces(
+        self, chunk_world_x: int, chunk_world_y: int
+    ) -> List[Tuple[int, pygame.Surface, Tuple[int, int]]]:
+        """Retourne uniquement les objets Y-sortables (arbres, buissons, rochers)."""
+        result = []
+        for obj in self.object:
+            if obj["type"] not in YSORT_TYPES:
+                continue
+            asset = self.asset[obj["type"]]
+            surface = (
+                asset["image"]
+                if obj["variant"] == -1
+                else asset[obj["variant"]]["image"]
+            )
+
+            world_x = chunk_world_x + obj["x"] * self.tile_size[0]
+            world_y = chunk_world_y + obj["y"] * self.tile_size[1]
+            world_bottom_y = world_y + surface.get_height()
+
+            result.append((world_bottom_y, surface, (world_x, world_y)))
+        return result
 
 
 class DungeonRoom:
@@ -1122,19 +1175,9 @@ class Map(BaseMap):
                     )
 
     def _load_chunks(self):
-        """Charge les chunks au alentour d'un joueur, dans un thread parallèle."""
         while self.load_chunk_running:
-            if (
-                self.load_chunk_event.is_set()
-                and self.size[0] != 0
-                and self.size[1] != 0
-            ):
+            if self.load_chunk_event.is_set() and self.size[0] != 0:
                 abs_position = np.array(self.load_chunk_position, dtype=np.int32)
-                if not np.less(abs_position, self.size * self.chunk_size_pix).all():
-                    raise ValueError(f"La position fourni n'est pas dans la carte,\
-                        position = {abs_position},\
-                        taille map = {self.size * self.chunk_size_pix}.")
-
                 chunk = abs_position // self.chunk_size_pix
 
                 for x in range(chunk[0] - 2, chunk[0] + 3):
@@ -1142,9 +1185,11 @@ class Map(BaseMap):
                         if (
                             0 <= x < self.nb_chunks[0]
                             and 0 <= y < self.nb_chunks[1]
-                            and not (x, y) in self.loaded_chunks
+                            and (x, y) not in self.loaded_chunks
                         ):
-                            self.loaded_chunks[(x, y)] = self.chunks[(x, y)].render()
+                            self.loaded_chunks[(x, y)] = self.chunks[
+                                (x, y)
+                            ].render_ground()
 
                 valid = {
                     (x, y)
@@ -1159,6 +1204,16 @@ class Map(BaseMap):
                 self.load_chunk_event.clear()
             else:
                 time.sleep(0.5)
+
+    def get_visible_objects(self) -> List[Tuple[int, pygame.Surface, Tuple[int, int]]]:
+        result = []
+        for cx, cy in list(self.loaded_chunks):  # snapshot des clés
+            if (cx, cy) not in self.loaded_chunks:
+                continue  # chunk déchargé entre-temps
+            world_x = cx * self.chunk_size_pix[0]
+            world_y = cy * self.chunk_size_pix[1]
+            result.extend(self.chunks[(cx, cy)].get_objects_surfaces(world_x, world_y))
+        return result
 
     def _trigger_load_chunk(self, absolute_position: Tuple[int, int]):
         """Dit au thread de calculer les nouveau chunks."""
@@ -1192,6 +1247,7 @@ class Map(BaseMap):
                 del_key.append(key)
 
         for key in del_key:
+            self.game.run_stats.enemies_killed += 1
             del self.ennemis[key]
 
         if self.game.player_controller.attaque_rect is not None:
@@ -1228,6 +1284,7 @@ class Map(BaseMap):
                 del_key.append(key)
 
         for key in del_key:
+            self.game.run_stats.enemies_killed += 1
             del self.ennemis[key]
 
         if self.game.player_controller.attaque_rect is not None:
@@ -1256,6 +1313,7 @@ class Map(BaseMap):
                 del_key.append(key)
 
         for key in del_key:
+            self.game.run_stats.enemies_killed += 1
             del self.ennemis[key]
             if key in self.game.ennemis.keys():
                 self.game.ennemis.pop(key)
@@ -2034,6 +2092,49 @@ class MapManager(BaseMap):
         else:
             self.map = None
 
+    def reset(
+        self,
+        camera: Camera,
+        nb_dungeons: int,
+        nb_chunks: Tuple[int, int],
+        chunk_size: Tuple[int, int],
+        octaves: Tuple[int, int],
+        seed: int,
+    ):
+        self.maps["principal_map"].load_chunk_running = False
+        self.maps["principal_map"].load_chunk_event.set()
+        keys = list(self.maps.keys())
+        keys.remove("hub")
+        for key in keys:
+            self.maps.pop(key)
+
+        map_data = {
+            "principal_map": {
+                "type": "map",
+                "nb_dungeons": nb_dungeons,
+                "nb_chunks": nb_chunks,
+                "chunk_size": chunk_size,
+                "octaves": octaves,
+                "seed": seed,
+                "pnj": [
+                    {"name": "Vieux Taupier", "position": [3800, 3800]},
+                    {"name": "Marchande Isabelle", "position": [4000, 3800]},
+                    {"name": "Forgeron Otto", "position": [4200, 3800]},
+                ],
+            },
+        }
+        for i in range(nb_dungeons):
+            map_data[f"dungeon{i}"] = {"type": "dungeon", "nb_rooms": 20, "pnj": []}
+
+        for name, map in map_data.items():
+            self.maps[name] = TYPE_STR[map["type"]].create_map(
+                self.screen, self.game, camera, map
+            )
+
+        self.initialize_var()
+
+        self.change_map("hub")
+
     @staticmethod
     def generate_maps(
         screen: pygame.Surface,
@@ -2048,7 +2149,7 @@ class MapManager(BaseMap):
         prams = {
             "hub": {
                 "type": "hub",
-                "pnj": [{"name": "Vieux Taupier", "position": [272, 256]}],
+                "pnj": [{"name": "Archiviste des Ames", "position": [272, 256]}],
             },
             "principal_map": {
                 "type": "map",
@@ -2086,6 +2187,39 @@ class MapManager(BaseMap):
 
         temp.initialize_var()
         return temp
+
+    def reset(
+        self,
+        camera: Camera,
+        nb_dungeons: int,
+        nb_chunks: Tuple[int, int],
+        chunk_size: Tuple[int, int],
+        octaves: Tuple[int, int],
+        seed: int,
+    ):
+        """Ferme toutes les cartes existantes et génère un nouveau monde.
+        Après le reset, la carte active est le hub (première entrée du dict maps).
+        """
+        self.close_map()
+        self.maps.clear()
+
+        new_manager = MapManager.generate_maps(
+            self.screen,
+            self.game,
+            camera,
+            nb_dungeons,
+            nb_chunks,
+            chunk_size,
+            octaves,
+            seed,
+        )
+
+        self.maps = new_manager.maps
+        self.map_name = new_manager.map_name
+        self.initialize_var()
+
+        # Met à jour le moteur avec la nouvelle map
+        self.game.moteur.map = self
 
     def close_map(self):
         for map in self.maps.values():
@@ -2148,6 +2282,9 @@ class MapManager(BaseMap):
     def display(self, camera: Camera):
 
         self.map.display(camera)
+
+    def get_visible_objects(self):
+        return self.map.get_visible_objects() if isinstance(self.map, Map) else []
 
 
 if __name__ == "__main__":

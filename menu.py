@@ -700,6 +700,7 @@ class Join_Multi_Menu(Menu):
                 self.screen,
                 (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 200 + count * 150),
                 self.rejoindre,
+                text=serveur,
             )
             self.list_button.append(button)
             count += 1
@@ -714,7 +715,7 @@ class Join_Multi_Menu(Menu):
                 self.manager.change_state("MENU_PLAY")
         self.retour.event(events, coord, "MENU_PLAY")
         for elt in self.list_button:
-            elt.event(events, coord, elt.text)
+            elt.event(events, coord, elt.text.to_display_text)
 
     def update(self):
         pass
@@ -766,7 +767,6 @@ class Pause_Menu(Menu):
             if isinstance(game.player_controller, GuestController):
                 game._send_close_and_disconnect()
             game.close_game()
-            game.reset()
             self.manager.change_state("MENU_P")
 
         # =======================Function Button End=======================
@@ -1066,13 +1066,13 @@ class Death_Screen(Menu):
                 self.manager.running = False
             if event.type == p.KEYDOWN or event.type == p.MOUSEBUTTONDOWN:
                 # TEMPO car il faudra envoyer vers le HUB
-                if isinstance(
+                """if isinstance(
                     self.manager.states["GAME"].player_controller, GuestController
                 ):
                     self.manager.states["GAME"]._send_close_and_disconnect()
-                self.manager.states["GAME"].close_network()
+                self.manager.states["GAME"].close_network()"""
                 self.manager.states["GAME"].reset()
-                self.manager.change_state("MENU_P")
+                self.manager.change_state("GAME")
 
     def update(self):
         pass

@@ -149,6 +149,17 @@ pnj_dic: dict[str, dict] = {
             },
         ],
     },
+    # =========================================================================
+    # PNJ : UPGRADE
+    # =========================================================================
+    "Archiviste des Ames": {
+        "pnj_type": "Upgrade",
+        "image_path": "Ressources/Animations/PNJ/PNJ_1/",
+        "dialogues": ["L'experience forge l'ame... Je peux renforcer la votre."],
+        "interaction_radius": 100,
+        "stock": None,
+        "quests": None,
+    },
 }
 
 
@@ -329,6 +340,8 @@ class MenuInteractionUI(PnjPanelUI):
             self.options.append("Échanger")
         elif pnj.pnj_type == "Quest" and pnj.quest_etat != "terminee":
             self.options.append("Quête")
+        elif pnj.pnj_type == "Upgrade":
+            self.options.append("Ameliorer")
         self.options.append("Quitter")
 
         # crée la liste des rects
@@ -765,6 +778,218 @@ class BoutiqueUI(PnjPanelUI):
             )
 
 
+class UpgradeUI(PnjPanelUI):
+    """Interface d'amélioration permanente — un seul upgrade, prix croissant."""
+
+    def __init__(self, screen: pygame.Surface, largeur: int, hauteur: int):
+        super().__init__(screen, largeur, hauteur)
+        self.xp: int = 0
+        self.max_pv_bonus: int = 0
+        self.msg_text = ""
+        self.msg_color = (130, 220, 100)
+        self.msg_timer = 0.0
+        self.msg_duration = 2500.0
+        self.panel_hauteur = 225
+        self.build_rects()
+
+    def build_rects(self):
+        self.rect = pygame.Rect(
+            self.x,
+            self.hauteur - self.panel_hauteur - 30,
+            self.larg,
+            self.panel_hauteur,
+        )
+
+        portrait_x = self.x + 10
+        portrait_y = self.rect.y + 44 + 4
+        portrait_h = self.rect.bottom - portrait_y
+        self.portrait_rect = pygame.Rect(portrait_x, portrait_y, 105, portrait_h)
+
+        buy_x = portrait_x + 105 + 10 * 2 + 2
+        self.buy_rect = pygame.Rect(
+            buy_x,
+            self.rect.y + 58,
+            self.rect.right - 20 - buy_x,
+            68,
+        )
+
+        cx = self.rect.x + self.rect.width // 2
+        btn_y = self.rect.y + self.panel_hauteur - 48
+        self.btn_close = pygame.Rect(cx - 75, btn_y, 150, 34)
+
+    def set_screen(self, screen: pygame.Surface, larg, haut):
+        self.screen = screen
+        self.largeur, self.hauteur = larg, haut
+        self.larg = self.largeur - 50
+        self.build_rects()
+
+    def upgrade_cost(self, n):
+        """Coût du (n+1)-ième PV Max.
+        n=0:10  n=1:50  n=2:120  n=3:220  n=4:350  n=5:510  n=6:700 ..."""
+        return 10 + n * 40 + n * (n - 1) * 15
+
+    def open(self, pnj: PNJ, xp: int, max_pv_bonus: int):
+        self.pnj = pnj
+        self.xp = xp
+        self.max_pv_bonus = max_pv_bonus
+        self.msg_timer = 0.0
+
+    def print_msg(self, text: str, color=(130, 220, 100)):
+        self.msg_text = text
+        self.msg_timer = self.msg_duration
+        self.msg_color = color
+
+    def buy(self):
+        cost = self.upgrade_cost(self.max_pv_bonus)
+        if self.xp < cost:
+            self.print_msg("Pas assez d'XP !", (220, 80, 80))
+            return
+        self.xp -= cost
+        self.max_pv_bonus += 1
+        self.print_msg(
+            f"PV Max augmente ! (total : +{self.max_pv_bonus})", (130, 220, 100)
+        )
+
+    def handle_event(self, event: pygame.event.Event, mouse_pos: tuple) -> bool:
+        if event.type == pygame.KEYDOWN and event.key in (pygame.K_e, pygame.K_ESCAPE):
+            return True
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.btn_close.collidepoint(mouse_pos):
+                return True
+            if self.buy_rect.collidepoint(mouse_pos):
+                self.buy()
+        return False
+
+    def update(self, dt: float):
+        if self.msg_timer > 0:
+            self.msg_timer -= dt
+
+    def draw(self, mouse_pos: tuple):
+        cost = self.upgrade_cost(self.max_pv_bonus)
+        can_afford = self.xp >= cost
+        close_hovered = self.btn_close.collidepoint(mouse_pos)
+        row_hovered = self.buy_rect.collidepoint(mouse_pos)
+
+        # Panel
+        self.draw_panel(pygame.Rect(self.x, self.rect.y, self.larg, self.rect.height))
+
+        # Portrait PNJ
+        if self.pnj:
+            self.draw_portrait(self.pnj, self.portrait_rect)
+
+        # Titre
+        title = self.font_titre.render(
+            "Boutique d'amélioration permanente", True, (230, 210, 160)
+        )
+        self.screen.blit(title, (self.x + 15, self.rect.y + 12))
+
+        # XP + bonus de PV
+        xp_s = self.font_sub.render(f"XP : {self.xp}", True, (255, 215, 0))
+        bonus_s = self.font_hint.render(
+            f"PV Max bonus : +{self.max_pv_bonus}", True, (100, 220, 100)
+        )
+        self.screen.blit(xp_s, (self.rect.right - 80, self.rect.y + 8))
+        self.screen.blit(
+            bonus_s,
+            (
+                self.rect.right - 135,
+                self.rect.y + 25,
+            ),
+        )
+
+        # Séparateur horizontal
+        pygame.draw.line(
+            self.screen,
+            (55, 55, 95),
+            (self.x + 10, self.rect.y + 44),
+            (self.rect.right - 20, self.rect.y + 44),
+        )
+
+        # Séparateur vertical
+        vert_x = self.portrait_rect.right + 10
+        pygame.draw.line(
+            self.screen,
+            (55, 55, 95),
+            (vert_x, self.rect.y + 44),
+            (vert_x, self.rect.bottom - 10),
+        )
+
+        # Ligne d'upgrade cliquable
+        r = self.buy_rect
+        hov_col_bg = (55, 85, 155, 220) if can_afford else (80, 40, 40, 220)
+        hov_col_brd = (120, 150, 225, 255) if can_afford else (160, 80, 80, 255)
+        col_bg = hov_col_bg if row_hovered else (22, 22, 44, 180)
+        col_brd = hov_col_brd if row_hovered else (50, 50, 90, 200)
+
+        bg = pygame.Surface((r.width, r.height), pygame.SRCALPHA)
+        pygame.draw.rect(bg, col_bg, (0, 0, r.width, r.height), border_radius=7)
+        pygame.draw.rect(
+            bg, col_brd, (0, 0, r.width, r.height), width=2, border_radius=7
+        )
+        self.screen.blit(bg, r.topleft)
+
+        label_s = self.font_corps.render("PV Max +1", True, (230, 230, 255))
+        next_cost_s = self.font_hint.render(
+            f"Prochain achat : {self.upgrade_cost(self.max_pv_bonus + 1)} XP",
+            True,
+            (130, 130, 170),
+        )
+        hint_s = self.font_hint.render(
+            "Cliquer pour acheter" if can_afford else "Pas assez d'XP",
+            True,
+            (160, 220, 160) if can_afford else (200, 100, 100),
+        )
+        self.screen.blit(label_s, (r.x + 12, r.y + 8))
+        self.screen.blit(next_cost_s, (r.x + 12, r.y + 30))
+        self.screen.blit(
+            hint_s,
+            (r.x + 12, r.y + 8 + label_s.get_height() + 22),
+        )
+
+        cost_col = (255, 215, 0) if can_afford else (180, 80, 80)
+        cost_s = self.font_sub.render(f"{cost} XP", True, cost_col)
+        self.screen.blit(
+            cost_s,
+            (
+                r.right - cost_s.get_width() - 14,
+                r.y + (r.height - 17) // 2,
+            ),
+        )
+
+        # Bouton Fermer
+        btn = self.btn_close
+        col_bg = (55, 85, 155, 220) if close_hovered else (28, 28, 50, 200)
+        col_brd = (120, 150, 225, 255) if close_hovered else (55, 55, 100, 255)
+        bs = pygame.Surface((btn.width, btn.height), pygame.SRCALPHA)
+        pygame.draw.rect(bs, col_bg, (0, 0, btn.width, btn.height), border_radius=7)
+        pygame.draw.rect(
+            bs, col_brd, (0, 0, btn.width, btn.height), width=2, border_radius=7
+        )
+        self.screen.blit(bs, btn.topleft)
+        ts = self.font_sub.render("Fermer", True, (240, 240, 255))
+        self.screen.blit(
+            ts,
+            (
+                btn.x + (btn.width - 52) // 2,
+                btn.y + (btn.height - 17) // 2,
+            ),
+        )
+
+        # Message temporaire
+        if self.msg_timer > 0:
+            msg = self.font_hint.render(self.msg_text, True, self.msg_color)
+            msg.set_alpha(
+                int(255 * min(1.0, self.msg_timer / (self.msg_duration * 0.4)))
+            )
+            self.screen.blit(
+                msg,
+                (
+                    self.rect.x + self.rect.width // 2 - msg.get_width() // 2,
+                    self.btn_close.y - msg.get_height() - 6,
+                ),
+            )
+
+
 class QueteUI(PnjPanelUI):
     """Affiche la quête courante du PNJ avec ses objectifs et récompenses."""
 
@@ -1037,6 +1262,7 @@ class PNJManager:
         self.dialogue_ui = DialogueUI(screen, self.largeur, self.hauteur)
         self.boutique_ui = BoutiqueUI(screen, self.largeur, self.hauteur)
         self.quete_ui = QueteUI(screen, self.largeur, self.hauteur)
+        self.upgrade_ui = UpgradeUI(screen, self.largeur, self.hauteur)
 
         self.inv_joueur: Inventaire | None = None
         self.money: int = 0
@@ -1059,6 +1285,9 @@ class PNJManager:
         )
         self.surface_bubble.blit(self.e_bubble_text, (3, 3))
 
+        self.permanent_xp: int = 0
+        self.permanent_max_pv_bonus: int = 0
+
     def set_screen(self, screen: pygame.Surface):
         self.screen = screen
         self.largeur, self.hauteur = self.screen.get_size()
@@ -1070,6 +1299,12 @@ class PNJManager:
         self.boutique_ui.set_screen(screen, self.largeur, self.hauteur)
 
         self.quete_ui.set_screen(screen, self.largeur, self.hauteur)
+
+        self.upgrade_ui.set_screen(screen, self.largeur, self.hauteur)
+
+    def set_xp_data(self, permanent_xp: int, permanent_max_pv_bonus: int):
+        self.permanent_xp = permanent_xp
+        self.permanent_max_pv_bonus = permanent_max_pv_bonus
 
     def add(self, pnj: PNJ):
         self.pnjs.append(pnj)
@@ -1098,6 +1333,11 @@ class PNJManager:
                 elif action == "Quête":
                     self.mode = "quete"
                     self.quete_ui.open(self.pnj_actif, self.inv_joueur, self.money)
+                elif action == "Ameliorer":
+                    self.mode = "amelioration"
+                    self.upgrade_ui.open(
+                        self.pnj_actif, self.permanent_xp, self.permanent_max_pv_bonus
+                    )
                 else:  # action == "Quitter"
                     self.mode = None
                     self.pnj_actif = None
@@ -1122,6 +1362,14 @@ class PNJManager:
                     self.pnj_actif = None
                 return True
 
+            case "amelioration":
+                if self.upgrade_ui.handle_event(event, mouse_pos):
+                    self.permanent_xp = self.upgrade_ui.xp
+                    self.permanent_max_pv_bonus = self.upgrade_ui.max_pv_bonus
+                    self.mode = None
+                    self.pnj_actif = None
+                return True
+
         # Aucun UI ouvert : [E] déclenche l'interaction avec le PNJ proche
         if event.type == pygame.KEYDOWN and event.key == pygame.K_e and self.neary_pnj:
             pnj = self.neary_pnj
@@ -1135,6 +1383,7 @@ class PNJManager:
             self.pnj_actif = pnj
             self.mode = "menu"
             self.menu_ui.open(pnj)
+
             return True
 
         return False
@@ -1148,6 +1397,8 @@ class PNJManager:
                 self.boutique_ui.update(dt)
             case "quete":
                 self.quete_ui.update(dt)
+            case "amelioration":
+                self.upgrade_ui.update(dt)
 
         # Animation de tous les PNJ
         for pnj in self.pnjs:
@@ -1157,18 +1408,17 @@ class PNJManager:
         if self.mode is None:
             self.neary_pnj = next((p for p in self.pnjs if p.is_near(player_pos)), None)
 
-    def draw_pnj(self):
-        """Dessine les PNJ si il sont sur le screen"""
-        screen_rect = pygame.Rect(0, 0, self.largeur, self.hauteur)
+    def draw_pnj(self, pnj):
+        """Dessine le PNJ"""
+        screen_hitbox = self.camera.apply(pnj.hitbox)
+        self.screen.blit(pnj.sprite, (screen_hitbox.centerx - 50, screen_hitbox.y - 50))
 
+    def draw_pnj_bubble(self):
+        """Dessine uniquement la bulle [E] au-dessus du PNJ proche."""
+        screen_rect = pygame.Rect(0, 0, self.largeur, self.hauteur)
         for pnj in self.pnjs:
             screen_hitbox = self.camera.apply(pnj.hitbox)
-            # pygame.draw.rect(self.screen, "red", screen_hitbox, 2)
-
             if screen_rect.colliderect(screen_hitbox):
-                self.screen.blit(
-                    pnj.sprite, (screen_hitbox.centerx - 50, screen_hitbox.y - 50)
-                )
                 if pnj is self.neary_pnj and self.mode is None:
                     self.screen.blit(
                         self.surface_bubble,
@@ -1191,6 +1441,8 @@ class PNJManager:
                 self.boutique_ui.draw(mouse_pos)
             case "quete":
                 self.quete_ui.draw()
+            case "amelioration":
+                self.upgrade_ui.draw(mouse_pos)
 
 
 def wrap_text(text: str, font: pygame.font.Font, max_width: int) -> list[str]:
@@ -1209,91 +1461,3 @@ def wrap_text(text: str, font: pygame.font.Font, max_width: int) -> list[str]:
     if current:
         liste.append(current)
     return liste
-
-
-if __name__ == "__main__":
-    pygame.init()
-    screen = pygame.display.set_mode((0, 0))
-    clock = pygame.time.Clock()
-
-    inv = Inventaire(rows=4, cols=8)
-    inv.add_item(Item.create("Potion Rouge", 3))
-    inv.add_item(Item.create("Pain", 5))
-    inv.add_item(Item.create("Pièce d'or", 30))
-    inv.add_item(Item.create("Bûche", 8))
-    inv.add_item(Item.create("Charbon", 5))
-    inv.add_item(Item.create("Pioche", 2))
-    inv.add_item(Item.create("Marteau", 2))
-    money = 1500
-
-    # camera
-    width, height = screen.get_size()
-    camera = Camera(width, height, 0, 0)
-
-    pnj_mgr = PNJManager(screen, camera)
-    pnj_mgr.set_inventaire(inv, money)
-    pnj_mgr.add(PNJ.create("Vieux Taupier", pos=[200, 350]))
-    pnj_mgr.add(PNJ.create("Marchande Isabelle", pos=[500, 350]))
-    pnj_mgr.add(PNJ.create("Forgeron Otto", pos=[800, 350]))
-
-    ui_inv = InventaireUI(
-        screen,
-        "Sac du joueur",
-        inv,
-        pos=((1000 - 486) // 2, 700 - 293),
-        is_merchant=False,
-        is_visible=False,
-    )
-    drag_mgr = InventaireManager(screen, [ui_inv])
-
-    def on_use(item, slot, ui: InventaireUI):
-        ui.inv.remove_item(*slot, 1)
-
-    PLAYER_SIZE = 20
-    SPEED = 5
-    player_rect = pygame.Rect(500 - PLAYER_SIZE // 2, 400, PLAYER_SIZE, PLAYER_SIZE)
-
-    running = True
-    while running:
-        dt = clock.tick(60)
-        mouse_pos = pygame.mouse.get_pos()
-
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    if pnj_mgr.mode is None and not ui_inv.is_visible:
-                        running = False
-                elif event.key == pygame.K_i:
-                    if pnj_mgr.mode is None:
-                        ui_inv.is_visible = not ui_inv.is_visible
-            if pnj_mgr.handle_event(event, mouse_pos):
-                drag_mgr.handle_event(event, mouse_pos, on_use=on_use)
-
-        if pnj_mgr.mode is None:
-            keys = pygame.key.get_pressed()
-            if keys[pygame.K_LEFT]:
-                player_rect.x -= SPEED
-            if keys[pygame.K_RIGHT]:
-                player_rect.x += SPEED
-            if keys[pygame.K_UP]:
-                player_rect.y -= SPEED
-            if keys[pygame.K_DOWN]:
-                player_rect.y += SPEED
-
-        player_pos = (player_rect.centerx, player_rect.centery)
-        pnj_mgr.update(player_pos, dt)
-
-        screen.fill((25, 25, 38))
-
-        pnj_mgr.draw_pnj()
-        pygame.draw.rect(screen, (200, 60, 60), player_rect)
-
-        if pnj_mgr.mode is None:
-            drag_mgr.draw(mouse_pos)
-
-        pnj_mgr.draw_ui(mouse_pos)
-        pygame.display.flip()
-
-    pygame.quit()

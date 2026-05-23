@@ -122,6 +122,7 @@ class HostNetwork:
         self._incoming_dirty = False
 
         self._initial_state: Optional[Dict[str, Any]] = None
+        self._pending_reset: Optional[Dict[str, Any]] = None
 
         self._server: Optional[asyncio.Server] = None
         self._asyncio_loop: Optional[asyncio.AbstractEventLoop] = None
@@ -154,7 +155,7 @@ class HostNetwork:
             and self._server is not None
         ):
             self._asyncio_loop.call_soon_threadsafe(self._server.close)
-    
+
     def is_guest_ready(self) -> bool:
         """True quand le guest a fini de charger le monde"""
         return self._guest_ready and not self._stop_event.is_set()
@@ -174,6 +175,7 @@ class HostNetwork:
             self._incoming_back = {}
             self._incoming_front = {}
             self._incoming_dirty = False
+            self._pending_reset = None
 
         self._tcp_thread = threading.Thread(target=self._run_tcp, daemon=True)
         self._udp_thread = threading.Thread(target=self._run_udp, daemon=True)
@@ -222,6 +224,11 @@ class HostNetwork:
 
     def _get_outgoing(self) -> Dict[str, Any]:
         with self._lock:
+            if self._pending_reset is not None:
+                packet = self._pending_reset
+                self._pending_reset = None
+                return packet
+
             if self._outgoing_dirty:
                 self._outgoing_front, self._outgoing_back = (
                     self._outgoing_back,
@@ -243,6 +250,10 @@ class HostNetwork:
             # pour le chargement d'écran
             if data.get("ready"):
                 self._guest_ready = True
+
+    def send_reset(self, reset_packet: Dict[str, Any]):
+        with self._lock:
+            self._pending_reset = reset_packet
 
     # ── TCP ───────────────────────────────────────────────────────────────────
 
@@ -552,6 +563,10 @@ class GuestNetwork:
                     print("[Guest] Host a fermé la connexion")
                     self._stop_event.set()
                     break
+
+                if data.get("reset"):
+                    with self._lock:
+                        self._map_data = data["map"]
 
                 self._set_incoming(data)
 

@@ -22,7 +22,7 @@ from menu import (
     InputBox,
     FULLSCREEN_SIZE,
 )
-from game import Game
+from game import Game, RecapScreen
 from sound import SoundController
 from loading import GameLoadingScreen, WaitingGuestScreen
 
@@ -72,6 +72,7 @@ class Manager:
             "LOADING": GameLoadingScreen(self.screen, self),
             "WAITING_GUEST": WaitingGuestScreen(self.screen, self),
             "INPUTBOX": InputBox(self.screen, self),
+            "RECAP": RecapScreen(self.screen, self),
         }
         self.state: DefaultManager = self.states["MENU_P"]
 
