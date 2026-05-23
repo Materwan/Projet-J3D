@@ -740,19 +740,34 @@ class Game(DefaultManager):
             )
         self.particles.update(self.manager.clock.get_time() / 1000)
 
+    def _draw_decor(self, args: Tuple[pygame.Surface, Tuple[int, int]]):
+        self.screen.blit(args[0], args[1])
+
     def display(self):
         """Affiche tout les éléments."""
         # -- Reset --
         self.screen.fill((32, 35, 32))
 
-        # -- Map --
+        # -- Map -- affiche uniquement le sol !
         self.map.display(self.camera)
 
         # -- Entités triées par Painter's Algorithm --
         drawables = []
-        pc = self.player_controller
+
+        # -- Objets de décor --
+        for (
+            world_bottom_y,
+            surface,
+            (world_x, world_y),
+        ) in self.map.get_visible_objects():
+            screen_x = world_x + self.camera.camera.x + self.camera.offset_x
+            screen_y = world_y + self.camera.camera.y + self.camera.offset_y
+            drawables.append(
+                (world_bottom_y, self._draw_decor, (surface, (screen_x, screen_y)))
+            )
 
         # -- Players --
+        pc = self.player_controller
         if not pc.is_dead:
             drawables.append((pc.hitbox.bottom, PlayerControllerBase.display, pc))
         partner = None
@@ -787,21 +802,22 @@ class Game(DefaultManager):
             if screen_rect.colliderect(screen_hitbox):
                 drawables.append((pnj.hitbox.bottom, self.pnj_manager.draw_pnj, pnj))
 
+        # Tri et rendu
         for _, fn, entity in sorted(drawables, key=lambda x: x[0]):
             fn(entity)
+
+        # Puis on affiche par dessus toute les entitées ceci :
 
         # -- Bulle [E] PNJ (toujours au-dessus) --
         self.pnj_manager.draw_pnj_bubble()
 
-        # Puis on affiche par dessus toute les entitées ceci :
+        # -- F2 : TOUTES les hitboxes --
+        if self.show_hitbox:
+            self.draw_debug_hitboxes()
 
         # -- Particules --
         for sprite in self.particles:
             self.screen.blit(sprite.image, self.camera.apply(sprite.rect))
-
-        # -- F2 : TOUTES les hitboxes --
-        if self.show_hitbox:
-            self.draw_debug_hitboxes()
 
         # -- Inventaire -- seulement si pas d'UI PNJ
         if self.pnj_manager.mode is None:
