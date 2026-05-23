@@ -1208,9 +1208,9 @@ class RecapScreen:
             # PHASE DE GAME_OVER
 
             progress = min(self.time / 3, 1.0)
-            overlay_alpha = int(160 * progress)
+            overlay_alpha = int(200 * progress)
             overlay = pygame.Surface((self.larg, self.haut))
-            overlay.fill((0, 0, 0))
+            overlay.fill((8, 8, 18))
             overlay.set_alpha(overlay_alpha)
             self.screen.blit(overlay, (0, 0))
 
