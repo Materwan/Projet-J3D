@@ -708,37 +708,36 @@ class Game(DefaultManager):
                 )
 
     def update_particles(self):
-        """if len(self.particles) < 50:  # Limite pour les performances
+        if len(self.particles) < 50:  # Limite pour les performances
+            # On récupère les coordonnées du monde actuellement à l'écran
+            # On prend une marge de 100 pixels pour que les particules
+            # n'apparaissent pas "magiquement" sur le bord
+            margin = 100
 
-        # On récupère les coordonnées du monde actuellement à l'écran
-        # On prend une marge de 100 pixels pour que les particules
-        # n'apparaissent pas "magiquement" sur le bord
-        margin = 100
+            # Le top-left de la caméra est en négatif (ex: -4000),
+            # on l'inverse pour avoir la position monde
+            visible_world_x = -self.camera.camera.x
+            visible_world_y = -self.camera.camera.y
 
-        # Le top-left de la caméra est en négatif (ex: -4000),
-        # on l'inverse pour avoir la position monde
-        visible_world_x = -self.camera.camera.x
-        visible_world_y = -self.camera.camera.y
-
-        # On définit la zone de spawn
-        spawn_x = randint(
-            int(visible_world_x - margin),
-            int(visible_world_x + self.screen.get_width() + margin),
-        )
-        spawn_y = randint(
-            int(visible_world_y - margin),
-            int(visible_world_y + self.screen.get_height() + margin),
-        )
-        spawn_local_particle(
-            self.particles,
-            sprite_path="Ressources/Particles/dust.png",
-            pos=(spawn_x, spawn_y),
-            size=10,
-            speed_range=(25, 45),
-            chaos=0.2,
-            shrink_range=(2, 15),
-            rot=10,
-        )"""
+            # On définit la zone de spawn
+            spawn_x = randint(
+                int(visible_world_x - margin),
+                int(visible_world_x + self.screen.get_width() + margin),
+            )
+            spawn_y = randint(
+                int(visible_world_y - margin),
+                int(visible_world_y + self.screen.get_height() + margin),
+            )
+            spawn_local_particle(
+                self.particles,
+                sprite_path="Ressources/Particles/dust.png",
+                pos=(spawn_x, spawn_y),
+                size=10,
+                speed_range=(25, 45),
+                chaos=0.2,
+                shrink_range=(2, 15),
+                rot=10,
+            )
         self.particles.update(self.manager.clock.get_time() / 1000)
 
     def display(self):
