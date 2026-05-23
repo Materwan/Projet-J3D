@@ -128,8 +128,12 @@ class Game(DefaultManager):
         self.inv_joueur.add_item(Item.create("Potion Rouge", 3))
 
         # PNJ :
-        self.pnj_manager: PNJManager = PNJManager(self.screen, self.camera)
+        self.pnj_manager = PNJManager(self.screen, self.camera)
         self.money: int = 500
+
+        # Stats de run
+        self.run_stats = RunStats()
+        self.permanent_xp = 0  # à inclure dans save/load !!!!!!!!!!!!!!!!!!!!!!!!!
 
     def set_screen(self, screen: pygame.Surface):
         self.screen = screen
@@ -302,7 +306,8 @@ class Game(DefaultManager):
         # -- Solo --
         if isinstance(pc, SoloPlayerController):
             if pc.is_dead:
-                self.manager.change_state("DEATH_SCREEN")
+                self.manager.states["RECAP"].start(self.run_stats)
+                self.manager.change_state("RECAP")
 
         # -- Host --
         elif isinstance(pc, HostController):
@@ -310,7 +315,8 @@ class Game(DefaultManager):
             # Les deux sont morts → nouvelle map, retour au hub
             if pc.is_dead and pc.guest.is_dead:
                 self.spectate_start = None
-                self.reset()
+                self.manager.states["RECAP"].start(self.run_stats)
+                self.manager.change_state("RECAP")
 
             # Un seul est mort → mode spectateur puis respawn
             elif pc.is_dead or pc.guest.is_dead:
@@ -337,8 +343,8 @@ class Game(DefaultManager):
 
             if pc.is_dead and pc.host.is_dead:
                 self.spectate_start = None
-                # Le host gère la régénération ; le guest attend le paquet reset
-                pass
+                self.manager.states["RECAP"].start(self.run_stats)
+                self.manager.change_state("RECAP")
 
             elif pc.is_dead or pc.host.is_dead:
                 if self.spectate_start is None:
@@ -453,6 +459,7 @@ class Game(DefaultManager):
             # Le host a régénéré le monde : on stocke la nouvelle map et on reset
             self.network._map_data = data["map"]
             self.reset()
+            self.manager.change_state("GAME")
             return
         gc = self.player_controller  # gc pour GuestController
 
@@ -537,6 +544,10 @@ class Game(DefaultManager):
         if self.map:
             self.map.close_map()
 
+    def on_chest_opened(self):
+        """Appeler depuis le système de coffres lors de l'ouverture."""
+        self.run_stats.chests_opened += 1
+
     # Game basic
 
     def event(self, events: List[pygame.event.Event]) -> bool:
@@ -566,6 +577,10 @@ class Game(DefaultManager):
                 elif event.key == pygame.K_i:  # Ouvre inventaire
                     self.ui_joueur.is_visible = not self.ui_joueur.is_visible
 
+                # tempo pour test mort
+                elif event.key == pygame.K_k:  # prend -10 PV
+                    self.player_controller.update_pv(-10)
+
             if not self.pnj_manager.handle_event(event, mouse_pos):
                 self.drag_mgr.handle_event(event, mouse_pos, on_use=self._on_use)
 
@@ -573,10 +588,7 @@ class Game(DefaultManager):
         if self.pnj_manager.mode is None:
             self.player_controller.event(pygame.key.get_pressed())
 
-    def update(self):
-        """Met à jour le jeu."""
-
-        # -- Réseau --
+    def reseau(self):
         if self.network is not None:
 
             if isinstance(self.player_controller, HostController):
@@ -615,9 +627,16 @@ class Game(DefaultManager):
             # Si l'hôte quitte alors fermeture totale
             elif self.network.is_closed():
                 self.close_game()
-                self.reset()
+                if self.playing_mode != "guest":
+                    self.reset()
                 self.manager.change_state("MENU_P")
                 return
+
+    def update(self):
+        """Met à jour le jeu."""
+
+        # -- Réseau --
+        self.reseau()
 
         # -- Map --
         self.map.update(self.get_position_target())
@@ -885,6 +904,10 @@ class Game(DefaultManager):
 
     def reset(self):
 
+        # ajoute l'exp gagner et reset les stats pour la prochaine partie
+        self.permanent_xp += self.run_stats.xp_gained
+        self.run_stats.reset()
+
         # -- Controlleur --
         if self.playing_mode == "solo":
             self.player_controller = SoloPlayerController(
@@ -1039,3 +1062,224 @@ class Game(DefaultManager):
 
         self.game_name = data["game_name"]
         self.playing_mode = data["playing_mode"]
+
+
+"""
+Code sur les Stats de la partie et le RecapScreen quand on meurt
+"""
+
+XP_PER_KILL = 10
+XP_PER_CHEST = 25
+XP_PER_BOSS = 100
+GUEST_TIMEOUT_S = 90.0
+
+
+class RunStats:
+    """Statistiques collectées pendant une run. Remise à zéro à chaque nouvelle partie."""
+
+    def __init__(self):
+        self.reset()
+
+    def update_xp_gained(self):
+        self.xp_gained = (
+            self.enemies_killed * XP_PER_KILL
+            + self.boss_killed * XP_PER_BOSS
+            + self.chests_opened * XP_PER_CHEST
+        )
+
+    def reset(self):
+        self.enemies_killed = 0
+        self.boss_killed = 0
+        self.chests_opened = 0
+        self.xp_gained = 0
+
+
+class RecapScreen:
+    """
+    Écran récapitulatif de fin de run.
+
+    Interface identique à DefaultManager (event / update / display / set_screen)
+    sans héritage pour éviter la dépendance circulaire avec main.py.
+    """
+
+    def __init__(self, screen: pygame.Surface, manager: "Manager"):
+        self.screen = screen
+        self.manager = manager
+
+        self.stats = RunStats()
+        self.guest_btn_clicked = (
+            False  # c'est uniquement pour le guest pour l'affichage
+        )
+        self.time = 0.0  # temps écoulé depuis l'ouverture de RecapScreen
+        self.transparence = 255  # 255 → 0 pour faire le fondu
+        self.btn_close_hovered = False
+
+        self.f_title = pygame.font.SysFont("segoeui", 34, bold=True)
+        self.f_stat = pygame.font.SysFont("segoeui", 22)
+        self.f_xp = pygame.font.SysFont("segoeui", 28, bold=True)
+        self.f_btn = pygame.font.SysFont("segoeui", 20, bold=True)
+
+        self.larg, self.haut = self.screen.get_size()
+        self._btn_rect = pygame.Rect(
+            self.larg // 2 - 155,
+            self.haut // 2 + 168,
+            310,
+            48,
+        )
+
+    def set_screen(self, screen: pygame.Surface):
+        self.screen = screen
+        self.larg, self.haut = self.screen.get_size()
+        self._btn_rect = pygame.Rect(
+            self.larg // 2 - 155,
+            self.haut // 2 + 168,
+            310,
+            48,
+        )
+
+    def start(self, run_stats: RunStats):
+        run_stats.update_xp_gained()
+        self.stats = run_stats
+        self.guest_btn_clicked = False
+        self.time = 0.0
+        self.transparence = 255
+
+    def return_HUB(self):
+        """Déclenché par le joueur local. Seul l'hôte/solo réinitialise le monde."""
+        if self.manager.states["GAME"].playing_mode in ("solo", "host"):
+            self.manager.states["GAME"].reset()
+            self.manager.change_state("GAME")
+        else:
+            self.guest_btn_clicked = True
+
+    def event(self, events: list[pygame.event.Event]):
+        mouse = pygame.mouse.get_pos()
+        self.btn_close_hovered = self._btn_rect.collidepoint(mouse)
+
+        for event in events:
+            if event.type == pygame.QUIT:
+                self.manager.running = False
+
+            pressed_key = event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN
+            pressed_btn = (
+                event.type == pygame.MOUSEBUTTONDOWN
+                and event.button == 1
+                and self.btn_close_hovered
+            )
+            if pressed_key or pressed_btn:
+                self.return_HUB()
+
+    def update(self):
+        dt = self.manager.clock.get_time() / 1000.0
+        self.time += dt
+        self.transparence = max(0, self.transparence - int(dt * 250))
+
+        game = self.manager.states["GAME"]
+
+        if game.playing_mode in ("host", "guest") and game.network is not None:
+            game.reseau()
+
+            if game.playing_mode == "guest" and self.time >= GUEST_TIMEOUT_S:
+                game.reset()
+                self.manager.change_state("GAME")
+
+    def display(self):
+        self.manager.states["GAME"].display()
+
+        overlay = pygame.Surface((self.larg, self.haut), pygame.SRCALPHA)
+        overlay.fill((8, 8, 18, 200))
+        self.screen.blit(overlay, (0, 0))
+
+        self.draw_panel()
+        self.draw_button()
+
+        if self.transparence > 0:
+            veil = pygame.Surface((self.larg, self.haut))
+            veil.fill((0, 0, 0))
+            veil.set_alpha(self.transparence)
+            self.screen.blit(veil, (0, 0))
+
+    def draw_panel(self):
+        pw, ph = 440, 310
+        px = self.larg // 2 - pw // 2
+        py = self.haut // 2 - ph // 2 - 44
+
+        surf = pygame.Surface((pw, ph), pygame.SRCALPHA)
+        pygame.draw.rect(surf, (14, 14, 26, 245), (0, 0, pw, ph), border_radius=12)
+        pygame.draw.rect(
+            surf, (70, 70, 115, 255), (0, 0, pw, ph), width=2, border_radius=12
+        )
+        self.screen.blit(surf, (px, py))
+
+        cx = self.larg // 2
+        y = py + 22
+
+        # Titre
+        title = self.f_title.render("Game Over !", True, (230, 210, 160))
+        self.screen.blit(title, (cx - title.get_width() // 2, y))
+        y += title.get_height() + 18
+
+        pygame.draw.line(self.screen, (55, 55, 95), (px + 20, y), (px + pw - 20, y))
+        y += 16
+
+        # Lignes de statistiques
+        rows = (
+            ("Ennemis éliminés", self.stats.enemies_killed),
+            ("Boss éliminés", self.stats.boss_killed),
+            ("Coffres ouverts", self.stats.chests_opened),
+        )
+        for label, value in rows:
+            lbl = self.f_stat.render(label, True, (200, 200, 215))
+            val = self.f_stat.render(str(value), True, (85, 195, 215))
+            self.screen.blit(lbl, (px + 24, y))
+            self.screen.blit(val, (px + pw - val.get_width() - 24, y))
+            y += lbl.get_height() + 12
+
+        y += 4
+        pygame.draw.line(self.screen, (55, 55, 95), (px + 20, y), (px + pw - 20, y))
+        y += 14
+
+        # XP total
+        xp_l = self.f_xp.render("XP Gagnée", True, (255, 210, 60))
+        xp_v = self.f_xp.render(f"+{self.stats.xp_gained}", True, (255, 230, 100))
+        self.screen.blit(xp_l, (px + 24, y))
+        self.screen.blit(xp_v, (px + pw - xp_v.get_width() - 24, y))
+
+    def draw_button(self):
+        mode = self.manager.states["GAME"].playing_mode
+        waiting_for_host = mode == "guest" and self.guest_btn_clicked
+
+        label = (
+            f"En attente de l'hôte{'.' * (int(self.time * 2) % 4)}"
+            if waiting_for_host
+            else "Continuer  →"
+        )
+        enabled = not waiting_for_host
+        btn = self._btn_rect
+        hovered = self.btn_close_hovered and enabled
+
+        s = pygame.Surface((btn.width, btn.height), pygame.SRCALPHA)
+        pygame.draw.rect(
+            s,
+            (55, 85, 155, 220) if hovered else (22, 22, 44, 200),
+            (0, 0, btn.width, btn.height),
+            border_radius=8,
+        )
+        pygame.draw.rect(
+            s,
+            (120, 150, 225, 255) if hovered else (50, 50, 95, 255),
+            (0, 0, btn.width, btn.height),
+            width=2,
+            border_radius=8,
+        )
+        self.screen.blit(s, btn.topleft)
+
+        col = (240, 240, 255) if enabled else (100, 100, 140)
+        ts = self.f_btn.render(label, True, col)
+        self.screen.blit(
+            ts,
+            (
+                btn.x + (btn.width - ts.get_width()) // 2,
+                btn.y + (btn.height - ts.get_height()) // 2,
+            ),
+        )

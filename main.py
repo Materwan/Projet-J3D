@@ -15,7 +15,7 @@ from menu import (
     Multiplayer_Menu,
     Death_Screen,
 )
-from game import Game
+from game import Game, RecapScreen
 from sound import SoundController
 from loading import GameLoadingScreen, WaitingGuestScreen
 
@@ -63,6 +63,7 @@ class Manager:
             "DEATH_SCREEN": Death_Screen(self.screen, self),
             "LOADING": GameLoadingScreen(self.screen, self),
             "WAITING_GUEST": WaitingGuestScreen(self.screen, self),
+            "RECAP": RecapScreen(self.screen, self),
         }
         self.state: DefaultManager = self.states["MENU_P"]
 

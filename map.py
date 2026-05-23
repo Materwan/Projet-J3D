@@ -1192,6 +1192,7 @@ class Map(BaseMap):
                 del_key.append(key)
 
         for key in del_key:
+            self.game.run_stats.enemies_killed += 1
             del self.ennemis[key]
 
         if self.game.player_controller.attaque_rect is not None:
@@ -1228,6 +1229,7 @@ class Map(BaseMap):
                 del_key.append(key)
 
         for key in del_key:
+            self.game.run_stats.enemies_killed += 1
             del self.ennemis[key]
 
         if self.game.player_controller.attaque_rect is not None:
@@ -1256,6 +1258,7 @@ class Map(BaseMap):
                 del_key.append(key)
 
         for key in del_key:
+            self.game.run_stats.enemies_killed += 1
             del self.ennemis[key]
             if key in self.game.ennemis.keys():
                 self.game.ennemis.pop(key)
