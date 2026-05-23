@@ -855,7 +855,7 @@ class Solo_Menu(Menu):
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + self.WINDOWS[1] // 3),
             create,
-            text="CREATE",
+            text="CREATE" if self.nbr_file_solo < 3 else "MAXIMUM SAVE",
         )
         self.list_button, self.list_button_suppr, self.list_file = (
             self.create_list_save_and_button("solo")
@@ -872,6 +872,9 @@ class Solo_Menu(Menu):
     def reset_solo(self):
         self.list_button, self.list_button_suppr, self.list_file = (
             self.create_list_save_and_button("solo")
+        )
+        self.change_button_text(
+            "CREATE" if self.nbr_file_solo < 3 else "MAXIMUM SAVE", self.create
         )
         self.eltpages = [self.retour, self.create]
         for elt in self.list_button:
@@ -949,7 +952,7 @@ class Multiplayer_Menu(Menu):
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + self.WINDOWS[1] // 3),
             create,
-            text="CREATE",
+            text="CREATE" if self.nbr_file_multi < 3 else "MAXIMUM SAVE",
         )
         self.list_button, self.list_button_suppr, self.list_file = (
             self.create_list_save_and_button("multiplayer")
@@ -968,6 +971,9 @@ class Multiplayer_Menu(Menu):
             self.create_list_save_and_button("multiplayer")
         )
         self.eltpages = [self.retour, self.create]
+        self.change_button_text(
+            "CREATE" if self.nbr_file_multi < 3 else "MAXIMUM SAVE", self.create
+        )
         for elt in self.list_button:
             self.eltpages.append(elt)
         for elt in self.list_button_suppr:
