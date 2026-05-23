@@ -301,6 +301,10 @@ class Game(DefaultManager):
     def _handle_death(self):
         """Gère la mort des joueurs : spectateur SPECTATE_DURATION s puis respawn,
         ou écran de mort si les deux sont morts simultanément."""
+        # Si déjà sur RECAP, ne pas re-déclencher !
+        if self.manager.state == self.manager.states["RECAP"]:
+            return
+
         pc = self.player_controller
 
         # -- Solo --
@@ -576,10 +580,6 @@ class Game(DefaultManager):
                     self.print_send_data = not self.print_send_data
                 elif event.key == pygame.K_i:  # Ouvre inventaire
                     self.ui_joueur.is_visible = not self.ui_joueur.is_visible
-
-                # tempo pour test mort
-                elif event.key == pygame.K_k:  # prend -10 PV
-                    self.player_controller.update_pv(-10)
 
             if not self.pnj_manager.handle_event(event, mouse_pos):
                 self.drag_mgr.handle_event(event, mouse_pos, on_use=self._on_use)
@@ -1071,7 +1071,7 @@ Code sur les Stats de la partie et le RecapScreen quand on meurt
 XP_PER_KILL = 10
 XP_PER_CHEST = 25
 XP_PER_BOSS = 100
-GUEST_TIMEOUT_S = 90.0
+GUEST_TIMEOUT_S = 60
 
 
 class RunStats:
@@ -1104,23 +1104,24 @@ class RecapScreen:
 
     def __init__(self, screen: pygame.Surface, manager: "Manager"):
         self.screen = screen
+        self.larg, self.haut = self.screen.get_size()
         self.manager = manager
 
         self.stats = RunStats()
-        self.guest_btn_clicked = (
-            False  # c'est uniquement pour le guest pour l'affichage
-        )
-        self.time = 0.0  # temps écoulé depuis l'ouverture de RecapScreen
-        self.transparence = 255  # 255 → 0 pour faire le fondu
+        self.guest_btn_clicked = False  # seulement pour le guest pour l'affichage
+        self.time = 0.0
         self.btn_close_hovered = False
 
+        # si True alors on est GAME_OVER sinon on est au RECAP
+        self.phase = True
+
+        self.f_death = pygame.font.SysFont("segoeui", 90, bold=True)
         self.f_title = pygame.font.SysFont("segoeui", 34, bold=True)
         self.f_stat = pygame.font.SysFont("segoeui", 22)
         self.f_xp = pygame.font.SysFont("segoeui", 28, bold=True)
         self.f_btn = pygame.font.SysFont("segoeui", 20, bold=True)
 
-        self.larg, self.haut = self.screen.get_size()
-        self._btn_rect = pygame.Rect(
+        self.btn_rect = pygame.Rect(
             self.larg // 2 - 155,
             self.haut // 2 + 168,
             310,
@@ -1130,7 +1131,7 @@ class RecapScreen:
     def set_screen(self, screen: pygame.Surface):
         self.screen = screen
         self.larg, self.haut = self.screen.get_size()
-        self._btn_rect = pygame.Rect(
+        self.btn_rect = pygame.Rect(
             self.larg // 2 - 155,
             self.haut // 2 + 168,
             310,
@@ -1142,144 +1143,161 @@ class RecapScreen:
         self.stats = run_stats
         self.guest_btn_clicked = False
         self.time = 0.0
-        self.transparence = 255
+        self.phase = True
 
     def return_HUB(self):
-        """Déclenché par le joueur local. Seul l'hôte/solo réinitialise le monde."""
-        if self.manager.states["GAME"].playing_mode in ("solo", "host"):
+
+        if self.manager.states["GAME"].playing_mode == "guest":
+            self.guest_btn_clicked = True
+        else:
             self.manager.states["GAME"].reset()
             self.manager.change_state("GAME")
-        else:
-            self.guest_btn_clicked = True
 
     def event(self, events: list[pygame.event.Event]):
         mouse = pygame.mouse.get_pos()
-        self.btn_close_hovered = self._btn_rect.collidepoint(mouse)
+        self.btn_close_hovered = self.phase == False and self.btn_rect.collidepoint(
+            mouse
+        )
 
         for event in events:
             if event.type == pygame.QUIT:
                 self.manager.running = False
 
-            pressed_key = event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN
-            pressed_btn = (
-                event.type == pygame.MOUSEBUTTONDOWN
-                and event.button == 1
-                and self.btn_close_hovered
-            )
-            if pressed_key or pressed_btn:
-                self.return_HUB()
+            if self.phase == False:
+                pressed_key = event.type == pygame.KEYDOWN and (
+                    event.key == pygame.K_RETURN or event.key == pygame.K_ESCAPE
+                )
+                pressed_btn = (
+                    event.type == pygame.MOUSEBUTTONDOWN
+                    and event.button == 1
+                    and self.btn_close_hovered
+                )
+                if pressed_key or pressed_btn:
+                    self.return_HUB()
 
     def update(self):
-        dt = self.manager.clock.get_time() / 1000.0
-        self.time += dt
-        self.transparence = max(0, self.transparence - int(dt * 250))
-
+        self.time += self.manager.clock.get_time() / 1000.0
         game = self.manager.states["GAME"]
 
-        if game.playing_mode in ("host", "guest") and game.network is not None:
-            game.reseau()
-
-            if game.playing_mode == "guest" and self.time >= GUEST_TIMEOUT_S:
-                game.reset()
-                self.manager.change_state("GAME")
+        if self.phase == True:
+            game.update()
+            if self.time >= 3:
+                if self.time >= 4:  # on attend 1s de plus
+                    self.phase = False
+                    self.time = 0.0
+        else:
+            if game.playing_mode in ("host", "guest") and game.network is not None:
+                game.reseau()
 
     def display(self):
         self.manager.states["GAME"].display()
 
-        overlay = pygame.Surface((self.larg, self.haut), pygame.SRCALPHA)
-        overlay.fill((8, 8, 18, 200))
-        self.screen.blit(overlay, (0, 0))
+        if self.phase == True:
+            # PHASE DE GAME_OVER
 
-        self.draw_panel()
-        self.draw_button()
+            progress = min(self.time / 3, 1.0)
+            overlay_alpha = int(160 * progress)
+            overlay = pygame.Surface((self.larg, self.haut))
+            overlay.fill((0, 0, 0))
+            overlay.set_alpha(overlay_alpha)
+            self.screen.blit(overlay, (0, 0))
 
-        if self.transparence > 0:
-            veil = pygame.Surface((self.larg, self.haut))
-            veil.fill((0, 0, 0))
-            veil.set_alpha(self.transparence)
-            self.screen.blit(veil, (0, 0))
+            text_progress = max(0.0, (progress - 0.1) / 0.9)
+            if text_progress > 0:
+                text_alpha = int(255 * text_progress)
+                surf = self.f_death.render("GAME OVER", True, (220, 60, 60))
+                surf.set_alpha(text_alpha)
+                self.screen.blit(
+                    surf,
+                    (
+                        self.larg // 2 - surf.get_width() // 2,
+                        self.haut // 2 - surf.get_height() // 2,
+                    ),
+                )
+        else:
+            # PHASE DE RECAP
+            overlay = pygame.Surface((self.larg, self.haut), pygame.SRCALPHA)
+            overlay.fill((8, 8, 18, 200))
+            self.screen.blit(overlay, (0, 0))
 
-    def draw_panel(self):
-        pw, ph = 440, 310
-        px = self.larg // 2 - pw // 2
-        py = self.haut // 2 - ph // 2 - 44
+            # Affiche le Panel
+            pw, ph = 440, 310
+            px = self.larg // 2 - pw // 2
+            py = self.haut // 2 - ph // 2 - 44
 
-        surf = pygame.Surface((pw, ph), pygame.SRCALPHA)
-        pygame.draw.rect(surf, (14, 14, 26, 245), (0, 0, pw, ph), border_radius=12)
-        pygame.draw.rect(
-            surf, (70, 70, 115, 255), (0, 0, pw, ph), width=2, border_radius=12
-        )
-        self.screen.blit(surf, (px, py))
+            surf = pygame.Surface((pw, ph), pygame.SRCALPHA)
+            pygame.draw.rect(surf, (14, 14, 26, 245), (0, 0, pw, ph), border_radius=12)
+            pygame.draw.rect(
+                surf, (70, 70, 115, 255), (0, 0, pw, ph), width=2, border_radius=12
+            )
+            self.screen.blit(surf, (px, py))
 
-        cx = self.larg // 2
-        y = py + 22
+            cx = self.larg // 2
+            y = py + 22
 
-        # Titre
-        title = self.f_title.render("Game Over !", True, (230, 210, 160))
-        self.screen.blit(title, (cx - title.get_width() // 2, y))
-        y += title.get_height() + 18
+            title = self.f_title.render("Run terminée !", True, (230, 210, 160))
+            self.screen.blit(title, (cx - title.get_width() // 2, y))
+            y += title.get_height() + 18
 
-        pygame.draw.line(self.screen, (55, 55, 95), (px + 20, y), (px + pw - 20, y))
-        y += 16
+            pygame.draw.line(self.screen, (55, 55, 95), (px + 20, y), (px + pw - 20, y))
+            y += 16
 
-        # Lignes de statistiques
-        rows = (
-            ("Ennemis éliminés", self.stats.enemies_killed),
-            ("Boss éliminés", self.stats.boss_killed),
-            ("Coffres ouverts", self.stats.chests_opened),
-        )
-        for label, value in rows:
-            lbl = self.f_stat.render(label, True, (200, 200, 215))
-            val = self.f_stat.render(str(value), True, (85, 195, 215))
-            self.screen.blit(lbl, (px + 24, y))
-            self.screen.blit(val, (px + pw - val.get_width() - 24, y))
-            y += lbl.get_height() + 12
+            rows = (
+                ("Ennemis éliminés", self.stats.enemies_killed),
+                ("Boss éliminés", self.stats.boss_killed),
+                ("Coffres ouverts", self.stats.chests_opened),
+            )
+            for label, value in rows:
+                lbl = self.f_stat.render(label, True, (200, 200, 215))
+                val = self.f_stat.render(str(value), True, (85, 195, 215))
+                self.screen.blit(lbl, (px + 24, y))
+                self.screen.blit(val, (px + pw - val.get_width() - 24, y))
+                y += lbl.get_height() + 12
 
-        y += 4
-        pygame.draw.line(self.screen, (55, 55, 95), (px + 20, y), (px + pw - 20, y))
-        y += 14
+            y += 4
+            pygame.draw.line(self.screen, (55, 55, 95), (px + 20, y), (px + pw - 20, y))
+            y += 14
 
-        # XP total
-        xp_l = self.f_xp.render("XP Gagnée", True, (255, 210, 60))
-        xp_v = self.f_xp.render(f"+{self.stats.xp_gained}", True, (255, 230, 100))
-        self.screen.blit(xp_l, (px + 24, y))
-        self.screen.blit(xp_v, (px + pw - xp_v.get_width() - 24, y))
+            xp_l = self.f_xp.render("XP Gagnée", True, (255, 210, 60))
+            xp_v = self.f_xp.render(f"+{self.stats.xp_gained}", True, (255, 230, 100))
+            self.screen.blit(xp_l, (px + 24, y))
+            self.screen.blit(xp_v, (px + pw - xp_v.get_width() - 24, y))
 
-    def draw_button(self):
-        mode = self.manager.states["GAME"].playing_mode
-        waiting_for_host = mode == "guest" and self.guest_btn_clicked
+            # Affiche le bouton "Continuer"
+            mode = self.manager.states["GAME"].playing_mode
+            waiting_for_host = mode == "guest" and self.guest_btn_clicked
 
-        label = (
-            f"En attente de l'hôte{'.' * (int(self.time * 2) % 4)}"
-            if waiting_for_host
-            else "Continuer  →"
-        )
-        enabled = not waiting_for_host
-        btn = self._btn_rect
-        hovered = self.btn_close_hovered and enabled
+            label = (
+                f"En attente de l'hôte{'.' * (int(self.time * 2) % 4)}"
+                if waiting_for_host
+                else "Continuer  →"
+            )
+            enabled = not waiting_for_host
+            btn = self.btn_rect
+            hovered = self.btn_close_hovered and enabled
 
-        s = pygame.Surface((btn.width, btn.height), pygame.SRCALPHA)
-        pygame.draw.rect(
-            s,
-            (55, 85, 155, 220) if hovered else (22, 22, 44, 200),
-            (0, 0, btn.width, btn.height),
-            border_radius=8,
-        )
-        pygame.draw.rect(
-            s,
-            (120, 150, 225, 255) if hovered else (50, 50, 95, 255),
-            (0, 0, btn.width, btn.height),
-            width=2,
-            border_radius=8,
-        )
-        self.screen.blit(s, btn.topleft)
+            s = pygame.Surface((btn.width, btn.height), pygame.SRCALPHA)
+            pygame.draw.rect(
+                s,
+                (55, 85, 155, 220) if hovered else (22, 22, 44, 200),
+                (0, 0, btn.width, btn.height),
+                border_radius=8,
+            )
+            pygame.draw.rect(
+                s,
+                (120, 150, 225, 255) if hovered else (50, 50, 95, 255),
+                (0, 0, btn.width, btn.height),
+                width=2,
+                border_radius=8,
+            )
+            self.screen.blit(s, btn.topleft)
 
-        col = (240, 240, 255) if enabled else (100, 100, 140)
-        ts = self.f_btn.render(label, True, col)
-        self.screen.blit(
-            ts,
-            (
-                btn.x + (btn.width - ts.get_width()) // 2,
-                btn.y + (btn.height - ts.get_height()) // 2,
-            ),
-        )
+            col = (240, 240, 255) if enabled else (100, 100, 140)
+            ts = self.f_btn.render(label, True, col)
+            self.screen.blit(
+                ts,
+                (
+                    btn.x + (btn.width - ts.get_width()) // 2,
+                    btn.y + (btn.height - ts.get_height()) // 2,
+                ),
+            )
