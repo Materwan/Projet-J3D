@@ -1,10 +1,11 @@
 import random
 import os
 import json
-
 import pygame
 
-INVENTORY_ASSET_DIRECTORY = r"Ressources\InventoryAsset"
+from utils import resource_path
+
+INVENTORY_ASSET_DIRECTORY = resource_path(r"Ressources\InventoryAsset")
 
 """
 item_dic c'est la base de données des Items du jeu
@@ -228,6 +229,45 @@ class Inventaire:
         else:
             self.grid[row_a][col_a], other_inv.grid[row_b][col_b] = item_b, item_a
 
+    def count_item(self, name: str) -> int:
+        """Retourne la quantité totale d'un item d'un iventaire par son nom."""
+        return sum(s.quantity for row in self.grid for s in row if s and s.name == name)
+
+    def has_items(self, objectifs: list[dict]) -> bool:
+        """Retourne True si la grille contient tous les items requis."""
+        for obj in objectifs:
+            total = self.count_item(obj["item"])
+            if total < obj["quantite"]:
+                return False
+        return True
+
+    def remove_items(self, objectifs: list[dict]):
+        """Retire de la grille les quantités exactes définies dans objectifs."""
+        for obj in objectifs:
+            reste = obj["quantite"]
+            for i in range(self.rows):
+                for j in range(self.cols):
+                    slot = self.grid[i][j]
+                    if slot and slot.name == obj["item"] and reste > 0:
+                        retire = min(slot.quantity, reste)
+                        self.remove_item(i, j, retire)
+                        reste -= retire
+
+    def add_item_at_random_position(self, item: Item) -> bool:
+        """Trouve une case vide au hasard dans la grille et y place l'objet."""
+
+        # on liste toutes les slots qui sont vides
+        empty_slots = []
+        for r in range(self.rows):
+            for c in range(self.cols):
+                if self.grid[r][c] is None:
+                    empty_slots.append((r, c))
+
+        # si inventaire pas plein
+        if len(empty_slots) != 0:
+            chosen_row, chosen_col = random.choice(empty_slots)
+            self.grid[chosen_row][chosen_col] = item
+
 
 class InventaireUI:
     """
@@ -236,18 +276,6 @@ class InventaireUI:
     Gère :
         - L'affichage du panneau (image + titre + icônes + highlight + tooltip)
         - La détection de la case sous la souris
-
-    Usage :
-        ui = InventaireUI(
-            name         = "Sac du joueur",
-            inv          = mon_inventaire,
-            pos          = (50, 100),
-            image_path   = "Ressources/InventoryAsset/chest.png",
-            slot_size    = 52,
-            slot_margin  = 4,
-            padding      = 21,
-            title_height = 11,
-        )
     """
 
     def __init__(
@@ -256,37 +284,33 @@ class InventaireUI:
         name,
         inv: Inventaire,
         pos: tuple,
-        image_path,
-        slot_size,
-        slot_margin,
-        padding,
-        title_height,
-        visible,
         is_merchant,
+        is_visible,
     ):
         self.screen: pygame.Surface = screen
 
         self.name = name
         self.inv = inv
-        self.pos = pos  # position où le panneau s'affiche
-        self.visible = visible
+        self.pos = pos
+        self.is_visible = is_visible
         self.is_merchant = is_merchant
         if is_merchant:
             self.price_multiplier = round(random.uniform(1.2, 1.6), 2)
         else:
             self.price_multiplier = 1.0
 
-        self.slot_size = slot_size  # taille d'une case en px
-        self.slot_margin = slot_margin  # espace entre les cases en px
-        self.padding = padding  # bord du panneau en px
-        self.title_height = title_height  # espace au-dessus pour le titre en px
+        self.slot_size = 52  # taille d'une case en px
+        self.slot_margin = 4  # espace entre les cases en px
+        self.padding = 21  # bord du panneau en px
+        self.title_height = 11  # espace au-dessus pour le titre en px
 
-        self.image = pygame.image.load(image_path).convert_alpha()
-
-        # Police d'écriture :
+        self.image = pygame.image.load(
+            os.path.join(INVENTORY_ASSET_DIRECTORY, "chest.png")
+        ).convert_alpha()
+        self.image_largeur = self.image.get_width()
 
         # Titre panneau
-        self.font_title = pygame.font.SysFont("segoeui", 11, bold=True)
+        self.font_title = pygame.font.SysFont("segoeui", 14, bold=True)
         # Compteur stack
         self.font_stack = pygame.font.SysFont("segoeui", 12, bold=True)
         # Nom item tooltip
@@ -322,15 +346,13 @@ class InventaireUI:
         """
         Retourne la position row, col de la case sous la souris, ou None.
         """
-        if not self.visible:
-            return None
         for i in range(self.inv.rows):
             for j in range(self.inv.cols):
                 if self.slot_rect(i, j).collidepoint(mouse_pos):
                     return (i, j)
         return None
 
-    def draw(self, mouse_pos, drag_mgr: "InventaireManager"):
+    def draw(self, mouse_pos, drag_mgr: "InventaireManager | None" = None):
         """
         Dessine le panneau complet dans l'ordre :
         - Image de fond
@@ -338,7 +360,7 @@ class InventaireUI:
         - Highlight de survol
         - Icônes des items
         """
-        if not self.visible:
+        if not self.is_visible:
             return
 
         # image de fond
@@ -349,9 +371,10 @@ class InventaireUI:
         self.screen.blit(
             title_surf,
             (
-                self.pos[0] + (self.image.get_width() - title_surf.get_width()) // 2,
+                self.pos[0] + (self.image_largeur - title_surf.get_width()) // 2,
                 self.pos[1]
-                + (self.padding + self.title_height - title_surf.get_height()) // 2,
+                + (self.padding + self.title_height - title_surf.get_height()) // 2
+                - 2,
             ),
         )
 
@@ -373,7 +396,8 @@ class InventaireUI:
                 # La case source du drag paraît vide :
                 # l'item "flotte" sous la souris, on ne le dessine pas ici
                 is_drag_source = (
-                    drag_mgr.drag_source_ui is self
+                    drag_mgr is not None
+                    and drag_mgr.drag_source_ui is self
                     and drag_mgr.drag_source_row == i
                     and drag_mgr.drag_source_col == j
                 )
@@ -568,7 +592,7 @@ class InventaireManager:
         # Clic gauche :
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for ui in self.ui_list:
-                if not ui.visible:
+                if not ui.is_visible:
                     continue
                 slot = ui.slot_at(mouse_pos)
                 if slot is not None:
@@ -579,7 +603,7 @@ class InventaireManager:
                         if pygame.key.get_mods() & pygame.KMOD_SHIFT:
                             # cherche le premier inventaire visible différent de l'actuel
                             for target_ui in self.ui_list:
-                                if target_ui is ui or not target_ui.visible:
+                                if target_ui is ui or not target_ui.is_visible:
                                     continue
                                 # tente d'ajouter dans l'autre inventaire
                                 reste = target_ui.inv.add_item(item)
@@ -603,7 +627,7 @@ class InventaireManager:
         # Clic droit :
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
             for ui in self.ui_list:
-                if not ui.visible:
+                if not ui.is_visible:
                     continue
                 slot = ui.slot_at(mouse_pos)
                 if slot is not None:
@@ -642,7 +666,7 @@ class InventaireManager:
                 return
 
             for ui in self.ui_list:
-                if not ui.visible:
+                if not ui.is_visible:
                     continue
                 slot = ui.slot_at(mouse_pos)
                 if slot is not None:
@@ -682,7 +706,7 @@ class InventaireManager:
         # affiche la tooltip
         if self.drag_item is None:
             for ui in self.ui_list:
-                if not ui.visible:
+                if not ui.is_visible:
                     continue
                 hovered = ui.slot_at(mouse_pos)
                 if hovered is not None:
@@ -704,55 +728,138 @@ class InventaireManager:
         self.screen.blit(ghost, (icon_x, icon_y))
 
 
+class LootGenerator:
+    """
+    Génère du butin aléatoire pour remplir un inventaire (coffre, marchand...).
+
+    Cette classe se base sur le 'item_type' des objets pour déterminer les chances d'apparition.
+
+    Règles de rareté appliquées automatiquement :
+        - Légendes    : Très rare, tombe toujours en 1 seul exemplaire.
+        - Curiosités  : Rare, quantité de 1 à 2.
+        - Consommable : Atypique, quantité de 1 à 3.
+        - Bric-à-brac : Commun, grande quantité de 2 à 8.
+    """
+
+    def __init__(self, item_names: list[str], rolls_min: int, rolls_max: int):
+        self.rolls_min = rolls_min
+        self.rolls_max = rolls_max
+        self.entries = []
+
+        for name in item_names:
+            if name not in item_dic:
+                print(f"ERREUR : '{name}' n'existe pas dans item_dic. Ignoré.")
+                continue
+
+            item_type = item_dic[name]["item_type"]
+
+            # plus le 'weight' est élevé plus c'est commun !
+            if item_type == "Légendes":
+                weight = 2  # Très rare
+                qty_min, qty_max = 1, 1
+            elif item_type == "Curiosités":
+                weight = 10  # Un peu rare
+                qty_min, qty_max = 1, 2
+            elif item_type == "Consommable":
+                weight = 25  # Atypique
+                qty_min, qty_max = 1, 3
+            else:
+                weight = 50  # Commun
+                qty_min, qty_max = 2, 8
+
+            self.entries.append(
+                {"name": name, "weight": weight, "qty_min": qty_min, "qty_max": qty_max}
+            )
+
+    def fill(self, inv: Inventaire) -> None:
+        """Remplit l'inventaire fourni avec le butin généré."""
+        if len(self.entries) == 0:
+            return
+
+        nb_slots = random.randint(self.rolls_min, self.rolls_max)
+
+        weights = [e["weight"] for e in self.entries]
+        tirages = random.choices(self.entries, weights=weights, k=nb_slots)
+
+        for entry in tirages:
+            qty = random.randint(entry["qty_min"], entry["qty_max"])
+            inv.add_item_at_random_position(Item.create(entry["name"], qty))
+
+
+# TOUCHE I ET E POUR AFFICHER/CACHER, TOUCHE L POUR GENERER DU BUTIN
 if __name__ == "__main__":
+
+    # exemple de LootGenerator pour coffre de village
+    VILLAGE_CHEST = LootGenerator(
+        item_names=[
+            # Bric-à-brac : Tombe souvent
+            "Pièce de cuivre",
+            "Os",
+            "Viande de monstre",
+            # Consommables : Tombe moyennement
+            "Pain",
+            "Fromage",
+            "Potion Rouge",
+            "Petite Potion Rouge",
+            # Curiosités : Un peu rare
+            "Engrenage",
+            "Cristal",
+            "Pièce d'or",
+            # Légendes : Une chance infime
+            "Diamant",
+        ],
+        rolls_min=3,  # minimum 3 slots remplis
+        rolls_max=6,  # maximum 6 slots remplis
+    )
+    # ou un coffre de donjon :
+    DUNGEON_CHEST = LootGenerator(
+        item_names=[
+            # Consommables
+            "Grande Potion Rouge",
+            "Potion Rouge",
+            "Fromage",
+            "Pain",
+            # Bric-à-brac
+            "Pièce de cuivre",
+            "Os",
+            "Viande de monstre",
+            "Crâne",
+            # Curiosités
+            "Engrenage",
+            "Cristal",
+            "Carte Ancienne",
+            # Légendes
+            "Diamant",
+            "Bâton de Rubis",
+        ],
+        rolls_min=5,  # minimum 5 slots remplis
+        rolls_max=10,  # maximum 10 slots remplis
+    )
+
     pygame.init()
     screen = pygame.display.set_mode((1000, 700))
 
     inv_joueur = Inventaire(rows=4, cols=8)
     inv_joueur.add_item(Item.create("Potion Rouge", 5))
-    inv_joueur.add_item(Item.create("Grande Potion Rouge", 2))
-    inv_joueur.add_item(Item.create("Pain", 4))
-    inv_joueur.add_item(Item.create("Champignon", 10))
-    inv_joueur.add_item(Item.create("Pièce de cuivre", 120))
-    inv_joueur.add_item(Item.create("Os", 80))
-    inv_joueur.add_item(Item.create("Engrenage", 3))
-    inv_joueur.add_item(Item.create("Cristal", 5))
-    inv_joueur.add_item(Item.create("Crâne", 1))
-    inv_joueur.add_item(Item.create("Diamant", 1))
-    inv_joueur.add_item(Item.create("Bâton de Rubis", 1))
 
     inv_coffre = Inventaire(rows=4, cols=8)
-    inv_coffre.add_item(Item.create("Petite Potion Rouge", 8))
-    inv_coffre.add_item(Item.create("Fromage", 6))
-    inv_coffre.add_item(Item.create("Pièce d'or", 50))
-    inv_coffre.add_item(Item.create("Carte Ancienne", 1))
-    inv_coffre.add_item(Item.create("Viande de monstre", 1))
+    VILLAGE_CHEST.fill(inv_coffre)  # ICI
 
     ui_joueur = InventaireUI(
         screen,
         name="Sac du joueur",
         inv=inv_joueur,
-        pos=(30, 80),
-        image_path=os.path.join(INVENTORY_ASSET_DIRECTORY, "chest.png"),
-        slot_size=52,
-        slot_margin=4,
-        padding=21,
-        title_height=11,
-        visible=True,
+        pos=(400, 80),
         is_merchant=False,
+        is_visible=True,
     )
     ui_coffre = InventaireUI(
         screen,
-        name="Coffre",
+        name="Coffre de village",
         inv=inv_coffre,
         pos=(30, 400),
-        image_path=os.path.join(INVENTORY_ASSET_DIRECTORY, "chest.png"),
-        slot_size=52,
-        slot_margin=4,
-        padding=21,
-        title_height=11,
-        visible=True,
         is_merchant=True,
+        is_visible=True,
     )
 
     drag_mgr = InventaireManager(screen, [ui_joueur, ui_coffre])
@@ -760,8 +867,7 @@ if __name__ == "__main__":
     def on_use(item: Item, slot: tuple, ui: InventaireUI):
         """Consomme 1 unité de l'item utilisé."""
         ui.inv.remove_item(*slot, 1)
-        print(f"Vous vous soigner de {item.effect} HP")
-        # self.player.hp += item.effect par exemple
+        print(f"Vous vous soignez de {item.effect} HP")
 
     running = True
     while running:
@@ -774,13 +880,20 @@ if __name__ == "__main__":
                 if event.key == pygame.K_ESCAPE:
                     running = False
                 if event.key == pygame.K_i:
-                    ui_joueur.visible = not ui_joueur.visible
+                    ui_joueur.is_visible = not ui_joueur.is_visible
                 if event.key == pygame.K_e:
-                    ui_coffre.visible = not ui_coffre.visible
+                    ui_coffre.is_visible = not ui_coffre.is_visible
+
+                if event.key == pygame.K_l:
+                    inv_coffre.grid = [
+                        [None for _ in range(inv_coffre.cols)]
+                        for _ in range(inv_coffre.rows)
+                    ]
+                    VILLAGE_CHEST.fill(inv_coffre)
+                    print("Nouveau butin généré dans le coffre !")
 
             drag_mgr.handle_event(event, mouse_pos, on_use=on_use)
 
-        # affichage
         screen.fill((20, 20, 30))
         drag_mgr.draw(mouse_pos)
         pygame.display.flip()

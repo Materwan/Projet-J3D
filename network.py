@@ -16,12 +16,15 @@ import threading
 import time
 import json
 import psutil
+from collections import deque
 from typing import Dict, Any, Optional
 
 # Configuration des ports
 UDP_PORT = 9999  # (découverte de parties)
 TCP_PORT = 8888  # (le jeu)
 NETWORK_TICK = 1 / 60  # tick du réseau
+
+RTT_WINDOW = 60  # nombre de mesures conservées pour le calcul de la moyenne
 
 
 def get_netmask_for_ip(ip: str) -> Optional[str]:
@@ -51,6 +54,54 @@ def bytes_to_dict(data: bytes) -> Optional[Dict]:
     if not data:
         return None
     return json.loads(data.decode().strip())
+
+
+class RttTracker:
+    """
+    Calcule le RTT moyen sur une fenêtre glissante de mesures.
+
+    Utilisation :
+        tracker = RttTracker(window=60)
+        t0 = tracker.start()          # juste avant l'envoi
+        ...reception de la réponse...
+        tracker.record(t0)            # enregistre la mesure
+        print(tracker.average_ms)     # RTT moyen en millisecondes
+    """
+
+    def __init__(self, window: int = RTT_WINDOW):
+        self._samples: deque[float] = deque(maxlen=window)
+        self._lock = threading.Lock()
+
+    def start(self) -> float:
+        """Retourne le timestamp actuel à passer à record()."""
+        return time.perf_counter()
+
+    def record(self, t0: float) -> float:
+        """Enregistre une mesure RTT (en ms) et la retourne."""
+        rtt_ms = (time.perf_counter() - t0) * 1000.0
+        with self._lock:
+            self._samples.append(rtt_ms)
+        return rtt_ms
+
+    @property
+    def average_ms(self) -> float:
+        """RTT moyen en millisecondes sur la fenêtre courante. 0.0 si aucune mesure."""
+        with self._lock:
+            if not self._samples:
+                return 0.0
+            return sum(self._samples) / len(self._samples)
+
+    @property
+    def last_ms(self) -> float:
+        """Dernier RTT mesuré en millisecondes. 0.0 si aucune mesure."""
+        with self._lock:
+            return self._samples[-1] if self._samples else 0.0
+
+    @property
+    def sample_count(self) -> int:
+        """Nombre de mesures actuellement dans la fenêtre."""
+        with self._lock:
+            return len(self._samples)
 
 
 class HostNetwork:
@@ -121,12 +172,19 @@ class HostNetwork:
         self._incoming_dirty = False
 
         self._initial_state: Optional[Dict[str, Any]] = None
+        self._pending_reset: Optional[Dict[str, Any]] = None
 
         self._server: Optional[asyncio.Server] = None
         self._asyncio_loop: Optional[asyncio.AbstractEventLoop] = None
 
         self._tcp_thread = threading.Thread(target=self._run_tcp, daemon=True)
         self._udp_thread = threading.Thread(target=self._run_udp, daemon=True)
+
+        # RTT : le host reçoit le rtt_ms moyen mesuré par le guest dans chaque paquet
+        self._guest_rtt_ms: float = 0.0
+
+        # Pour le chargement d'écran
+        self._guest_ready: bool = False
 
     def start(self, initial_state: Optional[Dict[str, Any]] = None):
         """Lance TCP + UDP. initial_state doit contenir les données de map."""
@@ -148,12 +206,17 @@ class HostNetwork:
         ):
             self._asyncio_loop.call_soon_threadsafe(self._server.close)
 
+    def is_guest_ready(self) -> bool:
+        """True quand le guest a fini de charger le monde"""
+        return self._guest_ready and not self._stop_event.is_set()
+
     def restart_listening(self):
         """Remet le serveur en écoute après déconnexion du guest."""
         self._guest_disconnected = False
         self._connected = False
         self._server = None
         self._asyncio_loop = None
+        self._guest_rtt_ms = 0.0
 
         with self._lock:
             self._outgoing_back = {}
@@ -162,11 +225,15 @@ class HostNetwork:
             self._incoming_back = {}
             self._incoming_front = {}
             self._incoming_dirty = False
+            self._pending_reset = None
 
         self._tcp_thread = threading.Thread(target=self._run_tcp, daemon=True)
         self._udp_thread = threading.Thread(target=self._run_udp, daemon=True)
         self._tcp_thread.start()
         self._udp_thread.start()
+
+        # pour le chargement d'écran
+        self._guest_ready = False
 
     def is_guest_disconnected(self) -> bool:
         """True si c'est le guest qui s'est déconnecté (pas un arrêt volontaire du host)."""
@@ -177,6 +244,11 @@ class HostNetwork:
 
     def is_closed(self) -> bool:
         return self._stop_event.is_set()
+
+    @property
+    def guest_rtt_ms(self) -> float:
+        """RTT moyen du guest (en ms), tel que rapporté par le guest lui-même."""
+        return self._guest_rtt_ms
 
     def update(self, game_state: Dict[str, Any]) -> Dict[str, Any]:
         """Appelé par le game loop à 60 FPS — O(1), juste un swap de référence."""
@@ -190,12 +262,23 @@ class HostNetwork:
                     self._incoming_front,
                 )
                 self._incoming_dirty = False
+
+                # Récupère le RTT moyen rapporté par le guest
+                rtt = self._incoming_front.get("rtt_ms")
+                if rtt is not None:
+                    self._guest_rtt_ms = rtt
+
                 return self._incoming_front
 
             return {}
 
     def _get_outgoing(self) -> Dict[str, Any]:
         with self._lock:
+            if self._pending_reset is not None:
+                packet = self._pending_reset
+                self._pending_reset = None
+                return packet
+
             if self._outgoing_dirty:
                 self._outgoing_front, self._outgoing_back = (
                     self._outgoing_back,
@@ -208,6 +291,19 @@ class HostNetwork:
         with self._lock:
             self._incoming_back = data
             self._incoming_dirty = True
+
+    def _set_incoming(self, data: Dict[str, Any]):
+        with self._lock:
+            self._incoming_back = data
+            self._incoming_dirty = True
+
+            # pour le chargement d'écran
+            if data.get("ready"):
+                self._guest_ready = True
+
+    def send_reset(self, reset_packet: Dict[str, Any]):
+        with self._lock:
+            self._pending_reset = reset_packet
 
     # ── TCP ───────────────────────────────────────────────────────────────────
 
@@ -314,47 +410,15 @@ class HostNetwork:
 class GuestNetwork:
     """Gère le côté client (guest) avec une connexion TCP dédiée.
 
-    Cette classe utilise le même système de double tampon que l'host pour
-    synchroniser les états. Elle fournit des méthodes pour vérifier si la
-    tentative de connexion est terminée (`is_loaded()`) et pour récupérer
-    les données de map initiales (`get_map_data()`).
+    Un seul thread dédié, indépendant du game loop.
+    Appeler is_loaded() pour savoir si la tentative de connexion est terminée.
+    Appeler get_map_data() pour récupérer les données de map reçues à la connexion.
 
-    Attributs:
-        address (str): Adresse IP du serveur distant.
-        port (int): Port TCP du serveur.
-        _lock (threading.Lock): Verrou pour accès concurrent-safe aux états.
-        _stop_event (threading.Event): Signal d'arrêt propre du thread réseau.
-        _connected (bool): Indicateur si la connexion est établie.
-        _loaded (bool): Indicateur si la tentative de connexion est terminée.
-        _outgoing_back: Tampon arrière pour les données à envoyer au serveur.
-        _outgoing_front: Tampon avant contenant l'état à envoyer.
-        _outgoing_dirty (bool): Flag indiquant si le tampon arrière est sale.
-        _incoming_back: Tampon arrière pour les données reçues du serveur.
-        _incoming_front: Tampon avant contenant les données à retourner.
-        _incoming_dirty (bool): Flag indiquant si le tampon arrière est sale.
-        _map_data: Données de map reçues lors du premier paquet.
-        _tcp_thread: Thread pour gérer la connexion TCP.
-        _close_sent (threading.Event): Signal que le guest demande la fermeture.
-        _reader: StreamReader asyncio pour les données entrantes.
-        _writer: StreamWriter asyncio pour les données sortantes.
-
-    Méthodes publiques:
-        start(initial_state): Lance la connexion TCP; l'état initial est ignoré côté guest (contrairement à l'host).
-        close(): Signale l'arrêt propre du thread réseau en définissant `_stop_event`.
-        is_connected(): Vérifie que la connexion TCP est active et que le thread n'est pas arrêté.
-        is_closed(): Retourne `True` si le thread doit être fermé.
-        is_loaded(): Retourne `True` quand la tentative de connexion est terminée.
-        get_map_data(): Retourne les données de map reçues lors du premier paquet.
-        update(game_state): Identique à l'host: swap O(1) entre tampons, retourne l'état à envoyer au serveur.
-        _get_outgoing(): Identique à l'host: récupère le contenu du tampon avant.
-        _set_incoming(data): Identique à l'host: enregistre les données reçues.
-        get_initial_state(): Retourne le premier paquet reçu (map + état initial).
-        request_close(): Demande l'envoi d'un paquet "close" puis coupe la connexion.
-
-    Méthodes privées:
-        _initialize(): Orchestrateur qui lance d'abord la connexion, puis gère les messages entrants si connecté.
-        _connect(): Établit la connexion TCP, reçoit le premier paquet (map + état), envoie un ACK.
-        _handle_host(): Boucle principale de réception des snapshots du serveur.
+    Le RTT est calculé à chaque échange : on horodate l'envoi et on mesure
+    le délai jusqu'à la réception de la réponse. La moyenne glissante est
+    accessible via rtt_tracker.average_ms (ou rtt_ms pour la dernière valeur).
+    La valeur moyenne est également injectée dans chaque paquet envoyé
+    (clé "rtt_ms") afin que le host puisse la consulter.
     """
 
     def __init__(self, address: str, port: int = TCP_PORT):
@@ -382,6 +446,26 @@ class GuestNetwork:
         self._reader: Optional[asyncio.StreamReader] = None
         self._writer: Optional[asyncio.StreamWriter] = None
 
+        # RTT
+        self.rtt_tracker = RttTracker(window=RTT_WINDOW)
+
+        # Pour le chargement d'écran
+        self._is_ready = False
+
+    # ── Propriétés RTT ────────────────────────────────────────────────────────
+
+    @property
+    def rtt_ms(self) -> float:
+        """Dernier RTT mesuré en millisecondes."""
+        return self.rtt_tracker.last_ms
+
+    @property
+    def average_rtt_ms(self) -> float:
+        """RTT moyen en millisecondes sur la fenêtre glissante."""
+        return self.rtt_tracker.average_ms
+
+    # ── Interface publique ────────────────────────────────────────────────────
+
     def start(self, initial_state: Optional[Dict[str, Any]] = None):
         """Lance la connexion TCP. initial_state ignoré côté guest."""
         self._tcp_thread.start()
@@ -400,6 +484,11 @@ class GuestNetwork:
         """True quand la tentative de connexion est terminée (succès ou échec)."""
         return self._loaded
 
+    def set_ready(self):
+        """C'est pour le chargement d'écran : Signale que le guest a fini le chargement du monde"""
+        with self._lock:
+            self._is_ready = True
+
     def get_map_data(self) -> Optional[Dict[str, Any]]:
         """Retourne les données de map reçues à la connexion initiale."""
         return self._map_data
@@ -407,6 +496,13 @@ class GuestNetwork:
     def update(self, game_state: Dict[str, Any]) -> Dict[str, Any]:
         """Appelé par le game loop à 60 FPS — O(1), juste un swap de référence."""
         with self._lock:
+            # Injecte le RTT moyen courant dans le paquet sortant
+            game_state["rtt_ms"] = self.rtt_tracker.average_ms
+
+            if self._is_ready:
+                game_state["ready"] = True
+                self._is_ready = False
+
             self._outgoing_back = game_state
             self._outgoing_dirty = True
 
@@ -499,17 +595,27 @@ class GuestNetwork:
                 if snapshot.get("close"):
                     self._close_sent.set()
 
+                # Horodatage juste avant l'attente de la réponse
+                t0 = self.rtt_tracker.start()
+
                 raw = await asyncio.wait_for(self._reader.readline(), timeout=2.0)
                 if not raw:
                     print("[Guest] Host a fermé la connexion")
                     self._stop_event.set()
                     break
 
+                # Enregistrement du RTT dès la réception
+                self.rtt_tracker.record(t0)
+
                 data = bytes_to_dict(raw)
                 if data is None or data.get("close"):
                     print("[Guest] Host a fermé la connexion")
                     self._stop_event.set()
                     break
+
+                if data.get("reset"):
+                    with self._lock:
+                        self._map_data = data["map"]
 
                 self._set_incoming(data)
 

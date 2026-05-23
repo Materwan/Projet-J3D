@@ -8,11 +8,11 @@ import time
 import pygame
 
 import numpy as np
+from utils import resource_path
 from map import Map
 from camera_system import Camera
 from animations import AnimationController
 from moteur import Moteur
-
 
 RECALC_MAX = 0.5
 DEATH_TIME = 1
@@ -136,7 +136,7 @@ class Ennemi:
 
         # -- Animation --
         self.animation = AnimationController(
-            r"Ressources\Animations\Ennemis\ennemy_1", None, self.screen
+            resource_path(r"Ressources\Animations\Ennemis\ennemy_1"), None, self.screen
         )
         self.direction = "right"
 
@@ -242,12 +242,19 @@ class Ennemi:
                 self.hitbox.center = self.position
                 self.hitbox_damage.midbottom = self.position
 
-    def update(self, *hitbox_joueur: pygame.Rect):
+    def update(self, *joueurs):
+        hitbox_joueur = [j.hitbox for j in joueurs if not j.is_dead]
 
         if not self.dying:
 
+            # ajout thibaut car sinon ça crash si les deux joueur sont mort
+            tempo = [hitbox.center for hitbox in hitbox_joueur]
+            if tempo == []:
+                self.update_animation()
+                return
+
             # -- Path --
-            self.update_path([hitbox.center for hitbox in hitbox_joueur])
+            self.update_path(tempo)
 
             # -- State --
             self.update_velocity(hitbox_joueur)

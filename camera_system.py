@@ -1,5 +1,7 @@
-import pygame
+from typing import Tuple
 import random
+
+import pygame
 
 
 class Camera:
@@ -45,8 +47,7 @@ class Camera:
             self.camera.x + self.offset_x, self.camera.y + self.offset_y
         )
 
-    def update(self, target):
-        target: pygame.Rect
+    def update(self, target: pygame.Rect):
 
         # 1. Calcul de la destination (centrage) - On utilise target_rect maintenant
         target_x = -target.centerx + int(self.width / 2)
@@ -76,3 +77,7 @@ class Camera:
         # On s'assure que même avec le tremblement, on ne sort pas de la map. BTW erwan faudra renseigner les dimensions de la map dans le constructeur de la caméra pour que ca marche
         self.camera.x = max(-(self.map_width - self.width), min(0, self.camera.x))
         self.camera.y = max(-(self.map_height - self.height), min(0, self.camera.y))
+
+    def set_position(self, position: Tuple[int, int]):
+        self.camera.x = -position[0] + int(self.width / 2)
+        self.camera.y = -position[1] + int(self.height / 2)
