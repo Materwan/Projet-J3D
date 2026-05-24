@@ -133,9 +133,11 @@ class Game(DefaultManager):
 
         # Stats de run
         self.run_stats = RunStats()
-        self.permanent_xp = 1000  # à inclure dans save/load !!!!!!!!!!!!!!!!!!!!!!!!!
+        self.permanent_xp = 1000
         self.font_xp = pygame.font.SysFont("segoeui", 18, bold=True)
         self.permanent_max_pv_bonus = 0
+        self._guest_permanent_xp: int = 1000
+        self._guest_permanent_max_pv_bonus: int = 0
 
     def set_screen(self, screen: pygame.Surface):
         self.screen = screen
@@ -160,6 +162,10 @@ class Game(DefaultManager):
             else:
                 ui.inv.remove_item(slot[0], slot[1], 1)
                 self.player_controller.update_pv(-1)
+
+    def is_in_hub(self) -> bool:
+        """True uniquement si la carte active est le Hub."""
+        return self.map is not None and isinstance(self.map.map, Hub)
 
     def initialize(self):
         """Initialise le moteur, la map, le contrôleur et le réseau.
@@ -190,6 +196,11 @@ class Game(DefaultManager):
             initial = self.network.get_initial_state()
             guest_start = tuple(initial.get("guest", {}).get("position", (0, 0)))
             host_start = tuple(initial.get("host", {}).get("position", (0, 0)))
+            print(initial)
+            self.permanent_xp = initial.get("guest", {}).get("permanent_xp", 0)
+            self.permanent_max_pv_bonus = initial.get("guest", {}).get(
+                "permanent_max_pv_bonus", 0
+            )
 
             self.player_controller = GuestController(
                 self.screen, self.camera, self.moteur, guest_start
@@ -424,6 +435,9 @@ class Game(DefaultManager):
 
         if include_map:
             dic["map"] = self.map._get_to_send_data()
+            # Données permanentes du guest renvoyées au guest lors de la connexion
+            dic["guest"]["permanent_xp"] = self._guest_permanent_xp
+            dic["guest"]["permanent_max_pv_bonus"] = self._guest_permanent_max_pv_bonus
 
         return dic
 
@@ -437,6 +451,8 @@ class Game(DefaultManager):
                 "velocity": list(gc.velocity),
                 "moving_intent": gc.moving_intent,
                 "attaque": gc.animation.current_state == "attack",
+                "permanent_xp": self.permanent_xp,
+                "permanent_max_pv_bonus": self.permanent_max_pv_bonus,
             },
             "map": {
                 "name": self.map.map_name,
@@ -454,6 +470,11 @@ class Game(DefaultManager):
             hc.guest.velocity = self.moteur.verif_velocity(data["guest"]["velocity"])
             hc.guest.moving_intent = data["guest"]["moving_intent"]
             hc.guest.attaque = data["guest"]["attaque"]
+
+            # Mise à jour des données permanentes du guest (pour sauvegarde)
+            self._guest_permanent_xp = data["guest"]["permanent_xp"]
+            self._guest_permanent_max_pv_bonus = data["guest"]["permanent_max_pv_bonus"]
+
             if hc.guest.current_map != self.map[data["map"]["name"]]:
                 self._change_map(hc.guest, data["map"]["name"], move_camera=False)
                 if self.player_controller.hitbox.colliderect(
@@ -582,8 +603,6 @@ class Game(DefaultManager):
                 ):
                     EFFECT["slash"].play()
                     self.player_controller.attaque = True
-                elif event.key == pygame.K_0:
-                    self.save()
                 elif event.key == pygame.K_F2:  # Debug F2
                     self.show_hitbox = not self.show_hitbox
                 elif event.key == pygame.K_F3:  # Debug F2
@@ -1208,14 +1227,39 @@ class Game(DefaultManager):
 
             f.write(json.dumps(data, indent="\t"))
 
+    def save(self, file: str | None = "save.json"):
+        if not self.is_in_hub():
+            return
+
+        base = {
+            "last_save": str(datetime.datetime.today()),
+            "game_name": self.game_name,
+            "playing_mode": (
+                "solo"
+                if isinstance(self.player_controller, SoloPlayerController)
+                else "multi"
+            ),
+            "permanent_xp": self.permanent_xp,
+            "permanent_max_pv_bonus": self.permanent_max_pv_bonus,
+        }
+
+        if not isinstance(self.player_controller, SoloPlayerController):
+            base["guest_permanent_xp"] = self._guest_permanent_xp
+            base["guest_permanent_max_pv_bonus"] = self._guest_permanent_max_pv_bonus
+
+        with open(file, "w") as f:
+            f.write(json.dumps(base, indent="\t"))
+
     def load_save(self, file: str):
-
         with open(file, "r") as f:
-
             data = json.loads(f.read())
 
         self.game_name = data["game_name"]
-        self.playing_mode = data["playing_mode"]
+        print(self.playing_mode)
+        self.permanent_xp = data.get("permanent_xp", 0)
+        self.permanent_max_pv_bonus = data.get("permanent_max_pv_bonus", 0)
+        self._guest_permanent_xp = data.get("guest_permanent_xp", 0)
+        self._guest_permanent_max_pv_bonus = data.get("guest_permanent_max_pv_bonus", 0)
 
 
 """

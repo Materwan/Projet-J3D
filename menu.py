@@ -108,12 +108,13 @@ class Menu(DefaultManager):
             self.manager.change_state(mode)
 
         def reprendre(mode: str, partie: int):
-            self.manager.states["GAME"].playing_mode = mode
+            playing_mode = "solo" if mode == "solo" else "host"
+            self.manager.states["GAME"].playing_mode = playing_mode
             current_save = SAVE_FILE + "/" + mode + "/" + self.list_file[partie]
             self.manager.states["MENU_PAUSE"].current_save = current_save
             self.manager.states["GAME"].load_save(current_save)
-            self.manager.change_state("GAME")
-            self.manager.state.initialize()
+            self.manager.change_state("LOADING")
+            self.manager.states["LOADING"].start(playing_mode)
 
         def destroy_save(mode: str, save: str):
             os.remove(SAVE_FILE + "/" + mode + "/" + save)
@@ -819,14 +820,40 @@ class Pause_Menu(Menu):
         self.settings.event(events, coord)
         self.save.event(events, coord)
 
+    def event(self, events: list[p.event.Event]):
+        coord = p.mouse.get_pos()
+        for event in events:
+            if event.type == p.QUIT:
+                self.manager.running = False
+            elif event.type == p.KEYDOWN and event.key == p.K_ESCAPE:
+                self.resume.clicked_function()
+        self.quit.event(events, coord)
+        self.resume.event(events, coord)
+        self.settings.event(events, coord)
+
+        game = self.manager.states["GAME"]
+        if game.is_in_hub() and not isinstance(game.player_controller, GuestController):
+            self.save.event(events, coord)
+
     def update(self):
         if self.manager.states["GAME"].playing_mode != "solo":
             self.manager.states["GAME"].update()
 
     def display(self):
-        self.manager.states["GAME"].display()
+        game = self.manager.states["GAME"]
+
+        game.display()
         self.screen.blit(self.blackscreen, (0, 0))
-        self.pagedisplay()
+        for elt in self.eltpages:
+            if elt is self.save:
+                if (
+                    isinstance(game.player_controller, GuestController)
+                    or not game.is_in_hub()
+                ):
+                    continue
+            if elt is self.save and not game.is_in_hub():
+                continue
+            elt.display()
         self.declicked_all()
 
 
