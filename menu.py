@@ -565,7 +565,7 @@ class Join_Multi_Menu(Menu):
     def __init__(self, screen: p.Surface, manager: "Manager"):
         super().__init__(screen, manager)
         self.serveurs_save = 0
-        self.list_button: List[a.Button] = []
+        self.list_button: Dict = {}
         self.manager.running = True
         self.serveurs = {}
         self.serveurs: Dict[Dict]
@@ -595,8 +595,8 @@ class Join_Multi_Menu(Menu):
 
     def set_screen(self, screen: p.Surface):
         super().set_screen(screen)
-        for count, button in enumerate(self.list_button):
-            button.set_screen(
+        for count, button in enumerate(self.list_button.keys()):
+            self.list_button[button].set_screen(
                 screen, (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 200 + count * 150)
             )
 
@@ -652,7 +652,7 @@ class Join_Multi_Menu(Menu):
                 print("UDP recieve protocol stopped")
 
     def create_list_button(self):
-        self.list_button = []
+        self.list_button = {}
         count = 0
         for serveur in self.serveurs.keys():
             button = a.Button(
@@ -660,9 +660,9 @@ class Join_Multi_Menu(Menu):
                 self.screen,
                 (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 200 + count * 150),
                 self.rejoindre,
-                text=serveur["Game name"],
+                text=self.serveurs[serveur]["Game name"],
             )
-            self.list_button.append(button)
+            self.list_button[serveur] = button
             count += 1
 
     def event(self, events: list[p.event.Event]):
@@ -674,8 +674,8 @@ class Join_Multi_Menu(Menu):
                 self.udp_event.clear()
                 self.manager.change_state("MENU_PLAY")
         self.retour.event(events, coord, "MENU_PLAY")
-        for elt in self.list_button:
-            elt.event(events, coord, elt.text.to_display_text)
+        for elt in self.list_button.keys():
+            self.list_button[elt].event(events, coord, elt)
 
     def update(self):
         pass
@@ -685,7 +685,8 @@ class Join_Multi_Menu(Menu):
         if len(self.serveurs) != self.serveurs_save:
             self.serveurs_save = len(self.serveurs)
             self.create_list_button()
-            self.eltpages = self.list_button[:]
+            for elt in self.list_button.keys():
+                self.eltpages.append(self.list_button[elt])
             self.eltpages.append(self.retour)
         self.pagedisplay()
         self.declicked_all()
