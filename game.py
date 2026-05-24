@@ -239,6 +239,11 @@ class Game(DefaultManager):
                 )
                 self.player_controller.guest.position.x += 20
 
+                self.player_controller.guest.max_pv += (
+                    self._guest_permanent_max_pv_bonus
+                )
+                self.player_controller.guest.pv = self.player_controller.guest.max_pv
+
                 # Réseau : construction de l'état initial avec la map
                 initial_state = self.get_to_send_data_host(include_map=True)
                 self.network = HostNetwork(self.port)
@@ -1126,6 +1131,9 @@ class Game(DefaultManager):
                 self.player_controller.guest.position
             )
             self.player_controller.current_map = self.map.map
+
+            self.player_controller.guest.max_pv += self._guest_permanent_max_pv_bonus
+            self.player_controller.guest.pv = self.player_controller.guest.max_pv
 
             # HUD
             self.hud.player_controller = self.player_controller
