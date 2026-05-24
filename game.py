@@ -618,6 +618,10 @@ class Game(DefaultManager):
                     self.show_hitbox = not self.show_hitbox
                 elif event.key == pygame.K_F3:  # Debug F2
                     self.print_send_data = not self.print_send_data
+                elif event.key == pygame.K_BACKSPACE:
+                    # pour revenir au HUB
+                    if not isinstance(self.map.map, Hub):
+                        self.player_controller.update_pv(-999)
                 elif event.key == pygame.K_TAB:  # Ouvre inventaire
                     if self.ui_joueur.is_visible == False:
                         EFFECT["open_inv"].play()
