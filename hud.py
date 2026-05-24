@@ -4,6 +4,7 @@ from utils import resource_path
 from camera_system import Camera
 from particule import spawn_local_particle
 from player import SoloPlayerController, HostController, GuestController
+from sound import EFFECT
 
 
 class HUD:
@@ -57,6 +58,7 @@ class HUD:
 
         # si perte de PV alors déclencher les effets visuels
         if new_pv < self.pv:
+            EFFECT["damage_player"].play()
             self.anim_timer = current_time
             self.is_flashing = True
             for _ in range(25):
@@ -86,20 +88,19 @@ class HUD:
 
         self.particles.update(dt)
 
-    def draw(self):
-        for i in range(self.max_pv):
+    def draw(self, pv: int = None, max_pv: int = None):
+        """pv et max_pv sont optionnels pour afficher une prévisualisation."""
+        pv = pv if pv is not None else self.pv
+        max_pv = max_pv if max_pv is not None else self.max_pv
+
+        for i in range(max_pv):
             x = self.margin_x + (i * self.gap)
             y = self.margin_y
 
-            # HP : état normal
-            if i < self.pv:
+            if i < pv:
                 self.screen.blit(self.base_heart, (x, y))
-
-            # HP : flash blanc
-            elif i == self.pv and self.is_flashing:
+            elif i == pv and self.is_flashing:
                 self.screen.blit(self.damaged_heart, (x, y))
-
-            # HP : vide
             else:
                 self.screen.blit(self.empty_heart, (x, y))
 

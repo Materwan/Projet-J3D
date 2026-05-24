@@ -5,7 +5,6 @@ import datetime
 import json
 from random import randint
 from typing import Dict, List, Any, Tuple, TYPE_CHECKING
-import os
 import pprint
 
 import pygame
@@ -19,13 +18,14 @@ from player import (
 from utils import resource_path, DefaultManager
 from network import HostNetwork, GuestNetwork
 from moteur import Moteur
-from map import MapManager, STR_TYPE
+from map import MapManager, STR_TYPE, Hub
 from camera_system import Camera
 from hud import HUD
 from inventory import Item, Inventaire, InventaireUI, InventaireManager
 from ennemis import Ennemi
 from particule import spawn_local_particle
-from pnj import PNJ, PNJManager
+from pnj import PNJManager
+from sound import EFFECT
 
 if TYPE_CHECKING:
     from main import Manager
@@ -70,10 +70,10 @@ class Game(DefaultManager):
 
         # -- Raccourcis --
         self.keybinds = {
-            "up": pygame.K_UP,
-            "down": pygame.K_DOWN,
-            "left": pygame.K_LEFT,
-            "right": pygame.K_RIGHT,
+            "up": pygame.K_z,
+            "down": pygame.K_s,
+            "left": pygame.K_q,
+            "right": pygame.K_d,
             "attack": pygame.K_SPACE,
         }
 
@@ -125,7 +125,7 @@ class Game(DefaultManager):
         self.drag_mgr = InventaireManager(self.screen, [self.ui_joueur])
 
         # Items de départ :
-        self.inv_joueur.add_item(Item.create("Potion Rouge", 3))
+        self.inv_joueur.add_item(Item.create("Potion Rouge", 2))
 
         # PNJ :
         self.pnj_manager = PNJManager(self.screen, self.camera)
@@ -133,7 +133,11 @@ class Game(DefaultManager):
 
         # Stats de run
         self.run_stats = RunStats()
-        self.permanent_xp = 0  # à inclure dans save/load !!!!!!!!!!!!!!!!!!!!!!!!!
+        self.permanent_xp = 1000
+        self.font_xp = pygame.font.SysFont("segoeui", 18, bold=True)
+        self.permanent_max_pv_bonus = 0
+        self._guest_permanent_xp: int = 1000
+        self._guest_permanent_max_pv_bonus: int = 0
 
     def set_screen(self, screen: pygame.Surface):
         self.screen = screen
@@ -151,12 +155,17 @@ class Game(DefaultManager):
         """Inventaire : Appelé au clic droit sur un consommable."""
 
         if item.item_type == "Consommable" and item.effect is not None:
-            if self.player_controller.pv >= self.player_controller.max_pv:
-                print("You are already full health !")
+            if item.effect > 0:
+                if self.player_controller.pv < self.player_controller.max_pv:
+                    ui.inv.remove_item(slot[0], slot[1], 1)
+                    self.player_controller.pv += 1
             else:
                 ui.inv.remove_item(slot[0], slot[1], 1)
-                print("You've suck dry your potion : +1 HP")
-                self.player_controller.pv += 1
+                self.player_controller.update_pv(-1)
+
+    def is_in_hub(self) -> bool:
+        """True uniquement si la carte active est le Hub."""
+        return self.map is not None and isinstance(self.map.map, Hub)
 
     def initialize(self):
         """Initialise le moteur, la map, le contrôleur et le réseau.
@@ -187,6 +196,11 @@ class Game(DefaultManager):
             initial = self.network.get_initial_state()
             guest_start = tuple(initial.get("guest", {}).get("position", (0, 0)))
             host_start = tuple(initial.get("host", {}).get("position", (0, 0)))
+            print(initial)
+            self.permanent_xp = initial.get("guest", {}).get("permanent_xp", 0)
+            self.permanent_max_pv_bonus = initial.get("guest", {}).get(
+                "permanent_max_pv_bonus", 0
+            )
 
             self.player_controller = GuestController(
                 self.screen, self.camera, self.moteur, guest_start
@@ -251,6 +265,12 @@ class Game(DefaultManager):
         # -- Taille camera --
         self.camera.map_width = self.map.size[0] * self.map.tile_size[0]
         self.camera.map_height = self.map.size[1] * self.map.tile_size[1]
+
+        # Applique le bonus permanent de PV Max
+        self.player_controller.max_pv += self.permanent_max_pv_bonus
+        # Synchronise le pnj_manager avec les valeurs courantes
+        self.pnj_manager.permanent_xp = self.permanent_xp
+        self.pnj_manager.permanent_max_pv_bonus = self.permanent_max_pv_bonus
 
         # -- HUD --
         self.hud.player_controller = self.player_controller
@@ -415,6 +435,9 @@ class Game(DefaultManager):
 
         if include_map:
             dic["map"] = self.map._get_to_send_data()
+            # Données permanentes du guest renvoyées au guest lors de la connexion
+            dic["guest"]["permanent_xp"] = self._guest_permanent_xp
+            dic["guest"]["permanent_max_pv_bonus"] = self._guest_permanent_max_pv_bonus
 
         return dic
 
@@ -428,6 +451,8 @@ class Game(DefaultManager):
                 "velocity": list(gc.velocity),
                 "moving_intent": gc.moving_intent,
                 "attaque": gc.animation.current_state == "attack",
+                "permanent_xp": self.permanent_xp,
+                "permanent_max_pv_bonus": self.permanent_max_pv_bonus,
             },
             "map": {
                 "name": self.map.map_name,
@@ -445,6 +470,11 @@ class Game(DefaultManager):
             hc.guest.velocity = self.moteur.verif_velocity(data["guest"]["velocity"])
             hc.guest.moving_intent = data["guest"]["moving_intent"]
             hc.guest.attaque = data["guest"]["attaque"]
+
+            # Mise à jour des données permanentes du guest (pour sauvegarde)
+            self._guest_permanent_xp = data["guest"]["permanent_xp"]
+            self._guest_permanent_max_pv_bonus = data["guest"]["permanent_max_pv_bonus"]
+
             if hc.guest.current_map != self.map[data["map"]["name"]]:
                 self._change_map(hc.guest, data["map"]["name"], move_camera=False)
                 if self.player_controller.hitbox.colliderect(
@@ -571,15 +601,18 @@ class Game(DefaultManager):
                     event.key == self.keybinds["attack"]
                     and not self.player_controller.is_dead
                 ):
+                    EFFECT["slash"].play()
                     self.player_controller.attaque = True
-                elif event.key == pygame.K_0:
-                    self.save()
                 elif event.key == pygame.K_F2:  # Debug F2
                     self.show_hitbox = not self.show_hitbox
                 elif event.key == pygame.K_F3:  # Debug F2
                     self.print_send_data = not self.print_send_data
-                elif event.key == pygame.K_i:  # Ouvre inventaire
-                    self.ui_joueur.is_visible = not self.ui_joueur.is_visible
+                elif event.key == pygame.K_TAB:  # Ouvre inventaire
+                    if self.ui_joueur.is_visible == False:
+                        EFFECT["open_inv"].play()
+                        self.ui_joueur.is_visible = True
+                    else:
+                        self.ui_joueur.is_visible = False
 
             if not self.pnj_manager.handle_event(event, mouse_pos):
                 self.drag_mgr.handle_event(event, mouse_pos, on_use=self._on_use)
@@ -652,6 +685,7 @@ class Game(DefaultManager):
         # Guest : gerer dans update_ennemis_guest() et appeler via update_variables_guest
 
         # PNJ
+        old_max_pv_bonus = self.permanent_max_pv_bonus
         self.pnj_manager.set_inventaire(self.inv_joueur, self.money)
         self.pnj_manager.update(
             (
@@ -661,6 +695,15 @@ class Game(DefaultManager):
             self.manager.clock.get_time(),
         )
         self.money = self.pnj_manager.money
+        self.permanent_xp = self.pnj_manager.permanent_xp
+        self.permanent_max_pv_bonus = self.pnj_manager.permanent_max_pv_bonus
+
+        # Mise à jour des permanent_max_pv_bonus
+        delta = self.permanent_max_pv_bonus - old_max_pv_bonus
+        if delta > 0:
+            self.player_controller.max_pv += delta
+            self.player_controller.pv = self.player_controller.max_pv
+            self.hud.max_pv = self.player_controller.max_pv
 
         # -- Particules --
         self.update_particles()
@@ -683,6 +726,8 @@ class Game(DefaultManager):
         if player_controller == self.player_controller:
             self.ennemis = self.map.get_ennemis()
             self.pnj_manager = self.map.get_pnjs()
+            self.pnj_manager.permanent_xp = self.permanent_xp
+            self.pnj_manager.permanent_max_pv_bonus = self.permanent_max_pv_bonus
             self.camera.map_width = self.map.size[0] * self.map.tile_size[0]
             self.camera.map_height = self.map.size[1] * self.map.tile_size[1]
         elif isinstance(self.player_controller, HostController):
@@ -722,64 +767,116 @@ class Game(DefaultManager):
                 )
 
     def update_particles(self):
-        """if len(self.particles) < 50:  # Limite pour les performances
+        if len(self.particles) < 50:  # Limite pour les performances
+            # On récupère les coordonnées du monde actuellement à l'écran
+            # On prend une marge de 100 pixels pour que les particules
+            # n'apparaissent pas "magiquement" sur le bord
+            margin = 100
 
-        # On récupère les coordonnées du monde actuellement à l'écran
-        # On prend une marge de 100 pixels pour que les particules
-        # n'apparaissent pas "magiquement" sur le bord
-        margin = 100
+            # Le top-left de la caméra est en négatif (ex: -4000),
+            # on l'inverse pour avoir la position monde
+            visible_world_x = -self.camera.camera.x
+            visible_world_y = -self.camera.camera.y
 
-        # Le top-left de la caméra est en négatif (ex: -4000),
-        # on l'inverse pour avoir la position monde
-        visible_world_x = -self.camera.camera.x
-        visible_world_y = -self.camera.camera.y
-
-        # On définit la zone de spawn
-        spawn_x = randint(
-            int(visible_world_x - margin),
-            int(visible_world_x + self.screen.get_width() + margin),
-        )
-        spawn_y = randint(
-            int(visible_world_y - margin),
-            int(visible_world_y + self.screen.get_height() + margin),
-        )
-        spawn_local_particle(
-            self.particles,
-            sprite_path="Ressources/Particles/dust.png",
-            pos=(spawn_x, spawn_y),
-            size=10,
-            speed_range=(25, 45),
-            chaos=0.2,
-            shrink_range=(2, 15),
-            rot=10,
-        )"""
+            # On définit la zone de spawn
+            spawn_x = randint(
+                int(visible_world_x - margin),
+                int(visible_world_x + self.screen.get_width() + margin),
+            )
+            spawn_y = randint(
+                int(visible_world_y - margin),
+                int(visible_world_y + self.screen.get_height() + margin),
+            )
+            spawn_local_particle(
+                self.particles,
+                sprite_path="Ressources/Particles/dust.png",
+                pos=(spawn_x, spawn_y),
+                size=10,
+                speed_range=(25, 45),
+                chaos=0.2,
+                shrink_range=(2, 15),
+                rot=10,
+            )
         self.particles.update(self.manager.clock.get_time() / 1000)
+
+    def _draw_decor(self, args: Tuple[pygame.Surface, Tuple[int, int]]):
+        self.screen.blit(args[0], args[1])
 
     def display(self):
         """Affiche tout les éléments."""
         # -- Reset --
         self.screen.fill((32, 35, 32))
 
-        # -- Map --
+        # -- Map -- affiche uniquement le sol !
         self.map.display(self.camera)
 
-        # -- Joueur --
-        self.player_controller.display()
+        # -- Entités triées par Painter's Algorithm --
+        drawables = []
+
+        # -- Objets de décor --
+        for (
+            world_bottom_y,
+            surface,
+            (world_x, world_y),
+        ) in self.map.get_visible_objects():
+            screen_x = world_x + self.camera.camera.x + self.camera.offset_x
+            screen_y = world_y + self.camera.camera.y + self.camera.offset_y
+            drawables.append(
+                (world_bottom_y, self._draw_decor, (surface, (screen_x, screen_y)))
+            )
+
+        # -- Players --
+        pc = self.player_controller
+        if not pc.is_dead:
+            drawables.append((pc.hitbox.bottom, PlayerControllerBase.display, pc))
+        partner = None
+        if (
+            isinstance(pc, HostController)
+            and not pc.guest.is_dead
+            and pc.current_map == pc.guest.current_map
+        ):
+            partner = pc.guest
+        elif (
+            isinstance(pc, GuestController)
+            and not pc.host.is_dead
+            and pc.current_map == pc.host.current_map
+        ):
+            partner = pc.host
+        if partner:
+            drawables.append(
+                (partner.hitbox.bottom, PlayerControllerBase.display, partner)
+            )
 
         # -- Ennemis --
         for ennemi in self.map.ennemis.values():
-            ennemi.display()
-
-        # -- Particules --
-        for sprite in self.particles:
-            self.screen.blit(sprite.image, self.camera.apply(sprite.rect))
+            if ennemi.hitbox:
+                drawables.append((ennemi.hitbox.bottom, Ennemi.display, ennemi))
 
         # -- PNJ --
-        self.pnj_manager.draw_pnj()
+        screen_rect = pygame.Rect(
+            0, 0, self.screen.get_width(), self.screen.get_height()
+        )
+        for pnj in self.pnj_manager.pnjs:
+            screen_hitbox = self.camera.apply(pnj.hitbox)
+            if screen_rect.colliderect(screen_hitbox):
+                drawables.append((pnj.hitbox.bottom, self.pnj_manager.draw_pnj, pnj))
+
+        # Tri et rendu
+        for _, fn, entity in sorted(drawables, key=lambda x: x[0]):
+            fn(entity)
+
+        # Puis on affiche par dessus toute les entitées ceci :
+
+        # -- Bulle [E] PNJ (toujours au-dessus) --
+        self.pnj_manager.draw_pnj_bubble()
 
         # -- F2 : TOUTES les hitboxes --
         if self.show_hitbox:
             self.draw_debug_hitboxes()
+
+        # -- Particules --
+        for sprite in self.particles:
+            self.screen.blit(sprite.image, self.camera.apply(sprite.rect))
 
         # -- Inventaire -- seulement si pas d'UI PNJ
         if self.pnj_manager.mode is None:
@@ -788,8 +885,52 @@ class Game(DefaultManager):
         # -- PNJ UI --
         self.pnj_manager.draw_ui(pygame.mouse.get_pos())
 
+        # -- XP Hub --
+        self.draw_xp_hub()
+
         # -- HUD --
-        self.hud.draw()
+        if self.pnj_manager.mode == "amelioration":
+            bonus = (
+                self.pnj_manager.upgrade_ui.max_pv_bonus - self.permanent_max_pv_bonus
+            )
+            self.hud.draw(
+                pv=self.player_controller.pv + bonus,
+                max_pv=self.player_controller.max_pv + bonus,
+            )
+        else:
+            self.hud.draw()
+
+    def draw_xp_hub(self):
+        """Affiche l'XP permanente en bas à droite — Hub uniquement."""
+        if not isinstance(self.map.map, Hub):
+            return
+
+        # Lecture en temps réel si l'UI d'amélioration est ouverte
+        if self.pnj_manager.mode == "amelioration":
+            xp = self.pnj_manager.upgrade_ui.xp
+            bonus = self.pnj_manager.upgrade_ui.max_pv_bonus
+        else:
+            xp = self.permanent_xp
+            bonus = self.permanent_max_pv_bonus
+
+        lines = [
+            (f"XP  {xp}", (255, 215, 0)),
+            (f"PV Max  +{bonus}", (100, 220, 100)),
+        ]
+        margin, pad_x, pad_y, gap = 12, 10, 6, 4
+        rendered = [self.font_xp.render(t, True, c) for t, c in lines]
+        w = max(s.get_width() for s in rendered) + pad_x * 2
+        h = sum(s.get_height() for s in rendered) + pad_y * 2 + gap
+        x = self.screen.get_width() - w - margin
+        y = self.screen.get_height() - h - margin
+        bg = pygame.Surface((w, h), pygame.SRCALPHA)
+        pygame.draw.rect(bg, (14, 14, 26, 210), (0, 0, w, h), border_radius=7)
+        pygame.draw.rect(bg, (180, 150, 0, 200), (0, 0, w, h), width=1, border_radius=7)
+        self.screen.blit(bg, (x, y))
+        cy = y + pad_y
+        for surf in rendered:
+            self.screen.blit(surf, (x + pad_x, cy))
+            cy += surf.get_height() + gap
 
     def draw_debug_hitboxes(self):
         """
@@ -930,21 +1071,30 @@ class Game(DefaultManager):
             self.map.reset(
                 self.camera, 7, self.nb_chunks, self.chunk_size, self.octaves, self.seed
             )
-            self.player_controller = SoloPlayerController(
-                self.screen, self.camera, self.moteur, self.map.start_position
-            )
-            self.player_controller.current_map = self.map.map
 
+            # Mise à jour de la caméra avec les nouvelles dimensions
             sizes = [m.size for m in self.map.maps.values()]
             self.camera.map_width = max(s[0] for s in sizes) * self.map.tile_size[0]
             self.camera.map_height = max(s[1] for s in sizes) * self.map.tile_size[1]
             self.camera.set_position(self.map.start_position)
 
+            # Respawn le joueur dans le hub
+            self.player_controller = SoloPlayerController(
+                self.screen, self.camera, self.moteur, self.map.start_position
+            )
+            self.player_controller.current_map = self.map.map
+
+            # HUD
             self.hud.player_controller = self.player_controller
+            self.player_controller.max_pv += self.permanent_max_pv_bonus
+            self.player_controller.pv = self.player_controller.max_pv
             self.hud.max_pv = self.player_controller.max_pv
             self.hud.pv = self.player_controller.pv
 
+            # PNJ
             self.pnj_manager = self.map.get_pnjs()
+            self.pnj_manager.permanent_xp = self.permanent_xp
+            self.pnj_manager.permanent_max_pv_bonus = self.permanent_max_pv_bonus
 
         elif self.playing_mode == "host":
             self.seed = randint(0, 999999)
@@ -956,6 +1106,7 @@ class Game(DefaultManager):
             sizes = [m.size for m in self.map.maps.values()]
             self.camera.map_width = max(s[0] for s in sizes) * self.map.tile_size[0]
             self.camera.map_height = max(s[1] for s in sizes) * self.map.tile_size[1]
+            self.camera.set_position(self.map.start_position)
 
             # Respawn des deux joueurs dans le hub (première map = hub)
             hub_start = self.map.start_position
@@ -971,24 +1122,28 @@ class Game(DefaultManager):
             self.player_controller.guest.hitbox_damage.midbottom = (
                 self.player_controller.guest.position
             )
-            self.player_controller.keybinds = self.keybinds
             self.player_controller.current_map = self.map.map
 
             # HUD
             self.hud.player_controller = self.player_controller
+            self.player_controller.max_pv += self.permanent_max_pv_bonus
+            self.player_controller.pv = self.player_controller.max_pv
             self.hud.max_pv = self.player_controller.max_pv
             self.hud.pv = self.player_controller.pv
 
             # PNJ
             self.pnj_manager = self.map.get_pnjs()
+            self.pnj_manager.permanent_xp = self.permanent_xp
+            self.pnj_manager.permanent_max_pv_bonus = self.permanent_max_pv_bonus
 
             # Envoie la nouvelle map au guest via le slot prioritaire :
             # send_reset() garantit que ce paquet sera transmis exactement une
             # fois par le thread TCP, sans risque d'être écrasé par un frame
             # de jeu normal avant d'avoir été lu.
-            self.network.send_reset(
-                self.get_to_send_data_host(include_map=True, reset=True)
-            )
+            if self.network is not None:
+                self.network.send_reset(
+                    self.get_to_send_data_host(include_map=True, reset=True)
+                )
             self.player_controller.guest.position.x += 20
 
         elif self.playing_mode == "guest":
@@ -1003,6 +1158,7 @@ class Game(DefaultManager):
             sizes = [m.size for m in self.map.maps.values()]
             self.camera.map_width = max(s[0] for s in sizes) * self.map.tile_size[0]
             self.camera.map_height = max(s[1] for s in sizes) * self.map.tile_size[1]
+            self.camera.set_position(self.map.start_position)
 
             # Respawn dans le hub
             hub_start = self.map.start_position
@@ -1014,16 +1170,19 @@ class Game(DefaultManager):
             self.player_controller.host.position.update(hub_start)
             self.player_controller.host.hitbox.center = hub_start
             self.player_controller.host.hitbox_damage.midbottom = hub_start
-            self.player_controller.keybinds = self.keybinds
             self.player_controller.current_map = self.map.map
 
             # HUD
             self.hud.player_controller = self.player_controller
+            self.player_controller.max_pv += self.permanent_max_pv_bonus  # ← ajoute
+            self.player_controller.pv = self.player_controller.max_pv  # ← ajoute
             self.hud.max_pv = self.player_controller.max_pv
             self.hud.pv = self.player_controller.pv
 
             # PNJ
             self.pnj_manager = self.map.get_pnjs()
+            self.pnj_manager.permanent_xp = self.permanent_xp
+            self.pnj_manager.permanent_max_pv_bonus = self.permanent_max_pv_bonus
 
         # -- Keybinds --
         self.player_controller.keybinds = self.keybinds
@@ -1082,14 +1241,39 @@ class Game(DefaultManager):
 
             f.write(json.dumps(data, indent="\t"))
 
+    def save(self, file: str | None = "save.json"):
+        if not self.is_in_hub():
+            return
+
+        base = {
+            "last_save": str(datetime.datetime.today()),
+            "game_name": self.game_name,
+            "playing_mode": (
+                "solo"
+                if isinstance(self.player_controller, SoloPlayerController)
+                else "multi"
+            ),
+            "permanent_xp": self.permanent_xp,
+            "permanent_max_pv_bonus": self.permanent_max_pv_bonus,
+        }
+
+        if not isinstance(self.player_controller, SoloPlayerController):
+            base["guest_permanent_xp"] = self._guest_permanent_xp
+            base["guest_permanent_max_pv_bonus"] = self._guest_permanent_max_pv_bonus
+
+        with open(file, "w") as f:
+            f.write(json.dumps(base, indent="\t"))
+
     def load_save(self, file: str):
-
         with open(file, "r") as f:
-
             data = json.loads(f.read())
 
         self.game_name = data["game_name"]
-        self.playing_mode = data["playing_mode"]
+        print(self.playing_mode)
+        self.permanent_xp = data.get("permanent_xp", 0)
+        self.permanent_max_pv_bonus = data.get("permanent_max_pv_bonus", 0)
+        self._guest_permanent_xp = data.get("guest_permanent_xp", 0)
+        self._guest_permanent_max_pv_bonus = data.get("guest_permanent_max_pv_bonus", 0)
 
 
 """
@@ -1172,6 +1356,7 @@ class RecapScreen:
         self.guest_btn_clicked = False
         self.time = 0.0
         self.phase = True
+        EFFECT["game_over"].play()
 
     def return_HUB(self):
 

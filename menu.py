@@ -29,6 +29,49 @@ SAVE_SOLO = os.path.join(SAVE_FILE, "solo")
 UDP_IP = "0.0.0.0"
 UDP_PORT = 9999
 
+FULLSCREEN_SIZE = p.display.Info().current_w, p.display.Info().current_h
+
+
+"""----------------------------------------"""
+
+
+class InputBox(DefaultManager):
+
+    def __init__(self, manager: "Manager", x, y, w, h, screen, text=""):
+        self.manager = manager
+        self.rect = p.Rect(x, y, w, h)
+        self.color = (255, 255, 255)
+        self.text = text
+        self.screen = screen
+        self.font = p.font.Font(None, 40)
+        self.active = False
+
+    def event(self, event):
+        if event.type == p.QUIT:
+            self.manager.running = False
+        elif event.type == p.MOUSEBUTTONDOWN:
+            self.active = self.rect.collidepoint(event.pos)
+        elif event.type == p.KEYDOWN:
+            if event.key == p.K_ESCAPE:
+                return True
+            if self.active:
+                if event.key == p.K_BACKSPACE:
+                    self.text = self.text[:-1]
+                elif event.key == p.K_RETURN:
+                    return self.text
+                elif len(self.text) < 20:
+                    self.text += event.unicode
+        return None
+
+    def draw(self):
+        txt_surface = self.font.render(self.text, True, (255, 255, 255))
+        p.draw.rect(self.screen, (30, 30, 30), self.rect)
+        p.draw.rect(self.screen, self.color, self.rect, 2)
+        self.screen.blit(txt_surface, (self.rect.x + 10, self.rect.y + 10))
+
+
+"""-------------------------------------------------"""
+
 
 class Menu(DefaultManager):
 
@@ -43,10 +86,10 @@ class Menu(DefaultManager):
         self.bg_img_coord = self.bg_img.get_rect()
         self.manager = manager
         self.keybinds = {
-            "up": p.K_UP,
-            "down": p.K_DOWN,
-            "left": p.K_LEFT,
-            "right": p.K_RIGHT,
+            "up": p.K_z,
+            "down": p.K_s,
+            "left": p.K_q,
+            "right": p.K_d,
             "attack": p.K_SPACE,
         }
         self.key = {"up": False, "down": False, "left": False, "right": False}
@@ -65,12 +108,22 @@ class Menu(DefaultManager):
             self.manager.change_state(mode)
 
         def reprendre(mode: str, partie: int):
-            self.manager.states["GAME"].playing_mode = mode
-            self.manager.states["GAME"].load_save(
-                SAVE_FILE + mode + "/" + self.list_file[partie]
-            )
-            self.manager.change_state("GAME")
-            self.manager.state.initialize()
+            playing_mode = "solo" if mode == "solo" else "host"
+            self.manager.states["GAME"].playing_mode = playing_mode
+            current_save = SAVE_FILE + "/" + mode + "/" + self.list_file[partie]
+            self.manager.states["MENU_PAUSE"].current_save = current_save
+            self.manager.states["GAME"].load_save(current_save)
+            self.manager.change_state("LOADING")
+            self.manager.states["LOADING"].start(playing_mode)
+
+        def destroy_save(mode: str, save: str):
+            os.remove(SAVE_FILE + "/" + mode + "/" + save)
+            if mode == "solo":
+                self.nbr_file_solo -= 1
+                self.manager.states["MENU_SOLO"].reset_solo()
+            else:
+                self.nbr_file_multi -= 1
+                self.manager.states["MENU_MULTIPLAYER"].reset_multi()
 
         # =======================Function Button End=======================
 
@@ -78,6 +131,7 @@ class Menu(DefaultManager):
         def no_function():
             pass
 
+        self.destroy_save = destroy_save
         self.reprendre = reprendre
         self.no_function = no_function
         # =======================Function Button End=======================
@@ -117,8 +171,11 @@ class Menu(DefaultManager):
         self.change_button_text(changetext, button)
         self.key[direction] = bool
 
-    def create_list_save_and_button(self, mode: str) -> Tuple[List[a.Button], Dict]:
+    def create_list_save_and_button(
+        self, mode: str
+    ) -> Tuple[List[a.Button], List[a.Button], Dict]:
         list_button = []
+        list_button_suppr = []
         list_save = []
         count = 0
         saves, files = get_all_saves(mode)
@@ -126,14 +183,22 @@ class Menu(DefaultManager):
             button = a.Button(
                 EMPTY_BUTTON,
                 self.screen,
-                (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 200 + count * 150),
+                (self.WINDOWS[0] // 2 - 200, self.WINDOWS[1] // 2 - 200 + count * 150),
                 self.reprendre,
                 text=serveur["game_name"],
             )
+            button_suppr = a.Button(
+                EMPTY_BUTTON,
+                self.screen,
+                (self.WINDOWS[0] // 2 + 200, self.WINDOWS[1] // 2 - 200 + count * 150),
+                self.destroy_save,
+                text="DESTROY SAVE",
+            )
             list_save.append(serveur)
             list_button.append(button)
+            list_button_suppr.append(button_suppr)
             count += 1
-        return list_button, files
+        return list_button, list_button_suppr, files
 
     def pagedisplay(self):
         for elt in self.eltpages:
@@ -254,11 +319,14 @@ class Setting_Menu(Menu):
             self.manager.change_volume(choise)
 
         def window():
-            if self.changewindow.text.to_display_text == "FULL SCREEN":
-                manager.resize((500, 500), menu_appel)
+            current = self.changewindow.text.to_display_text
+            if current == "FULL SCREEN":
+                # Borderless fullscreen : fenêtre sans bordure à la taille du bureau
+                manager.resize(FULLSCREEN_SIZE, menu_appel)
                 self.change_button_text("NOT FULL SCREEN", self.changewindow)
             else:
-                manager.resize((0, 0), menu_appel)
+                # Retour en mode fenêtré
+                manager.resize((1080, 780), menu_appel)
                 self.change_button_text("FULL SCREEN", self.changewindow)
 
         # =======================Function Button End=======================
@@ -324,11 +392,7 @@ class Setting_Menu(Menu):
             self.screen,
             (self.WINDOWS[0] - 170, 67),
             window,
-            text=(
-                "NOT FULL SCREEN"
-                if self.screen.get_size() == (500, 500)
-                else "FULL SCREEN"
-            ),
+            text=("NOT FULL SCREEN" if self.manager.fullscreen else "FULL SCREEN"),
         )
         # =======================Button End=======================
 
@@ -679,6 +743,7 @@ class Pause_Menu(Menu):
             (10, 10, 22, 100),
             (0, 0, self.WINDOWS[0], self.WINDOWS[1]),
         )
+        self.current_save = None
         self.manager.running = True
 
         # =======================Function Button Start=======================
@@ -686,14 +751,11 @@ class Pause_Menu(Menu):
             self.manager.change_state("GAME")
 
         def save():
+            self.manager.states["GAME"].save(self.current_save)
             if self.manager.states["GAME"].playing_mode == "solo":
-                self.manager.states["GAME"].save(
-                    SAVE_SOLO + "/save_" + str(self.nbr_file_solo)
-                )
+                self.manager.states["MENU_SOLO"].reset_solo()
             else:
-                self.manager.states["GAME"].save(
-                    SAVE_MULTI + "/save_" + str(self.nbr_file_multi)
-                )
+                self.manager.states["MENU_MULTIPLAYER"].reset_multi()
 
         def settings():
             self.manager.states["MENU_SETTING_PAUSE"].keybinds = self.manager.states[
@@ -758,14 +820,40 @@ class Pause_Menu(Menu):
         self.settings.event(events, coord)
         self.save.event(events, coord)
 
+    def event(self, events: list[p.event.Event]):
+        coord = p.mouse.get_pos()
+        for event in events:
+            if event.type == p.QUIT:
+                self.manager.running = False
+            elif event.type == p.KEYDOWN and event.key == p.K_ESCAPE:
+                self.resume.clicked_function()
+        self.quit.event(events, coord)
+        self.resume.event(events, coord)
+        self.settings.event(events, coord)
+
+        game = self.manager.states["GAME"]
+        if game.is_in_hub() and not isinstance(game.player_controller, GuestController):
+            self.save.event(events, coord)
+
     def update(self):
         if self.manager.states["GAME"].playing_mode != "solo":
             self.manager.states["GAME"].update()
 
     def display(self):
-        self.manager.states["GAME"].display()
+        game = self.manager.states["GAME"]
+
+        game.display()
         self.screen.blit(self.blackscreen, (0, 0))
-        self.pagedisplay()
+        for elt in self.eltpages:
+            if elt is self.save:
+                if (
+                    isinstance(game.player_controller, GuestController)
+                    or not game.is_in_hub()
+                ):
+                    continue
+            if elt is self.save and not game.is_in_hub():
+                continue
+            elt.display()
         self.declicked_all()
 
 
@@ -777,12 +865,9 @@ class Solo_Menu(Menu):
 
         # =======================Function Button Start=======================
         def create():
-            self.nbr_file_solo += 1
-            self.manager.states["GAME"].playing_mode = "solo"
-
-            # pour l'écran de chargement !
-            self.manager.change_state("LOADING")
-            self.manager.states["LOADING"].start("solo")
+            if self.nbr_file_solo < 3:
+                self.manager.states["INPUTBOX"].playing_mode = "solo"
+                self.manager.change_state("INPUTBOX")
 
         # =======================Function Button End=======================
 
@@ -796,29 +881,51 @@ class Solo_Menu(Menu):
         self.create = a.Button(
             EMPTY_BUTTON,
             self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 70),
+            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + self.WINDOWS[1] // 3),
             create,
-            text="CREATE",
+            text="CREATE" if self.nbr_file_solo < 3 else "MAXIMUM SAVE",
         )
-        self.list_button, self.list_file = self.create_list_save_and_button("solo")
-        self.len_save = len(self.list_button)
+        self.list_button, self.list_button_suppr, self.list_file = (
+            self.create_list_save_and_button("solo")
+        )
         # =======================Button End=======================
 
         self.eltpages = [self.retour, self.create]
         self.textpages = [self.solo]
         for elt in self.list_button:
             self.eltpages.append(elt)
+        for elt in self.list_button_suppr:
+            self.eltpages.append(elt)
+
+    def reset_solo(self):
+        self.list_button, self.list_button_suppr, self.list_file = (
+            self.create_list_save_and_button("solo")
+        )
+        self.change_button_text(
+            "CREATE" if self.nbr_file_solo < 3 else "MAXIMUM SAVE", self.create
+        )
+        self.eltpages = [self.retour, self.create]
+        for elt in self.list_button:
+            self.eltpages.append(elt)
+        for elt in self.list_button_suppr:
+            self.eltpages.append(elt)
 
     def set_screen(self, screen: p.Surface):
         super().set_screen(screen)
         self.solo.set_screen(self.screen, (self.WINDOWS[0] // 2, self.WINDOWS[1] // 10))
         self.create.set_screen(
-            self.screen, (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 70)
+            self.screen,
+            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + self.WINDOWS[1] // 3),
         )
         for count, button in enumerate(self.list_button):
             button.set_screen(
                 self.screen,
-                (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 200 + count * 150),
+                (self.WINDOWS[0] // 2 - 200, self.WINDOWS[1] // 2 - 200 + count * 150),
+            )
+        for count, button in enumerate(self.list_button_suppr):
+            button.set_screen(
+                self.screen,
+                (self.WINDOWS[0] // 2 + 200, self.WINDOWS[1] // 2 - 200 + count * 150),
             )
 
     def event(self, events: list[p.event.Event]):
@@ -830,8 +937,13 @@ class Solo_Menu(Menu):
                 self.manager.change_state("MENU_PLAY")
         self.retour.event(events, coord, "MENU_PLAY")
         self.create.event(events, coord)
-        for ind in range(self.len_save):
+        ind = 0
+        while ind < len(self.list_button):
             self.list_button[ind].event(events, coord, "solo", ind)
+            self.list_button_suppr[ind].event(
+                events, coord, "solo", self.list_file[ind]
+            )
+            ind += 1
 
     def update(self):
         pass
@@ -850,12 +962,9 @@ class Multiplayer_Menu(Menu):
 
         # =======================Function Button Start=======================
         def create():
-            self.nbr_file_multi += 1
-            self.manager.states["GAME"].playing_mode = "host"
-
-            # pour l'écran de chargement !
-            self.manager.change_state("LOADING")
-            self.manager.states["LOADING"].start("host")
+            if self.nbr_file_multi < 3:
+                self.manager.states["INPUTBOX"].playing_mode = "host"
+                self.manager.change_state("INPUTBOX")
 
         # =======================Function Button End=======================
 
@@ -869,19 +978,33 @@ class Multiplayer_Menu(Menu):
         self.create = a.Button(
             EMPTY_BUTTON,
             self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 70),
+            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + self.WINDOWS[1] // 3),
             create,
-            text="CREATE",
+            text="CREATE" if self.nbr_file_multi < 3 else "MAXIMUM SAVE",
         )
-        self.list_button, self.list_file = self.create_list_save_and_button(
-            "multiplayer"
+        self.list_button, self.list_button_suppr, self.list_file = (
+            self.create_list_save_and_button("multiplayer")
         )
-        self.len_save = len(self.list_button)
         # =======================Button End=======================
 
         self.eltpages = [self.retour, self.create]
         self.textpages = [self.multiplayer]
         for elt in self.list_button:
+            self.eltpages.append(elt)
+        for elt in self.list_button_suppr:
+            self.eltpages.append(elt)
+
+    def reset_multi(self):
+        self.list_button, self.list_button_suppr, self.list_file = (
+            self.create_list_save_and_button("multiplayer")
+        )
+        self.eltpages = [self.retour, self.create]
+        self.change_button_text(
+            "CREATE" if self.nbr_file_multi < 3 else "MAXIMUM SAVE", self.create
+        )
+        for elt in self.list_button:
+            self.eltpages.append(elt)
+        for elt in self.list_button_suppr:
             self.eltpages.append(elt)
 
     def set_screen(self, screen: p.Surface):
@@ -890,12 +1013,18 @@ class Multiplayer_Menu(Menu):
             self.screen, (self.WINDOWS[0] // 2, self.WINDOWS[1] // 10)
         )
         self.create.set_screen(
-            self.screen, (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 70)
+            self.screen,
+            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + self.WINDOWS[1] // 3),
         )
         for count, button in enumerate(self.list_button):
             button.set_screen(
                 self.screen,
-                (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 200 + count * 150),
+                (self.WINDOWS[0] // 2 - 200, self.WINDOWS[1] // 2 - 200 + count * 150),
+            )
+        for count, button in enumerate(self.list_button_suppr):
+            button.set_screen(
+                self.screen,
+                (self.WINDOWS[0] // 2 + 200, self.WINDOWS[1] // 2 - 200 + count * 150),
             )
 
     def event(self, events: list[p.event.Event]):
@@ -907,8 +1036,13 @@ class Multiplayer_Menu(Menu):
                 self.manager.change_state("MENU_PLAY")
         self.retour.event(events, coord, "MENU_PLAY")
         self.create.event(events, coord)
-        for ind in range(self.len_save):
+        ind = 0
+        while ind < len(self.list_button):
             self.list_button[ind].event(events, coord, "multiplayer", ind)
+            self.list_button_suppr[ind].event(
+                events, coord, "multiplayer", self.list_file[ind]
+            )
+            ind += 1
 
     def update(self):
         pass
@@ -974,6 +1108,96 @@ class Death_Screen(Menu):
         self.manager.states["GAME"].display()
         self.screen.blit(self.blackscreen, (0, 0))
         self.pagedisplay()
+
+
+class InputBox(Menu):
+
+    def __init__(self, screen: p.Surface, manager: "Manager"):
+        super().__init__(screen, manager)
+        self.manager.running = True
+        self.rect = p.Rect(
+            self.WINDOWS[0] // 2 - 150, self.WINDOWS[1] // 2 + 100, 300, 50
+        )
+        self.color = (255, 255, 255)
+        self.text = ""
+        self.screen = screen
+        self.font = p.font.Font(None, 40)
+        self.active = False
+        self.playing_mode = "solo"
+
+    def set_screen(self, screen: p.Surface):
+        super().set_screen(screen)
+        self.rect.topleft = (self.WINDOWS[0] // 2 - 150, self.WINDOWS[1] // 2 + 100)
+
+    def event(self, events: list[p.event.Event]):
+        for event in events:
+            if event.type == p.QUIT:
+                self.manager.running = False
+            elif event.type == p.MOUSEBUTTONDOWN:
+                self.active = self.rect.collidepoint(event.pos)
+            elif event.type == p.KEYDOWN:
+                if event.key == p.K_ESCAPE:
+                    if self.playing_mode == "solo":
+                        self.manager.change_state("MENU_SOLO")
+                    else:
+                        self.manager.change_state("MENU_MULTIPLAYER")
+                elif self.active:
+                    if event.key == p.K_BACKSPACE:
+                        self.text = self.text[:-1]
+                    elif event.key == p.K_RETURN:
+                        if self.playing_mode == "solo":
+                            self.lancer_solo()
+                        else:
+                            self.lancer_multi()
+                    elif len(self.text) < 20:
+                        self.text += event.unicode
+
+    def lancer_solo(self):
+        save_name = self.text.strip()
+        if save_name == "":
+            save_name = "New Game"
+        if "save_0" not in self.manager.states["MENU_SOLO"].list_file:
+            current_save = SAVE_SOLO + "/save_0"
+        elif "save_1" not in self.manager.states["MENU_SOLO"].list_file:
+            current_save = SAVE_SOLO + "/save_1"
+        else:
+            current_save = SAVE_SOLO + "/save_2"
+        self.manager.states["MENU_SOLO"].nbr_file_solo += 1
+        self.manager.states["MENU_PAUSE"].current_save = current_save
+        self.manager.states["GAME"].playing_mode = "solo"
+        self.manager.states["GAME"].game_name = save_name
+        self.manager.change_state("LOADING")
+        self.manager.states["LOADING"].start("solo")
+
+    def lancer_multi(self):
+        save_name = self.text.strip()
+        if save_name == "":
+            save_name = "New Game"
+        if "save_0" not in self.manager.states["MENU_MULTIPLAYER"].list_file:
+            current_save = SAVE_MULTI + "/save_0"
+        elif "save_1" not in self.manager.states["MENU_MULTIPLAYER"].list_file:
+            current_save = SAVE_MULTI + "/save_1"
+        else:
+            current_save = SAVE_MULTI + "/save_2"
+        self.manager.states["MENU_MULTIPLAYER"].nbr_file_multi += 1
+        self.manager.states["MENU_PAUSE"].current_save = current_save
+        self.manager.states["GAME"].playing_mode = "host"
+        self.manager.states["GAME"].game_name = save_name
+        self.manager.change_state("LOADING")
+        self.manager.states["LOADING"].start("host")
+
+    def draw(self):
+        txt_surface = self.font.render(self.text, True, (255, 255, 255))
+        p.draw.rect(self.screen, (30, 30, 30), self.rect)
+        p.draw.rect(self.screen, self.color, self.rect, 2)
+        self.screen.blit(txt_surface, (self.rect.x + 10, self.rect.y + 10))
+
+    def update(self):
+        pass
+
+    def display(self):
+        self.screen.blit(self.blackscreen, (0, 0))
+        self.draw()
 
 
 def get_all_saves(mode: str) -> List[Dict[str, str]] | List[str]:

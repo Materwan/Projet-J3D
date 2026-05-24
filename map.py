@@ -30,6 +30,8 @@ TILESET_DIRECTORY = resource_path(r"Ressources\TileSet")
 TILEMAP_DIRECTORY = resource_path(r"Ressources\TileMap")
 DUNGEON_TILEMAP_DIRECTORY = resource_path(r"Ressources\TileMap")
 
+YSORT_TYPES = {"tree", "bush", "rock"}
+
 
 def get_dungeon_tiles(
     tmx_filepath,
@@ -412,6 +414,57 @@ class Chunk:
 
         ground_sur.blit(asset_sur, (0, 0))
         return ground_sur
+
+    def render_ground(self) -> pygame.Surface:
+        """Pre-render sol + tous les objets NON Y-sortés — mis en cache."""
+        ground_sur = pygame.Surface(
+            (self.chunk_size + 5) * self.tile_size, pygame.SRCALPHA
+        )
+        blit_sequence = [
+            (
+                self.asset["ground"]["image"],
+                (x * self.tile_size[0], y * self.tile_size[1]),
+            )
+            for x, y in zip(*np.where(self.ground))
+        ]
+        ground_sur.blits(blit_sequence)
+
+        for obj in sorted(self.object, key=lambda o: o["z"]):
+            if obj["type"] in YSORT_TYPES:
+                continue  # sera géré par le Y-sort
+            asset = self.asset[obj["type"]]
+            surface = (
+                asset["image"]
+                if obj["variant"] == -1
+                else asset[obj["variant"]]["image"]
+            )
+            ground_sur.blit(
+                surface, (obj["x"] * self.tile_size[0], obj["y"] * self.tile_size[1])
+            )
+
+        return ground_sur
+
+    def get_objects_surfaces(
+        self, chunk_world_x: int, chunk_world_y: int
+    ) -> List[Tuple[int, pygame.Surface, Tuple[int, int]]]:
+        """Retourne uniquement les objets Y-sortables (arbres, buissons, rochers)."""
+        result = []
+        for obj in self.object:
+            if obj["type"] not in YSORT_TYPES:
+                continue
+            asset = self.asset[obj["type"]]
+            surface = (
+                asset["image"]
+                if obj["variant"] == -1
+                else asset[obj["variant"]]["image"]
+            )
+
+            world_x = chunk_world_x + obj["x"] * self.tile_size[0]
+            world_y = chunk_world_y + obj["y"] * self.tile_size[1]
+            world_bottom_y = world_y + surface.get_height()
+
+            result.append((world_bottom_y, surface, (world_x, world_y)))
+        return result
 
 
 class DungeonRoom:
@@ -1122,19 +1175,9 @@ class Map(BaseMap):
                     )
 
     def _load_chunks(self):
-        """Charge les chunks au alentour d'un joueur, dans un thread parallèle."""
         while self.load_chunk_running:
-            if (
-                self.load_chunk_event.is_set()
-                and self.size[0] != 0
-                and self.size[1] != 0
-            ):
+            if self.load_chunk_event.is_set() and self.size[0] != 0:
                 abs_position = np.array(self.load_chunk_position, dtype=np.int32)
-                if not np.less(abs_position, self.size * self.chunk_size_pix).all():
-                    raise ValueError(f"La position fourni n'est pas dans la carte,\
-                        position = {abs_position},\
-                        taille map = {self.size * self.chunk_size_pix}.")
-
                 chunk = abs_position // self.chunk_size_pix
 
                 for x in range(chunk[0] - 2, chunk[0] + 3):
@@ -1142,9 +1185,11 @@ class Map(BaseMap):
                         if (
                             0 <= x < self.nb_chunks[0]
                             and 0 <= y < self.nb_chunks[1]
-                            and not (x, y) in self.loaded_chunks
+                            and (x, y) not in self.loaded_chunks
                         ):
-                            self.loaded_chunks[(x, y)] = self.chunks[(x, y)].render()
+                            self.loaded_chunks[(x, y)] = self.chunks[
+                                (x, y)
+                            ].render_ground()
 
                 valid = {
                     (x, y)
@@ -1159,6 +1204,16 @@ class Map(BaseMap):
                 self.load_chunk_event.clear()
             else:
                 time.sleep(0.5)
+
+    def get_visible_objects(self) -> List[Tuple[int, pygame.Surface, Tuple[int, int]]]:
+        result = []
+        for cx, cy in list(self.loaded_chunks):  # snapshot des clés
+            if (cx, cy) not in self.loaded_chunks:
+                continue  # chunk déchargé entre-temps
+            world_x = cx * self.chunk_size_pix[0]
+            world_y = cy * self.chunk_size_pix[1]
+            result.extend(self.chunks[(cx, cy)].get_objects_surfaces(world_x, world_y))
+        return result
 
     def _trigger_load_chunk(self, absolute_position: Tuple[int, int]):
         """Dit au thread de calculer les nouveau chunks."""
@@ -2094,7 +2149,7 @@ class MapManager(BaseMap):
         prams = {
             "hub": {
                 "type": "hub",
-                "pnj": [{"name": "Vieux Taupier", "position": [272, 256]}],
+                "pnj": [{"name": "Archiviste des Ames", "position": [272, 256]}],
             },
             "principal_map": {
                 "type": "map",
@@ -2227,6 +2282,9 @@ class MapManager(BaseMap):
     def display(self, camera: Camera):
 
         self.map.display(camera)
+
+    def get_visible_objects(self):
+        return self.map.get_visible_objects() if isinstance(self.map, Map) else []
 
 
 if __name__ == "__main__":

@@ -131,7 +131,9 @@ class Ennemi:
         self.attack_range = 60
         self.attack: bool | None = False
         self.attaque_rect: pygame.Rect | None = None
-        self.attack_duration = 0.5
+        self.attack_duration = 0.65
+        self.attack_damage_delay = 0.45  # secondes avant activation hitbox
+        self.attack_damage_window = 0.15  # durée fenêtre de dégâts
         self.timer = -1
 
         # -- Animation --
@@ -271,15 +273,21 @@ class Ennemi:
                 and self.timer + self.attack_duration < time.time()
                 and self.animation.current_state != "attack"
             ):
-                self.attaque_rect = self.moteur.create_rect_attaque(
-                    self.hitbox, self.direction
-                )
+                self.attaque_rect = None
                 self.attack = True
                 self.timer = time.time()
-            else:
-                self.attack = False
 
-            if self.attaque_rect and self.timer + self.attack_duration < time.time():
+            elapsed = time.time() - self.timer if self.timer >= 0 else -1
+
+            if elapsed >= self.attack_duration:
+                self.attack = False
+                self.attaque_rect = None
+            elif elapsed >= self.attack_damage_delay and self.attack:
+                if self.attaque_rect is None:
+                    self.attaque_rect = self.moteur.create_rect_attaque(
+                        self.hitbox, self.direction
+                    )
+            else:
                 self.attaque_rect = None
 
             # -- Animation --
