@@ -32,47 +32,6 @@ UDP_PORT = 9999
 FULLSCREEN_SIZE = p.display.Info().current_w, p.display.Info().current_h
 
 
-"""----------------------------------------"""
-
-
-class InputBox(DefaultManager):
-
-    def __init__(self, manager: "Manager", x, y, w, h, screen, text=""):
-        self.manager = manager
-        self.rect = p.Rect(x, y, w, h)
-        self.color = (255, 255, 255)
-        self.text = text
-        self.screen = screen
-        self.font = p.font.Font(None, 40)
-        self.active = False
-
-    def event(self, event):
-        if event.type == p.QUIT:
-            self.manager.running = False
-        elif event.type == p.MOUSEBUTTONDOWN:
-            self.active = self.rect.collidepoint(event.pos)
-        elif event.type == p.KEYDOWN:
-            if event.key == p.K_ESCAPE:
-                return True
-            if self.active:
-                if event.key == p.K_BACKSPACE:
-                    self.text = self.text[:-1]
-                elif event.key == p.K_RETURN:
-                    return self.text
-                elif len(self.text) < 20:
-                    self.text += event.unicode
-        return None
-
-    def draw(self):
-        txt_surface = self.font.render(self.text, True, (255, 255, 255))
-        p.draw.rect(self.screen, (30, 30, 30), self.rect)
-        p.draw.rect(self.screen, self.color, self.rect, 2)
-        self.screen.blit(txt_surface, (self.rect.x + 10, self.rect.y + 10))
-
-
-"""-------------------------------------------------"""
-
-
 class Menu(DefaultManager):
 
     def __init__(self, screen: p.Surface, manager: "Manager"):
