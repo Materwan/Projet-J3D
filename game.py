@@ -125,7 +125,7 @@ class Game(DefaultManager):
         self.drag_mgr = InventaireManager(self.screen, [self.ui_joueur])
 
         # Items de départ :
-        self.inv_joueur.add_item(Item.create("Potion Rouge", 3))
+        self.inv_joueur.add_item(Item.create("Potion Rouge", 2))
 
         # PNJ :
         self.pnj_manager = PNJManager(self.screen, self.camera)
@@ -153,12 +153,13 @@ class Game(DefaultManager):
         """Inventaire : Appelé au clic droit sur un consommable."""
 
         if item.item_type == "Consommable" and item.effect is not None:
-            if self.player_controller.pv >= self.player_controller.max_pv:
-                print("You are already full health !")
+            if item.effect > 0:
+                if self.player_controller.pv < self.player_controller.max_pv:
+                    ui.inv.remove_item(slot[0], slot[1], 1)
+                    self.player_controller.pv += 1
             else:
                 ui.inv.remove_item(slot[0], slot[1], 1)
-                print("You've suck dry your potion : +1 HP")
-                self.player_controller.pv += 1
+                self.player_controller.update_pv(-1)
 
     def initialize(self):
         """Initialise le moteur, la map, le contrôleur et le réseau.
