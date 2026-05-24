@@ -1,5 +1,5 @@
 import pygame
-from camera_system import Camera
+from sound import EFFECT
 from inventory import Item, Inventaire, InventaireUI, InventaireManager
 import math
 
@@ -358,6 +358,7 @@ class MenuInteractionUI(PnjPanelUI):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for i in range(len(self.options)):
                 if self.btn_rects[i].collidepoint(mouse_pos):
+                    EFFECT["menu"].play()
                     self.pnj = None
                     return self.options[i]
         return None
@@ -440,7 +441,7 @@ class DialogueUI(PnjPanelUI):
             event.type == pygame.KEYDOWN
             and event.key in (pygame.K_e, pygame.K_RETURN, pygame.K_SPACE)
         ) or (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1):
-
+            EFFECT["menu"].play()
             # si dialogue finie alors dialogue suivante
             if self.done:
 
@@ -650,11 +651,13 @@ class BoutiqueUI(PnjPanelUI):
         self.btn_hovered = self.btn.collidepoint(mouse_pos)
 
         if event.type == pygame.KEYDOWN and event.key in (pygame.K_e, pygame.K_ESCAPE):
+            EFFECT["menu"].play()
             self.btn_hovered = False
             return True
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.btn_hovered:
+                EFFECT["menu"].play()
                 self.btn_hovered = False
                 return True
 
@@ -852,11 +855,14 @@ class UpgradeUI(PnjPanelUI):
 
     def handle_event(self, event: pygame.event.Event, mouse_pos: tuple) -> bool:
         if event.type == pygame.KEYDOWN and event.key in (pygame.K_e, pygame.K_ESCAPE):
+            EFFECT["menu"].play()
             return True
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.btn_close.collidepoint(mouse_pos):
+                EFFECT["menu"].play()
                 return True
             if self.buy_rect.collidepoint(mouse_pos):
+                EFFECT["menu"].play()
                 self.buy()
         return False
 
@@ -1092,16 +1098,19 @@ class QueteUI(PnjPanelUI):
         self.btn_fermer_hov = self.btn_fermer.collidepoint(mouse_pos)
 
         if event.type == pygame.KEYDOWN and event.key in (pygame.K_e, pygame.K_ESCAPE):
+            EFFECT["menu"].play()
             self.btn_fermer_hov = False
             self.btn_action_hov = False
             return True
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.btn_fermer_hov:
+                EFFECT["menu"].play()
                 self.btn_fermer_hov = False
                 self.btn_action_hov = False
                 return True
             if self.btn_action_hov:
+                EFFECT["menu"].play()
                 if self.pnj.quest_etat == "disponible":
                     self.pnj.quest_etat = "active"
                     self.print_temporary_msg("Quête acceptée !")

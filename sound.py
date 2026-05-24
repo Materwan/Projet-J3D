@@ -1,4 +1,6 @@
 import pygame as p
+import os
+from utils import resource_path
 
 
 class SoundController:
@@ -38,3 +40,38 @@ class SoundController:
         if self.volume >= 0.1:
             self.volume -= 0.1
             p.mixer.music.set_volume(self.volume)
+
+
+class SoundEffect:
+    """Son court joué par-dessus la musique (utilise un canal mixer)."""
+
+    def __init__(self, path: str, volume: float = 1.0):
+        self.sound = p.mixer.Sound(path)
+        self.sound.set_volume(volume)
+
+    def play(self):
+        self.sound.play()
+
+    def set_volume(self, volume: float):
+        self.sound.set_volume(volume)
+
+
+SOUND_PATH = resource_path("Ressources/Musics/")
+
+MUSIC_HOLDER = os.path.join(SOUND_PATH, "placeholder.mp3")
+SOUND_AMBIANCE = os.path.join(SOUND_PATH, "ambiance.mp3")
+SOUND_FOOTSTEP = os.path.join(SOUND_PATH, "footstep.mp3")
+SOUND_ATTACK = os.path.join(SOUND_PATH, "attack.mp3")
+EFFECT_MENU = os.path.join(SOUND_PATH, "bruit_menu.mp3")
+
+
+SOUND = {
+    "main_music": SoundController(MUSIC_HOLDER),
+    "ambiance": SoundController(SOUND_AMBIANCE),
+    "footstep": SoundController(SOUND_FOOTSTEP, 1),
+    "attack": SoundController(SOUND_ATTACK, 1),
+}
+
+EFFECT = {
+    "menu": SoundEffect(EFFECT_MENU, volume=0.3),
+}

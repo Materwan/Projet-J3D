@@ -1,6 +1,5 @@
 import logging
 import traceback
-import os
 import sys
 import pygame
 from pygame._sdl2.video import Window
@@ -9,7 +8,7 @@ pygame.init()
 pygame.mixer.init()
 pygame.display.init()
 
-from utils import resource_path, DefaultManager
+from utils import DefaultManager
 from menu import (
     Principal_Menu,
     Setting_Menu,
@@ -23,25 +22,14 @@ from menu import (
     FULLSCREEN_SIZE,
 )
 from game import Game, RecapScreen
-from sound import SoundController
 from loading import GameLoadingScreen, WaitingGuestScreen
+from sound import SOUND
 
 pygame.display.set_caption("MoleTale")
 
 FPS = 60
 TAILLE_ECRAN = (1080, 780)  # (500, 500) pour petit ecran (0, 0) pour plein ecran
 
-SOUND_PATH = resource_path("Ressources/Musics/")
-MUSIC_HOLDER = os.path.join(SOUND_PATH, "placeholder.mp3")
-SOUND_AMBIANCE = os.path.join(SOUND_PATH, "ambiance.mp3")
-SOUND_FOOTSTEP = os.path.join(SOUND_PATH, "footstep.mp3")
-SOUND_ATTACK = os.path.join(SOUND_PATH, "attack.mp3")
-SOUND = {
-    "main_music": SoundController(MUSIC_HOLDER),
-    "ambiance": SoundController(SOUND_AMBIANCE),
-    "footstep": SoundController(SOUND_FOOTSTEP, 1),
-    "attack": SoundController(SOUND_ATTACK, 1),
-}
 
 screen = pygame.display.set_mode(TAILLE_ECRAN, pygame.RESIZABLE)
 if TAILLE_ECRAN == (0, 0):
