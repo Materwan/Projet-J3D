@@ -133,11 +133,11 @@ class Game(DefaultManager):
 
         # Stats de run
         self.run_stats = RunStats()
-        self.permanent_xp = 1000
+        self.permanent_xp = 0
         self.font_xp = pygame.font.SysFont("segoeui", 18, bold=True)
         self.permanent_max_pv_bonus = 0
-        self._guest_permanent_xp: int = 1000
-        self._guest_permanent_max_pv_bonus: int = 0
+        self._guest_permanent_xp = 0
+        self._guest_permanent_max_pv_bonus = 0
 
     def set_screen(self, screen: pygame.Surface):
         self.screen = screen
