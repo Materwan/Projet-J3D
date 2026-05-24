@@ -246,7 +246,7 @@ class Game(DefaultManager):
 
                 # Réseau : construction de l'état initial avec la map
                 initial_state = self.get_to_send_data_host(include_map=True)
-                self.network = HostNetwork(self.port)
+                self.network = HostNetwork(self.game_name, self.port)
                 self.network.start(initial_state)
 
             # -- Ennemis (pour test) --
