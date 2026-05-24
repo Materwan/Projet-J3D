@@ -685,7 +685,7 @@ class Join_Multi_Menu(Menu):
         if len(self.serveurs) != self.serveurs_save:
             self.serveurs_save = len(self.serveurs)
             self.create_list_button()
-            self.eltpages = self.list_button
+            self.eltpages = self.list_button[:]
             self.eltpages.append(self.retour)
         self.pagedisplay()
         self.declicked_all()

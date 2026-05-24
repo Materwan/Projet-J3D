@@ -196,7 +196,6 @@ class Game(DefaultManager):
             initial = self.network.get_initial_state()
             guest_start = tuple(initial.get("guest", {}).get("position", (0, 0)))
             host_start = tuple(initial.get("host", {}).get("position", (0, 0)))
-            print(initial)
             self.permanent_xp = initial.get("guest", {}).get("permanent_xp", 0)
             self.permanent_max_pv_bonus = initial.get("guest", {}).get(
                 "permanent_max_pv_bonus", 0
@@ -680,9 +679,6 @@ class Game(DefaultManager):
 
         # -- Ennemis --
         self.paths = self.map.update_ennemis()
-        """for ennemi in self.ennemis.values():
-            print(ennemi.death_time, time.time())"""
-        # Guest : gerer dans update_ennemis_guest() et appeler via update_variables_guest
 
         # PNJ
         old_max_pv_bonus = self.permanent_max_pv_bonus
@@ -1269,7 +1265,6 @@ class Game(DefaultManager):
             data = json.loads(f.read())
 
         self.game_name = data["game_name"]
-        print(self.playing_mode)
         self.permanent_xp = data.get("permanent_xp", 0)
         self.permanent_max_pv_bonus = data.get("permanent_max_pv_bonus", 0)
         self._guest_permanent_xp = data.get("guest_permanent_xp", 0)
