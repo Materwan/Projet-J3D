@@ -151,7 +151,7 @@ class Menu(DefaultManager):
                 self.screen,
                 (self.WINDOWS[0] // 2 + 200, self.WINDOWS[1] // 2 - 200 + count * 150),
                 self.destroy_save,
-                text="DESTROY SAVE",
+                text="SUPPRIMER",
             )
             list_save.append(serveur)
             list_button.append(button)
@@ -279,14 +279,14 @@ class Setting_Menu(Menu):
 
         def window():
             current = self.changewindow.text.to_display_text
-            if current == "FULL SCREEN":
+            if current == "PLEIN ÉCRAN":
                 # Borderless fullscreen : fenêtre sans bordure à la taille du bureau
                 manager.resize(FULLSCREEN_SIZE, menu_appel)
-                self.change_button_text("NOT FULL SCREEN", self.changewindow)
+                self.change_button_text("FENÊTRÉ", self.changewindow)
             else:
                 # Retour en mode fenêtré
                 manager.resize((1080, 780), menu_appel)
-                self.change_button_text("FULL SCREEN", self.changewindow)
+                self.change_button_text("PLEIN ÉCRAN", self.changewindow)
 
         # =======================Function Button End=======================
 
@@ -297,35 +297,35 @@ class Setting_Menu(Menu):
             self.screen,
             (self.WINDOWS[0] // 2 - 400, self.WINDOWS[1] // 2 - 70),
             changeup,
-            text="UP: " + p.key.name(self.keybinds["up"]),
+            text="HAUT: " + p.key.name(self.keybinds["up"]),
         )
         self.changedown = a.Button(
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2 - 400, self.WINDOWS[1] // 2 + 70),
             changedown,
-            text="DOWN: " + p.key.name(self.keybinds["down"]),
+            text="BAS: " + p.key.name(self.keybinds["down"]),
         )
         self.changeleft = a.Button(
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 - 70),
             changeleft,
-            text="LEFT: " + p.key.name(self.keybinds["left"]),
+            text="GAUCHE: " + p.key.name(self.keybinds["left"]),
         )
         self.changeright = a.Button(
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 70),
             changeright,
-            text="RIGHT: " + p.key.name(self.keybinds["right"]),
+            text="DROITE: " + p.key.name(self.keybinds["right"]),
         )
         self.changeattack = a.Button(
             EMPTY_BUTTON,
             self.screen,
             (self.WINDOWS[0] // 2 - 200, self.WINDOWS[1] // 2 + 200),
             changeattack,
-            text="ATTACK: " + p.key.name(self.keybinds["attack"]),
+            text="ATTAQUE: " + p.key.name(self.keybinds["attack"]),
         )
         self.volume_up = a.Button(
             EMPTY_BUTTON,
@@ -342,7 +342,7 @@ class Setting_Menu(Menu):
             text="-",
         )
         self.volume = a.Text(
-            "Sounds volume",
+            "Volume du son",
             self.screen,
             (self.WINDOWS[0] // 2 + 400, self.WINDOWS[1] // 2 - 180),
         )
@@ -351,7 +351,7 @@ class Setting_Menu(Menu):
             self.screen,
             (self.WINDOWS[0] - 170, 67),
             window,
-            text=("NOT FULL SCREEN" if self.manager.fullscreen else "FULL SCREEN"),
+            text=("FENÊTRÉ" if self.manager.fullscreen else "PLEIN ÉCRAN"),
         )
         # =======================Button End=======================
 
@@ -423,31 +423,31 @@ class Setting_Menu(Menu):
                 else:
                     self.changekey(event)  # try to change the keybind
                     self.interchange(
-                        "UP: " + p.key.name(self.keybinds["up"]),
+                        "HAUT: " + p.key.name(self.keybinds["up"]),
                         self.changeup,
                         "up",
                         False,
                     )
                     self.interchange(
-                        "DOWN: " + p.key.name(self.keybinds["down"]),
+                        "BAS: " + p.key.name(self.keybinds["down"]),
                         self.changedown,
                         "down",
                         False,
                     )
                     self.interchange(
-                        "LEFT: " + p.key.name(self.keybinds["left"]),
+                        "GAUCHE: " + p.key.name(self.keybinds["left"]),
                         self.changeleft,
                         "left",
                         False,
                     )
                     self.interchange(
-                        "RIGHT: " + p.key.name(self.keybinds["right"]),
+                        "DROITE: " + p.key.name(self.keybinds["right"]),
                         self.changeright,
                         "right",
                         False,
                     )
                     self.interchange(
-                        "ATTACK: " + p.key.name(self.keybinds["attack"]),
+                        "ATTAQUE: " + p.key.name(self.keybinds["attack"]),
                         self.changeattack,
                         "attack",
                         False,
@@ -508,7 +508,7 @@ class Play_Menu(Menu):
             self.screen,
             self.half,
             multiplayer,
-            text="MULTIPLAYER",
+            text="MULTIJOUEUR",
         )
         self.solo = a.Button(
             EMPTY_BUTTON,
@@ -522,7 +522,7 @@ class Play_Menu(Menu):
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 150),
             joinmultiplayer,
-            text="JOIN MULTIPLAYER",
+            text="REJOINDRE MULTIJOUEUR",
         )
         # =======================Button End=======================
 
@@ -737,14 +737,14 @@ class Pause_Menu(Menu):
             self.screen,
             (self.half[0], self.half[1] - 220),
             resume,
-            text="RESUME",
+            text="REPRENDRE",
         )
         self.save = a.Button(
             EMPTY_BUTTON,
             self.screen,
             (self.half[0], self.half[1] - 70),
             save,
-            text="SAVE",
+            text="SAUVEGARDE",
         )
         self.settings = a.Button(
             SETTING_BUTTON,
@@ -842,7 +842,7 @@ class Solo_Menu(Menu):
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + self.WINDOWS[1] // 3),
             create,
-            text="CREATE" if self.nbr_file_solo < 3 else "MAXIMUM SAVE",
+            text="CRÉER" if self.nbr_file_solo < 3 else "SAUVEGARDE MAXIMUM",
         )
         self.list_button, self.list_button_suppr, self.list_file = (
             self.create_list_save_and_button("solo")
@@ -861,7 +861,7 @@ class Solo_Menu(Menu):
             self.create_list_save_and_button("solo")
         )
         self.change_button_text(
-            "CREATE" if self.nbr_file_solo < 3 else "MAXIMUM SAVE", self.create
+            "CRÉER" if self.nbr_file_solo < 3 else "SAUVEGARDE MAXIMUM", self.create
         )
         self.eltpages = [self.retour, self.create]
         for elt in self.list_button:
@@ -929,7 +929,7 @@ class Multiplayer_Menu(Menu):
 
         # =======================Button Start=======================
         self.multiplayer = a.Text(
-            "MULTIPLAYER",
+            "MULTIJOUEUR",
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 10),
             font_size=100,
@@ -939,7 +939,7 @@ class Multiplayer_Menu(Menu):
             self.screen,
             (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + self.WINDOWS[1] // 3),
             create,
-            text="CREATE" if self.nbr_file_multi < 3 else "MAXIMUM SAVE",
+            text="CRÉER" if self.nbr_file_multi < 3 else "SAUVEGARDE MAXIMUM",
         )
         self.list_button, self.list_button_suppr, self.list_file = (
             self.create_list_save_and_button("multiplayer")
@@ -959,7 +959,7 @@ class Multiplayer_Menu(Menu):
         )
         self.eltpages = [self.retour, self.create]
         self.change_button_text(
-            "CREATE" if self.nbr_file_multi < 3 else "MAXIMUM SAVE", self.create
+            "CRÉER" if self.nbr_file_multi < 3 else "SAUVEGARDE MAXIMUM", self.create
         )
         for elt in self.list_button:
             self.eltpages.append(elt)
