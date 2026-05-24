@@ -737,7 +737,21 @@ class Game(DefaultManager):
 
     def _boss_fight_start(self):
         print("start boss fight")
-        # self.manager.change_state("CARD")
+        self.manager.states["CARD"].start(
+            playing_mode=self.playing_mode,
+            on_victory=self._on_card_victory,
+            on_defeat=self._on_card_defeat,
+        )
+        self.manager.change_state("CARD")
+
+    def _on_card_victory(self):
+        self.run_stats.boss_killed += 1
+        self.manager.states["RECAP"].start(self.run_stats)
+        self.manager.change_state("RECAP")
+
+    def _on_card_defeat(self):
+        self.manager.states["RECAP"].start(self.run_stats)
+        self.manager.change_state("RECAP")
 
     def spawn_death_particles(self, ennemi: Ennemi):
         """Fait spawn des particules de mort si ennemi est mort"""

@@ -1,4 +1,14 @@
-"""Module réseau : HostNetwork et GuestNetwork."""
+"""Module réseau : HostNetwork et GuestNetwork.
+
+Ce module fournit une implémentation de réseau hybride combinant:
+    - Un serveur TCP pour la connexion durable au client
+    - Une diffusion UDP pour la découverte automatique du client sur le réseau local
+
+Il utilise un système de double tampon (back/front) avec détection de saleté
+(`dirty`) pour synchroniser les états entre les boucles de jeu et le réseau,
+tout en maintenant des performances O(1) lors des mises à jour.
+
+"""
 
 import asyncio
 import socket
@@ -95,12 +105,52 @@ class RttTracker:
 
 
 class HostNetwork:
-    """
-    Côté Host : serveur TCP + broadcast UDP.
+    """Gère le côté hôte du réseau avec une architecture hybride.
 
-    Deux threads dédiés, indépendants du game loop :
-        - _tcp_thread  : asyncio server, accepte 1 client max
-        - _udp_thread  : broadcast UDP jusqu'à connexion du client
+    Cette classe combine un serveur TCP pour la connexion durable au client
+    et une diffusion UDP pour la découverte automatique du client sur le
+    réseau local. Elle utilise un système de double tampon (back/front) avec
+    détection de saleté (`dirty`) pour synchroniser les états entre les boucles
+    de jeu et le réseau, tout en maintenant des performances O(1).
+
+    Attributs:
+        port (int): Port TCP du serveur.
+        ip (str): Adresse IP locale de l'hôte.
+        subnet_mask (str): Masque de sous-réseau local.
+        _lock (threading.Lock): Verrou pour accès concurrent-safe aux états.
+        _stop_event (threading.Event): Signal d'arrêt propre du thread réseau.
+        _connected (bool): Indicateur si le guest est connecté.
+        _guest_disconnected (bool): Indicateur de déconnexion du guest.
+        _outgoing_back: Tampon arrière pour les données à envoyer au client.
+        _outgoing_front: Tampon avant contenant l'état à envoyer.
+        _outgoing_dirty (bool): Flag indiquant si le tampon arrière est sale.
+        _incoming_back: Tampon arrière pour les données reçues du client.
+        _incoming_front: Tampon avant contenant les données à retourner.
+        _incoming_dirty (bool): Flag indiquant si le tampon arrière est sale.
+        _initial_state: État initial du jeu au moment de la connexion.
+        _server: Serveur TCP asyncio.
+        _asyncio_loop: Event loop asyncio actif.
+        _tcp_thread: Thread pour gérer la connexion TCP.
+        _udp_thread: Thread pour la diffusion UDP.
+
+    Méthodes publiques:
+        start(initial_state): Lance les threads TCP et UDP; copie l'état initial dans le tampon arrière si fourni.
+        close(): Signale l'arrêt propre en définissant `_stop_event` et ferme le serveur TCP via asyncio.
+        restart_listening(): Réinitialise complètement les états réseau après déconnexion du guest pour permettre une nouvelle connexion.
+        is_guest_disconnected(): Retourne `True` si le guest s'est déconnecté (pas un arrêt volontaire de l'host).
+        is_connected(): Vérifie que la connexion TCP est active et que l'événement d'arrêt n'est pas déclenché.
+        is_closed(): Retourne `True` si le thread réseau doit être arrêté.
+        update(game_state): Appelé par la boucle de jeu à 60 FPS; fait un swap O(1) entre tampons arrière et avant, retourne l'état à envoyer au client.
+
+    Méthodes privées:
+        _get_outgoing(): Retourne le contenu du tampon avant après vérification de saleté du tampon arrière.
+        _set_incoming(data): Enregistre les données reçues dans le tampon arrière et marque comme sale.
+
+    Fonctions utilitaires (module):
+        get_netmask_for_ip(ip): Récupère le masque de sous-réseau pour une IP donnée.
+        get_broadcast_ip(ip, subnet_mask): Calcule l'adresse de broadcast.
+        dict_to_bytes(data): Transforme un dictionnaire en octets JSON.
+        bytes_to_dict(data): Décode les octets reçus en dictionnaire JSON.
     """
 
     def __init__(self, port: int = TCP_PORT):
@@ -358,8 +408,7 @@ class HostNetwork:
 
 
 class GuestNetwork:
-    """
-    Côté guest : client TCP.
+    """Gère le côté client (guest) avec une connexion TCP dédiée.
 
     Un seul thread dédié, indépendant du game loop.
     Appeler is_loaded() pour savoir si la tentative de connexion est terminée.

@@ -1012,63 +1012,6 @@ class Multiplayer_Menu(Menu):
         self.declicked_all()
 
 
-class Death_Screen(Menu):
-
-    def __init__(self, screen: p.Surface, manager: "Manager"):
-        super().__init__(screen, manager)
-        self.manager.running = True
-
-        # =======================Function Button Start=======================
-        # =======================Function Button End=======================
-
-        # =======================Button Start=======================
-        self.death = a.Text(
-            "Game Over",
-            self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2),
-            font_size=150,
-        )
-        self.death2 = a.Text(
-            "Press any keybind to continu",
-            self.screen,
-            (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 200),
-            font_size=50,
-        )
-        # =======================Button End=======================
-
-        self.eltpages = []
-        self.textpages = [self.death, self.death2]
-
-    def set_screen(self, screen: p.Surface):
-        super().set_screen(screen)
-        self.death.set_screen(self.screen, (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2))
-        self.death2.set_screen(
-            self.screen, (self.WINDOWS[0] // 2, self.WINDOWS[1] // 2 + 200)
-        )
-
-    def event(self, events: list[p.event.Event]):
-        for event in events:
-            if event.type == p.QUIT:
-                self.manager.running = False
-            if event.type == p.KEYDOWN or event.type == p.MOUSEBUTTONDOWN:
-                # TEMPO car il faudra envoyer vers le HUB
-                """if isinstance(
-                    self.manager.states["GAME"].player_controller, GuestController
-                ):
-                    self.manager.states["GAME"]._send_close_and_disconnect()
-                self.manager.states["GAME"].close_network()"""
-                self.manager.states["GAME"].reset()
-                self.manager.change_state("GAME")
-
-    def update(self):
-        pass
-
-    def display(self):
-        self.manager.states["GAME"].display()
-        self.screen.blit(self.blackscreen, (0, 0))
-        self.pagedisplay()
-
-
 class InputBox(Menu):
 
     def __init__(self, screen: p.Surface, manager: "Manager"):
@@ -1155,6 +1098,7 @@ class InputBox(Menu):
         pass
 
     def display(self):
+        self.screen.blit(self.bg_img, self.bg_img_coord)
         self.screen.blit(self.blackscreen, (0, 0))
         self.draw()
 
