@@ -1043,6 +1043,14 @@ class InputBox(Menu):
         )
         self.btn_hovered = False
 
+        def retour_action(mode: str):
+            self.text = ""
+            self.error_msg = ""
+            self.manager.change_state(mode)
+
+        self.retour.clicked_function = retour_action
+        self.eltpages = [self.retour]
+
     def set_screen(self, screen: p.Surface):
         super().set_screen(screen)
         self.rect.topleft = (self.WINDOWS[0] // 2 - 150, self.WINDOWS[1] // 2 - 25)
@@ -1074,6 +1082,8 @@ class InputBox(Menu):
         mouse_pos = p.mouse.get_pos()
         self.btn_hovered = self.btn_rect.collidepoint(mouse_pos)
 
+        target = "MENU_SOLO" if self.playing_mode == "solo" else "MENU_MULTIPLAYER"
+
         for event in events:
             if event.type == p.QUIT:
                 self.manager.running = False
@@ -1087,11 +1097,6 @@ class InputBox(Menu):
                 if event.key == p.K_ESCAPE:
                     self.text = ""
                     self.error_msg = ""
-                    target = (
-                        "MENU_SOLO"
-                        if self.playing_mode == "solo"
-                        else "MENU_MULTIPLAYER"
-                    )
                     self.manager.change_state(target)
                 elif self.active:
                     if event.key == p.K_BACKSPACE:
@@ -1100,6 +1105,8 @@ class InputBox(Menu):
                         self._confirm()
                     elif len(self.text) < 20:
                         self.text += event.unicode
+
+        self.retour.event(events, mouse_pos, target)
 
     def lancer_solo(self):
         save_name = self.text.strip()
@@ -1201,6 +1208,9 @@ class InputBox(Menu):
                     self.btn_rect.bottom + 14,
                 ),
             )
+
+        self.pagedisplay()
+        self.declicked_all()
 
 
 def get_all_saves(mode: str) -> List[Dict[str, str]] | List[str]:

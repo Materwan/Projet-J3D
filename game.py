@@ -267,6 +267,7 @@ class Game(DefaultManager):
 
         # Applique le bonus permanent de PV Max
         self.player_controller.max_pv += self.permanent_max_pv_bonus
+        self.player_controller.pv = self.player_controller.max_pv
         # Synchronise le pnj_manager avec les valeurs courantes
         self.pnj_manager.permanent_xp = self.permanent_xp
         self.pnj_manager.permanent_max_pv_bonus = self.permanent_max_pv_bonus
@@ -471,8 +472,14 @@ class Game(DefaultManager):
             hc.guest.attaque = data["guest"]["attaque"]
 
             # Mise à jour des données permanentes du guest (pour sauvegarde)
+            old_bonus = self._guest_permanent_max_pv_bonus
             self._guest_permanent_xp = data["guest"]["permanent_xp"]
             self._guest_permanent_max_pv_bonus = data["guest"]["permanent_max_pv_bonus"]
+
+            delta = self._guest_permanent_max_pv_bonus - old_bonus
+            if delta > 0:
+                hc.guest.max_pv += delta
+                hc.guest.pv = hc.guest.max_pv
 
             if hc.guest.current_map != self.map[data["map"]["name"]]:
                 self._change_map(hc.guest, data["map"]["name"], move_camera=False)
