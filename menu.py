@@ -1018,46 +1018,91 @@ class InputBox(Menu):
         super().__init__(screen, manager)
         self.manager.running = True
         self.rect = p.Rect(
-            self.WINDOWS[0] // 2 - 150, self.WINDOWS[1] // 2 + 100, 300, 50
+            self.WINDOWS[0] // 2 - 150,
+            self.WINDOWS[1] // 2 - 25,
+            300,
+            50,
         )
         self.color = (255, 255, 255)
         self.text = ""
         self.screen = screen
         self.font = p.font.Font(None, 40)
+        self.font_hint = p.font.Font(None, 30)
         self.active = False
         self.playing_mode = "solo"
 
+        self.error_msg = ""
+        self.error_timer = 0.0
+        self.ERROR_DURATION = 2500.0
+
+        self.btn_rect = p.Rect(
+            self.WINDOWS[0] // 2 - 80,
+            self.WINDOWS[1] // 2 + 45,
+            160,
+            44,
+        )
+        self.btn_hovered = False
+
     def set_screen(self, screen: p.Surface):
         super().set_screen(screen)
-        self.rect.topleft = (self.WINDOWS[0] // 2 - 150, self.WINDOWS[1] // 2 + 100)
+        self.rect.topleft = (self.WINDOWS[0] // 2 - 150, self.WINDOWS[1] // 2 - 25)
+        self.btn_rect = p.Rect(
+            self.WINDOWS[0] // 2 - 80,
+            self.WINDOWS[1] // 2 + 45,
+            160,
+            44,
+        )
+
+    def _show_error(self, msg: str):
+        self.error_msg = msg
+        self.error_timer = self.ERROR_DURATION
+
+    def _confirm(self):
+        name = self.text.strip()
+        if not name:
+            self.error_msg = (
+                "Attention : le nom de la sauvegarde ne peut pas être vide."
+            )
+            self.error_timer = self.ERROR_DURATION
+        else:
+            if self.playing_mode == "solo":
+                self.lancer_solo()
+            else:
+                self.lancer_multi()
 
     def event(self, events: list[p.event.Event]):
+        mouse_pos = p.mouse.get_pos()
+        self.btn_hovered = self.btn_rect.collidepoint(mouse_pos)
+
         for event in events:
             if event.type == p.QUIT:
                 self.manager.running = False
-            elif event.type == p.MOUSEBUTTONDOWN:
+
+            elif event.type == p.MOUSEBUTTONDOWN and event.button == 1:
                 self.active = self.rect.collidepoint(event.pos)
+                if self.btn_hovered:
+                    self._confirm()
+
             elif event.type == p.KEYDOWN:
                 if event.key == p.K_ESCAPE:
-                    if self.playing_mode == "solo":
-                        self.manager.change_state("MENU_SOLO")
-                    else:
-                        self.manager.change_state("MENU_MULTIPLAYER")
+                    self.text = ""
+                    self.error_msg = ""
+                    target = (
+                        "MENU_SOLO"
+                        if self.playing_mode == "solo"
+                        else "MENU_MULTIPLAYER"
+                    )
+                    self.manager.change_state(target)
                 elif self.active:
                     if event.key == p.K_BACKSPACE:
                         self.text = self.text[:-1]
                     elif event.key == p.K_RETURN:
-                        if self.playing_mode == "solo":
-                            self.lancer_solo()
-                        else:
-                            self.lancer_multi()
+                        self._confirm()
                     elif len(self.text) < 20:
                         self.text += event.unicode
 
     def lancer_solo(self):
         save_name = self.text.strip()
-        if save_name == "":
-            save_name = "New Game"
         if "save_0" not in self.manager.states["MENU_SOLO"].list_file:
             current_save = SAVE_SOLO + "/save_0"
         elif "save_1" not in self.manager.states["MENU_SOLO"].list_file:
@@ -1068,13 +1113,12 @@ class InputBox(Menu):
         self.manager.states["MENU_PAUSE"].current_save = current_save
         self.manager.states["GAME"].playing_mode = "solo"
         self.manager.states["GAME"].game_name = save_name
+        self.text = ""
         self.manager.change_state("LOADING")
         self.manager.states["LOADING"].start("solo")
 
     def lancer_multi(self):
         save_name = self.text.strip()
-        if save_name == "":
-            save_name = "New Game"
         if "save_0" not in self.manager.states["MENU_MULTIPLAYER"].list_file:
             current_save = SAVE_MULTI + "/save_0"
         elif "save_1" not in self.manager.states["MENU_MULTIPLAYER"].list_file:
@@ -1085,22 +1129,78 @@ class InputBox(Menu):
         self.manager.states["MENU_PAUSE"].current_save = current_save
         self.manager.states["GAME"].playing_mode = "host"
         self.manager.states["GAME"].game_name = save_name
+        self.text = ""
         self.manager.change_state("LOADING")
         self.manager.states["LOADING"].start("host")
 
-    def draw(self):
-        txt_surface = self.font.render(self.text, True, (255, 255, 255))
-        p.draw.rect(self.screen, (30, 30, 30), self.rect)
-        p.draw.rect(self.screen, self.color, self.rect, 2)
-        self.screen.blit(txt_surface, (self.rect.x + 10, self.rect.y + 10))
-
     def update(self):
-        pass
+        self.error_timer = max(0.0, self.error_timer - self.manager.clock.get_time())
 
     def display(self):
         self.screen.blit(self.bg_img, self.bg_img_coord)
         self.screen.blit(self.blackscreen, (0, 0))
-        self.draw()
+
+        instruction = self.font_hint.render(
+            "Veuillez donner un nom à la partie :",
+            True,
+            (200, 200, 200),
+        )
+        self.screen.blit(
+            instruction,
+            (
+                self.WINDOWS[0] // 2 - instruction.get_width() // 2,
+                self.WINDOWS[1] // 2 - 75,
+            ),
+        )
+
+        # Champ de saisie
+        txt_surface = self.font.render(self.text, True, (255, 255, 255))
+        p.draw.rect(self.screen, (30, 30, 30), self.rect)
+        p.draw.rect(
+            self.screen, self.color if self.active else (120, 120, 120), self.rect, 2
+        )
+        self.screen.blit(txt_surface, (self.rect.x + 10, self.rect.y + 10))
+
+        # Bouton Confirmer
+        col_bg = (55, 85, 155, 220) if self.btn_hovered else (28, 28, 50, 200)
+        col_brd = (120, 150, 225, 255) if self.btn_hovered else (55, 55, 100, 255)
+        btn_surf = p.Surface((self.btn_rect.width, self.btn_rect.height), p.SRCALPHA)
+        p.draw.rect(
+            btn_surf,
+            col_bg,
+            (0, 0, self.btn_rect.width, self.btn_rect.height),
+            border_radius=8,
+        )
+        p.draw.rect(
+            btn_surf,
+            col_brd,
+            (0, 0, self.btn_rect.width, self.btn_rect.height),
+            width=2,
+            border_radius=8,
+        )
+        self.screen.blit(btn_surf, self.btn_rect.topleft)
+
+        label = self.font_hint.render("Confirmer", True, (240, 240, 255))
+        self.screen.blit(
+            label,
+            (
+                self.btn_rect.x + (self.btn_rect.width - label.get_width()) // 2,
+                self.btn_rect.y + (self.btn_rect.height - label.get_height()) // 2,
+            ),
+        )
+
+        # Pop-up erreur
+        if self.error_timer > 0:
+            alpha = int(255 * min(1.0, self.error_timer / (self.ERROR_DURATION * 0.3)))
+            err_surf = self.font_hint.render(self.error_msg, True, (220, 80, 80))
+            err_surf.set_alpha(alpha)
+            self.screen.blit(
+                err_surf,
+                (
+                    self.WINDOWS[0] // 2 - err_surf.get_width() // 2,
+                    self.btn_rect.bottom + 14,
+                ),
+            )
 
 
 def get_all_saves(mode: str) -> List[Dict[str, str]] | List[str]:
