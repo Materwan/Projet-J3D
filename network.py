@@ -450,10 +450,6 @@ class GuestNetwork:
             # Injecte le RTT moyen courant dans le paquet sortant
             game_state["rtt_ms"] = self.rtt_tracker.average_ms
 
-            if self._is_ready:
-                game_state["ready"] = True
-                self._is_ready = False
-
             self._outgoing_back = game_state
             self._outgoing_dirty = True
 
@@ -475,6 +471,23 @@ class GuestNetwork:
                     self._outgoing_front,
                 )
                 self._outgoing_dirty = False
+            return self._outgoing_front
+
+    def _get_outgoing(self) -> Dict[str, Any]:
+        with self._lock:
+            if self._outgoing_dirty:
+                self._outgoing_front, self._outgoing_back = (
+                    self._outgoing_back,
+                    self._outgoing_front,
+                )
+                self._outgoing_dirty = False
+
+            if self._is_ready:
+                packet = dict(self._outgoing_front)
+                packet["ready"] = True
+                self._is_ready = False
+                return packet
+
             return self._outgoing_front
 
     def _set_incoming(self, data: Dict[str, Any]):
