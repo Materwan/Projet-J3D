@@ -17,7 +17,6 @@ from menu import (
     Pause_Menu,
     Solo_Menu,
     Multiplayer_Menu,
-    Death_Screen,
     InputBox,
     FULLSCREEN_SIZE,
 )
@@ -57,7 +56,6 @@ class Manager:
             "MENU_PAUSE": Pause_Menu(self.screen, self),
             "MENU_SOLO": Solo_Menu(self.screen, self),
             "MENU_MULTIPLAYER": Multiplayer_Menu(self.screen, self),
-            "DEATH_SCREEN": Death_Screen(self.screen, self),
             "LOADING": GameLoadingScreen(self.screen, self),
             "WAITING_GUEST": WaitingGuestScreen(self.screen, self),
             "INPUTBOX": InputBox(self.screen, self),
