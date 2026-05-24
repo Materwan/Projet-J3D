@@ -69,10 +69,10 @@ class Game(DefaultManager):
 
         # -- Raccourcis --
         self.keybinds = {
-            "up": pygame.K_UP,
-            "down": pygame.K_DOWN,
-            "left": pygame.K_LEFT,
-            "right": pygame.K_RIGHT,
+            "up": pygame.K_z,
+            "down": pygame.K_s,
+            "left": pygame.K_q,
+            "right": pygame.K_d,
             "attack": pygame.K_SPACE,
         }
 
@@ -585,7 +585,7 @@ class Game(DefaultManager):
                     self.show_hitbox = not self.show_hitbox
                 elif event.key == pygame.K_F3:  # Debug F2
                     self.print_send_data = not self.print_send_data
-                elif event.key == pygame.K_i:  # Ouvre inventaire
+                elif event.key == pygame.K_TAB:  # Ouvre inventaire
                     self.ui_joueur.is_visible = not self.ui_joueur.is_visible
 
             if not self.pnj_manager.handle_event(event, mouse_pos):

@@ -86,10 +86,10 @@ class Menu(DefaultManager):
         self.bg_img_coord = self.bg_img.get_rect()
         self.manager = manager
         self.keybinds = {
-            "up": p.K_UP,
-            "down": p.K_DOWN,
-            "left": p.K_LEFT,
-            "right": p.K_RIGHT,
+            "up": p.K_z,
+            "down": p.K_s,
+            "left": p.K_q,
+            "right": p.K_d,
             "attack": p.K_SPACE,
         }
         self.key = {"up": False, "down": False, "left": False, "right": False}
