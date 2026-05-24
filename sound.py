@@ -62,8 +62,6 @@ MUSIC_HOLDER = os.path.join(SOUND_PATH, "placeholder.mp3")
 SOUND_AMBIANCE = os.path.join(SOUND_PATH, "ambiance.mp3")
 SOUND_FOOTSTEP = os.path.join(SOUND_PATH, "footstep.mp3")
 SOUND_ATTACK = os.path.join(SOUND_PATH, "attack.mp3")
-EFFECT_MENU = os.path.join(SOUND_PATH, "bruit_menu.mp3")
-
 
 SOUND = {
     "main_music": SoundController(MUSIC_HOLDER),
@@ -72,6 +70,16 @@ SOUND = {
     "attack": SoundController(SOUND_ATTACK, 1),
 }
 
+EFFECT_MENU = os.path.join(SOUND_PATH, "bruit_menu.mp3")
+EFFECT_SLASH = os.path.join(SOUND_PATH, "slash.wav")
+EFFECT_INV = os.path.join(SOUND_PATH, "open_inv.wav")
+EFFECT_DAMAGE_PLAYER = os.path.join(SOUND_PATH, "damage_player.wav")
+EFFECT_GAME_OVER = os.path.join(SOUND_PATH, "game_over.wav")
+
 EFFECT = {
-    "menu": SoundEffect(EFFECT_MENU, volume=0.3),
+    "menu": SoundEffect(EFFECT_MENU, volume=0.8),
+    "slash": SoundEffect(EFFECT_SLASH, volume=0.5),
+    "open_inv": SoundEffect(EFFECT_INV, volume=0.3),
+    "damage_player": SoundEffect(EFFECT_DAMAGE_PLAYER, volume=0.3),
+    "game_over": SoundEffect(EFFECT_GAME_OVER, volume=1),
 }

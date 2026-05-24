@@ -25,6 +25,7 @@ from inventory import Item, Inventaire, InventaireUI, InventaireManager
 from ennemis import Ennemi
 from particule import spawn_local_particle
 from pnj import PNJManager
+from sound import EFFECT
 
 if TYPE_CHECKING:
     from main import Manager
@@ -578,6 +579,7 @@ class Game(DefaultManager):
                     event.key == self.keybinds["attack"]
                     and not self.player_controller.is_dead
                 ):
+                    EFFECT["slash"].play()
                     self.player_controller.attaque = True
                 elif event.key == pygame.K_0:
                     self.save()
@@ -586,7 +588,11 @@ class Game(DefaultManager):
                 elif event.key == pygame.K_F3:  # Debug F2
                     self.print_send_data = not self.print_send_data
                 elif event.key == pygame.K_TAB:  # Ouvre inventaire
-                    self.ui_joueur.is_visible = not self.ui_joueur.is_visible
+                    if self.ui_joueur.is_visible == False:
+                        EFFECT["open_inv"].play()
+                        self.ui_joueur.is_visible = True
+                    else:
+                        self.ui_joueur.is_visible = False
 
             if not self.pnj_manager.handle_event(event, mouse_pos):
                 self.drag_mgr.handle_event(event, mouse_pos, on_use=self._on_use)
@@ -1291,6 +1297,7 @@ class RecapScreen:
         self.guest_btn_clicked = False
         self.time = 0.0
         self.phase = True
+        EFFECT["game_over"].play()
 
     def return_HUB(self):
 

@@ -4,6 +4,7 @@ from utils import resource_path
 from camera_system import Camera
 from particule import spawn_local_particle
 from player import SoloPlayerController, HostController, GuestController
+from sound import EFFECT
 
 
 class HUD:
@@ -57,6 +58,7 @@ class HUD:
 
         # si perte de PV alors déclencher les effets visuels
         if new_pv < self.pv:
+            EFFECT["damage_player"].play()
             self.anim_timer = current_time
             self.is_flashing = True
             for _ in range(25):
