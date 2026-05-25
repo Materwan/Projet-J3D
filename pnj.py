@@ -74,23 +74,6 @@ pnj_dic: dict[str, dict] = {
         },
         "quests": None,
     },
-    "Apothicaire Gontran": {
-        "pnj_type": "Merchant",
-        "image_path": "Ressources/Animations/PNJ/PNJ_1/",
-        "dialogues": [
-            "Mes remèdes sont faits à base de champignons des profondeurs. Efficaces, je vous assure.",
-            "Une bonne potion vaut mieux qu'une armure parfois.",
-        ],
-        "interaction_radius": 80,
-        "stock": {
-            "Petite Potion Rouge": 15,
-            "Potion Rouge": 8,
-            "Grande Potion Rouge": 3,
-            "Champignon": 20,
-            "Pain": 5,
-        },
-        "quests": None,
-    },
     "Colporteur Barnabé": {
         "pnj_type": "Merchant",
         "image_path": "Ressources/Animations/PNJ/PNJ_1/",
@@ -155,64 +138,6 @@ pnj_dic: dict[str, dict] = {
                     "Une Pioche et un Marteau. Revenez quand vous les aurez.",
                 ],
                 "dialogue_complet": ["Parfait ! Exactement ce qu'il me faut."],
-            },
-        ],
-    },
-    "Vieille Sorcière": {
-        "pnj_type": "Quest",
-        "image_path": "Ressources/Animations/PNJ/PNJ_1/",
-        "dialogues": ["Merci encore pour votre aide, je ne l'oublierai pas."],
-        "interaction_radius": 80,
-        "stock": None,
-        "quests": [
-            {
-                "titre": "La potion de vision nocturne",
-                "description": "La sorcière cherche à recréer une potion qui permettait autrefois de voir sans lumière solaire.",
-                "objectifs": [
-                    {"item": "Champignon", "quantite": 3},
-                    {"item": "Cristal", "quantite": 1},
-                ],
-                "recompense_coins": 200,
-                "recompense_items": [{"item": "Grande Potion Rouge", "quantite": 2}],
-                "dialogue_debut": [
-                    "Depuis que le soleil a disparu, mes yeux de vieille taupe ne voient plus rien.",
-                    "J'ai besoin de 3 Champignons lumineux et d'un Cristal pour ma potion.",
-                ],
-                "dialogue_actif": [
-                    "Dépêche-toi, je n'y vois plus rien sans ma potion !"
-                ],
-                "dialogue_complet": [
-                    "Enfin ! Tu as tout. Donne-moi vite ces ingrédients."
-                ],
-            },
-        ],
-    },
-    "Éclaireur Tormund": {
-        "pnj_type": "Quest",
-        "image_path": "Ressources/Animations/PNJ/PNJ_1/",
-        "dialogues": [
-            "Je cartographie les mines depuis des années. C'est un travail dangereux."
-        ],
-        "interaction_radius": 80,
-        "stock": None,
-        "quests": [
-            {
-                "titre": "Rapport de terrain",
-                "description": "Tormund a besoin de matériaux ramenés des profondeurs pour confirmer ses théories.",
-                "objectifs": [
-                    {"item": "Pièce de cuivre", "quantite": 5},
-                    {"item": "Engrenage", "quantite": 2},
-                ],
-                "recompense_coins": 120,
-                "recompense_items": [{"item": "Carte Ancienne", "quantite": 1}],
-                "dialogue_debut": [
-                    "Les anciennes mines cachent des mécanismes oubliés depuis des siècles.",
-                    "Ramène-moi 5 Pièces de cuivre et 2 Engrenages, j'ai une théorie à vérifier.",
-                ],
-                "dialogue_actif": [
-                    "Tu n'as pas encore tout rassemblé ? Les mines n'attendent pas !"
-                ],
-                "dialogue_complet": ["Excellent ! Ces échantillons vont tout changer."],
             },
         ],
     },

@@ -1320,11 +1320,8 @@ class Game(DefaultManager):
                 "Vieille Taupière",
                 "Garde de la Surface",
                 "Marchande Isabelle",
-                "Apothicaire Gontran",
                 "Colporteur Barnabé",
                 "Forgeron Otto",
-                "Vieille Sorcière",
-                "Éclaireur Tormund",
             ],
         )
 
