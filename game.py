@@ -1312,7 +1312,7 @@ class Game(DefaultManager):
 
     def _setup_enemies_and_pnjs(self) -> None:
         """Spawn ennemis et PNJs sur toutes les maps jouables."""
-        self._spawn_enemies(self.map["principal_map"], nb=15, speed=1.0, chase_range=15)
+        self._spawn_enemies(self.map["principal_map"], nb=10, speed=1.0, chase_range=15)
         self._spawn_pnjs(
             self.map["principal_map"],
             [
@@ -1337,7 +1337,7 @@ class Game(DefaultManager):
         ]
         for i in range(nb_dungeons):
             self._spawn_enemies(
-                self.map[f"dungeon{i}"], nb=8, speed=1.2, chase_range=10
+                self.map[f"dungeon{i}"], nb=5, speed=1.0, chase_range=10
             )
             pnjs = dungeon_pnj_pool[i % len(dungeon_pnj_pool)]
             self._spawn_pnjs(self.map[f"dungeon{i}"], pnjs)

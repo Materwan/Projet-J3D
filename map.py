@@ -32,6 +32,8 @@ DUNGEON_TILEMAP_DIRECTORY = resource_path(r"Ressources\TileMap")
 
 YSORT_TYPES = {"tree", "bush", "rock"}
 
+ENEMY_UPDATE_RADIUS_SQ = 1200**2
+
 
 def get_dungeon_tiles(
     tmx_filepath,
@@ -724,11 +726,28 @@ class BaseMap(ABC):
         player = self.game.player_controller
         on_same_map = self is player.current_map
 
+        px, py = (
+            (player.hitbox.centerx, player.hitbox.centery)
+            if not player.is_dead
+            else (0, 0)
+        )
+
         for key, ennemi in self.ennemis.items():
-            if on_same_map:
-                paths.append(ennemi.update(player))
+            if on_same_map and not player.is_dead:
+                ex, ey = int(ennemi.position[0]), int(ennemi.position[1])
+                dx, dy = ex - px, ey - py
+                in_range = dx * dx + dy * dy <= ENEMY_UPDATE_RADIUS_SQ
+
+                if in_range:
+                    paths.append(ennemi.update(player))
+                else:
+                    # Hors caméra : juste l'animation idle, pas de A*
+                    ennemi.velocity = ennemi.velocity * 0  # stoppe
+                    ennemi.update_animation()
+
                 if ennemi.attaque_rect:
                     self.game.moteur.apply_attack(ennemi.attaque_rect, player)
+
             self.game.spawn_death_particles(ennemi)
             if time.time() > ennemi.death_time:
                 del_key.append(key)
@@ -737,7 +756,7 @@ class BaseMap(ABC):
             self.game.run_stats.enemies_killed += 1
             del self.ennemis[key]
 
-        if on_same_map and player.attaque_rect:
+        if on_same_map and not player.is_dead and player.attaque_rect:
             for ennemi in self.ennemis.values():
                 self.game.moteur.apply_attack(player.attaque_rect, ennemi)
         return paths
@@ -748,6 +767,16 @@ class BaseMap(ABC):
         on_same_map_host = self is hc.current_map
         on_same_map_guest = self is hc.guest.current_map
 
+        def nearest_player_dist_sq(ex, ey):
+            best = float("inf")
+            if on_same_map_host and not hc.is_dead:
+                dx, dy = ex - hc.hitbox.centerx, ey - hc.hitbox.centery
+                best = min(best, dx * dx + dy * dy)
+            if on_same_map_guest and not hc.guest.is_dead:
+                dx, dy = ex - hc.guest.hitbox.centerx, ey - hc.guest.hitbox.centery
+                best = min(best, dx * dx + dy * dy)
+            return best
+
         for key, ennemi in self.ennemis.items():
             active_players = []
             if on_same_map_host and not hc.is_dead:
@@ -756,10 +785,19 @@ class BaseMap(ABC):
                 active_players.append(hc.guest)
 
             if active_players:
-                paths.append(ennemi.update(*active_players))
+                ex, ey = int(ennemi.position[0]), int(ennemi.position[1])
+                in_range = nearest_player_dist_sq(ex, ey) <= ENEMY_UPDATE_RADIUS_SQ
+
+                if in_range:
+                    paths.append(ennemi.update(*active_players))
+                else:
+                    ennemi.velocity = ennemi.velocity * 0
+                    ennemi.update_animation()
+
                 if ennemi.attaque_rect:
                     for target in active_players:
                         self.game.moteur.apply_attack(ennemi.attaque_rect, target)
+
             self.game.spawn_death_particles(ennemi)
             if time.time() > ennemi.death_time:
                 del_key.append(key)
