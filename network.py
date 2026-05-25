@@ -153,7 +153,8 @@ class HostNetwork:
         bytes_to_dict(data): Décode les octets reçus en dictionnaire JSON.
     """
 
-    def __init__(self, port: int = TCP_PORT):
+    def __init__(self, game_name: str, port: int = TCP_PORT):
+        self.game_name = game_name
         self.port = port
         self.ip = socket.gethostbyname(socket.gethostname())
         self.subnet_mask = get_netmask_for_ip(self.ip)
@@ -391,7 +392,7 @@ class HostNetwork:
         sock.settimeout(0.5)
 
         message = dict_to_bytes(
-            {"Game name": "MoleTale", "Port": self.port, "last": time.time()}
+            {"Game name": self.game_name, "Port": self.port, "last": time.time()}
         )
 
         print(f"[Host] Broadcast UDP → {broadcast_ip}:{UDP_PORT}")
