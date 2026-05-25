@@ -129,7 +129,7 @@ class Game(DefaultManager):
 
         # PNJ :
         self.pnj_manager = PNJManager(self.screen, self.camera)
-        self.money: int = 500
+        self.money: int = 100
 
         # Stats de run
         self.run_stats = RunStats()
@@ -1221,6 +1221,9 @@ class Game(DefaultManager):
             is_visible=False,
         )
         self.drag_mgr = InventaireManager(self.screen, [self.ui_joueur])
+
+        # Items de départ :
+        self.inv_joueur.add_item(Item.create("Potion Rouge", 2))
 
     def save(self, file: str | None = "save.json"):
 
