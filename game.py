@@ -24,7 +24,7 @@ from hud import HUD
 from inventory import Item, Inventaire, InventaireUI, InventaireManager
 from ennemis import Ennemi
 from particule import spawn_local_particle
-from pnj import PNJManager
+from pnj import PNJ, PNJManager
 from sound import EFFECT
 
 if TYPE_CHECKING:
@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 
 INVENTORY_ASSET_DIRECTORY = resource_path(r"Ressources\InventoryAsset")
 RESPAWN_PV = 2
-SPECTATE_DURATION = 15
+SPECTATE_DURATION = 20
 RESPAWN_OFFSET = 50  # l'autre joueur respawn 50 pixel a droite de l'autre
 
 
@@ -250,14 +250,7 @@ class Game(DefaultManager):
                 self.network.start(initial_state)
 
             # -- Ennemis --
-            self._spawn_enemies(
-                self.map["principal_map"], nb=20, speed=1.0, chase_range=15
-            )
-            nb_dungeons = self.map["principal_map"].nb_dungeons
-            for i in range(nb_dungeons):
-                self._spawn_enemies(
-                    self.map[f"dungeon{i}"], nb=8, speed=1.2, chase_range=10
-                )
+            self._setup_enemies_and_pnjs()
 
             self.pnj_manager = self.map.get_pnjs()
 
@@ -1197,16 +1190,8 @@ class Game(DefaultManager):
             self.pnj_manager.permanent_xp = self.permanent_xp
             self.pnj_manager.permanent_max_pv_bonus = self.permanent_max_pv_bonus
 
-        # Dans reset(), après les blocs solo/host (avant # -- Keybinds --)
         if self.playing_mode in ("solo", "host"):
-            self._spawn_enemies(
-                self.map["principal_map"], nb=20, speed=1.0, chase_range=15
-            )
-            nb_dungeons = self.map["principal_map"].nb_dungeons
-            for i in range(nb_dungeons):
-                self._spawn_enemies(
-                    self.map[f"dungeon{i}"], nb=8, speed=1.2, chase_range=10
-                )
+            self._setup_enemies_and_pnjs()
 
         # -- Keybinds --
         self.player_controller.keybinds = self.keybinds
@@ -1318,6 +1303,44 @@ class Game(DefaultManager):
                 self.camera,
                 self.moteur,
             )
+
+    def _spawn_pnjs(self, map_obj, pnj_names: List[str]) -> None:
+        """Place les PNJs sur des tuiles praticables aléatoires."""
+        positions = map_obj.get_random_walkable_positions(len(pnj_names))
+        for name, pos in zip(pnj_names, positions):
+            map_obj.pnj_manager.add(PNJ.create(name, pos=list(pos)))
+
+    def _setup_enemies_and_pnjs(self) -> None:
+        """Spawn ennemis et PNJs sur toutes les maps jouables."""
+        self._spawn_enemies(self.map["principal_map"], nb=15, speed=1.0, chase_range=15)
+        self._spawn_pnjs(
+            self.map["principal_map"],
+            [
+                "René le Sage",
+                "Vieille Taupière",
+                "Garde de la Surface",
+                "Marchande Isabelle",
+                "Apothicaire Gontran",
+                "Colporteur Barnabé",
+                "Forgeron Otto",
+                "Vieille Sorcière",
+                "Éclaireur Tormund",
+            ],
+        )
+
+        nb_dungeons = self.map["principal_map"].nb_dungeons
+        dungeon_pnj_pool = [
+            ["Mineur Rescapé", "Explorateur Blessé"],
+            ["Explorateur Blessé", "Vieux Taupier"],
+            ["Mineur Rescapé", "Garde Roland"],
+            ["Vieux Taupier", "Explorateur Blessé"],
+        ]
+        for i in range(nb_dungeons):
+            self._spawn_enemies(
+                self.map[f"dungeon{i}"], nb=8, speed=1.2, chase_range=10
+            )
+            pnjs = dungeon_pnj_pool[i % len(dungeon_pnj_pool)]
+            self._spawn_pnjs(self.map[f"dungeon{i}"], pnjs)
 
 
 """

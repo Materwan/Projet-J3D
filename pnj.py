@@ -15,8 +15,234 @@ Chaque PNJ a :
 """
 pnj_dic: dict[str, dict] = {
     # =========================================================================
-    # PNJ : BASIC
+    # PNJ SURFACE — MAP PRINCIPALE
     # =========================================================================
+    "René le Sage": {
+        "pnj_type": "Basic",
+        "image_path": "Ressources/Animations/PNJ/PNJ_1/",
+        "dialogues": [
+            "Tu veux affronter les corbeaux ? Sois prudent, ils sont plus dangereux que tu ne le crois.",
+            "Depuis que le chef corbeau a tué les dieux, le soleil ne s'est plus jamais levé...",
+            "Nous les taupes, on s'est réfugiés sous terre. Toi tu oses sortir à la surface. Respect.",
+        ],
+        "interaction_radius": 80,
+        "stock": None,
+        "quests": None,
+    },
+    "Vieille Taupière": {
+        "pnj_type": "Basic",
+        "image_path": "Ressources/Animations/PNJ/PNJ_1/",
+        "dialogues": [
+            "Mon fils est parti chasser du corbeau il y a trois lunes... il n'est pas revenu.",
+            "Les étoiles ont disparu le jour où ce maudit chef corbeau a volé les pouvoirs divins.",
+            "Je prie encore les anciens dieux même si ça ne sert plus à rien. On n'abandonne pas sa foi comme ça.",
+        ],
+        "interaction_radius": 80,
+        "stock": None,
+        "quests": None,
+    },
+    "Garde de la Surface": {
+        "pnj_type": "Basic",
+        "image_path": "Ressources/Animations/PNJ/PNJ_1/",
+        "dialogues": [
+            "Halte ! ... Ah, tu es l'un des nôtres. Circule.",
+            "Les corbeaux patrouillent de plus en plus près de nos tunnels. Reste sur tes gardes.",
+            "On dit qu'ils sont répartis en 7 familles. Autant de chefs à abattre.",
+        ],
+        "interaction_radius": 80,
+        "stock": None,
+        "quests": None,
+    },
+    # =========================================================================
+    # MARCHANDS — MAP PRINCIPALE
+    # =========================================================================
+    "Marchande Isabelle": {
+        "pnj_type": "Merchant",
+        "image_path": "Ressources/Animations/PNJ/PNJ_1/",
+        "dialogues": [
+            "Bienvenue dans ma boutique ! J'ai ce qu'il vous faut.",
+            "Revenez quand vous voulez, j'ai toujours du stock frais !",
+        ],
+        "interaction_radius": 80,
+        "stock": {
+            "Potion Rouge": 10,
+            "Grande Potion Rouge": 5,
+            "Pain": 8,
+            "Fromage": 6,
+            "Vin blanc": 3,
+            "Champignon": 15,
+        },
+        "quests": None,
+    },
+    "Apothicaire Gontran": {
+        "pnj_type": "Merchant",
+        "image_path": "Ressources/Animations/PNJ/PNJ_1/",
+        "dialogues": [
+            "Mes remèdes sont faits à base de champignons des profondeurs. Efficaces, je vous assure.",
+            "Une bonne potion vaut mieux qu'une armure parfois.",
+        ],
+        "interaction_radius": 80,
+        "stock": {
+            "Petite Potion Rouge": 15,
+            "Potion Rouge": 8,
+            "Grande Potion Rouge": 3,
+            "Champignon": 20,
+            "Pain": 5,
+        },
+        "quests": None,
+    },
+    "Colporteur Barnabé": {
+        "pnj_type": "Merchant",
+        "image_path": "Ressources/Animations/PNJ/PNJ_1/",
+        "dialogues": [
+            "Curiosités, raretés, objets d'origine inconnue... tout ça pour vous !",
+            "J'ai trouvé ça dans les ruines d'un ancien sanctuaire. Je préfère ne pas savoir ce que c'est.",
+        ],
+        "interaction_radius": 80,
+        "stock": {
+            "Cristal": 5,
+            "Engrenage": 8,
+            "Pièce d'or": 10,
+            "Carte Ancienne": 3,
+            "Diamant": 1,
+        },
+        "quests": None,
+    },
+    # =========================================================================
+    # DONNEURS DE QUÊTES — MAP PRINCIPALE
+    # =========================================================================
+    "Forgeron Otto": {
+        "pnj_type": "Quest",
+        "image_path": "Ressources/Animations/PNJ/PNJ_1/",
+        "dialogues": ["Merci encore pour votre aide, je ne l'oublierai pas."],
+        "interaction_radius": 80,
+        "stock": None,
+        "quests": [
+            {
+                "titre": "Les matériaux du forgeron",
+                "description": "Otto a besoin de 5 Bûches et 3 Charbons pour forger une arme capable de blesser les corbeaux.",
+                "objectifs": [
+                    {"item": "Bûche", "quantite": 5},
+                    {"item": "Charbon", "quantite": 3},
+                ],
+                "recompense_coins": 150,
+                "recompense_items": [{"item": "Bâton de Rubis", "quantite": 1}],
+                "dialogue_debut": [
+                    "Les corbeaux ont une peau épaisse. Mon acier ordinaire ne suffira pas.",
+                    "Rapporte-moi 5 Bûches et 3 Charbons, je te forge quelque chose de spécial.",
+                ],
+                "dialogue_actif": [
+                    "Toujours en quête des matériaux ? 5 Bûches et 3 Charbons, n'oublie pas.",
+                ],
+                "dialogue_complet": [
+                    "Tu les as ! Donne-moi ça, je commence immédiatement.",
+                ],
+            },
+            {
+                "titre": "La commande spéciale",
+                "description": "Otto a besoin d'une Pioche et d'un Marteau pour agrandir son atelier.",
+                "objectifs": [
+                    {"item": "Pioche", "quantite": 1},
+                    {"item": "Marteau", "quantite": 1},
+                ],
+                "recompense_coins": 300,
+                "recompense_items": [{"item": "Pierre Runique", "quantite": 2}],
+                "dialogue_debut": [
+                    "Mon atelier est trop petit. J'ai besoin d'agrandir.",
+                    "Une Pioche et un Marteau, c'est tout ce qu'il me faut.",
+                ],
+                "dialogue_actif": [
+                    "Une Pioche et un Marteau. Revenez quand vous les aurez.",
+                ],
+                "dialogue_complet": ["Parfait ! Exactement ce qu'il me faut."],
+            },
+        ],
+    },
+    "Vieille Sorcière": {
+        "pnj_type": "Quest",
+        "image_path": "Ressources/Animations/PNJ/PNJ_1/",
+        "dialogues": ["Merci encore pour votre aide, je ne l'oublierai pas."],
+        "interaction_radius": 80,
+        "stock": None,
+        "quests": [
+            {
+                "titre": "La potion de vision nocturne",
+                "description": "La sorcière cherche à recréer une potion qui permettait autrefois de voir sans lumière solaire.",
+                "objectifs": [
+                    {"item": "Champignon", "quantite": 3},
+                    {"item": "Cristal", "quantite": 1},
+                ],
+                "recompense_coins": 200,
+                "recompense_items": [{"item": "Grande Potion Rouge", "quantite": 2}],
+                "dialogue_debut": [
+                    "Depuis que le soleil a disparu, mes yeux de vieille taupe ne voient plus rien.",
+                    "J'ai besoin de 3 Champignons lumineux et d'un Cristal pour ma potion.",
+                ],
+                "dialogue_actif": [
+                    "Dépêche-toi, je n'y vois plus rien sans ma potion !"
+                ],
+                "dialogue_complet": [
+                    "Enfin ! Tu as tout. Donne-moi vite ces ingrédients."
+                ],
+            },
+        ],
+    },
+    "Éclaireur Tormund": {
+        "pnj_type": "Quest",
+        "image_path": "Ressources/Animations/PNJ/PNJ_1/",
+        "dialogues": [
+            "Je cartographie les mines depuis des années. C'est un travail dangereux."
+        ],
+        "interaction_radius": 80,
+        "stock": None,
+        "quests": [
+            {
+                "titre": "Rapport de terrain",
+                "description": "Tormund a besoin de matériaux ramenés des profondeurs pour confirmer ses théories.",
+                "objectifs": [
+                    {"item": "Pièce de cuivre", "quantite": 5},
+                    {"item": "Engrenage", "quantite": 2},
+                ],
+                "recompense_coins": 120,
+                "recompense_items": [{"item": "Carte Ancienne", "quantite": 1}],
+                "dialogue_debut": [
+                    "Les anciennes mines cachent des mécanismes oubliés depuis des siècles.",
+                    "Ramène-moi 5 Pièces de cuivre et 2 Engrenages, j'ai une théorie à vérifier.",
+                ],
+                "dialogue_actif": [
+                    "Tu n'as pas encore tout rassemblé ? Les mines n'attendent pas !"
+                ],
+                "dialogue_complet": ["Excellent ! Ces échantillons vont tout changer."],
+            },
+        ],
+    },
+    # =========================================================================
+    # PNJ BASIQUES — DONJON / MINES
+    # =========================================================================
+    "Mineur Rescapé": {
+        "pnj_type": "Basic",
+        "image_path": "Ressources/Animations/PNJ/PNJ_1/",
+        "dialogues": [
+            "Attention ! Ce donjon est rempli d'ennemis féroces ! J'ai failli ne pas en sortir.",
+            "Les corbeaux ont colonisé les galeries du bas. Ne t'aventure pas trop loin sans te préparer.",
+            "J'ai perdu mes outils en fuyant. Mais au moins j'ai la vie sauve.",
+        ],
+        "interaction_radius": 80,
+        "stock": None,
+        "quests": None,
+    },
+    "Explorateur Blessé": {
+        "pnj_type": "Basic",
+        "image_path": "Ressources/Animations/PNJ/PNJ_1/",
+        "dialogues": [
+            "Ces mines... elles sont maudites depuis que les corbeaux s'y sont installés.",
+            "Je suis entré à cinq. Je suis le seul à ressortir. Ne fais pas la même erreur que nous.",
+            "Si tu vois une grande salle tout au fond... fuis. Le chef de cette famille corbeau y trône.",
+        ],
+        "interaction_radius": 80,
+        "stock": None,
+        "quests": None,
+    },
     "Vieux Taupier": {
         "pnj_type": "Basic",
         "image_path": "Ressources/Animations/PNJ/PNJ_1/",
@@ -41,121 +267,12 @@ pnj_dic: dict[str, dict] = {
         "quests": None,
     },
     # =========================================================================
-    # PNJ : MERCHANT
-    # =========================================================================
-    "Marchande Isabelle": {
-        "pnj_type": "Merchant",
-        "image_path": "Ressources/Animations/PNJ/PNJ_1/",
-        "dialogues": [
-            "Bienvenue dans ma boutique ! J'ai ce qu'il vous faut.",
-            "Revenez quand vous voulez, j'ai toujours du stock frais !",
-        ],
-        "interaction_radius": 80,
-        "stock": {
-            "Potion Rouge": 10,
-            "Grande Potion Rouge": 5,
-            "Pain": 8,
-            "Fromage": 6,
-            "Vin blanc": 3,
-            "Champignon": 15,
-        },
-        "quests": None,
-    },
-    # =========================================================================
-    # PNJ : QUEST
-    # =========================================================================
-    "Forgeron Otto": {
-        "pnj_type": "Quest",
-        "image_path": "Ressources/Animations/PNJ/PNJ_1/",
-        "dialogues": ["Merci encore pour votre aide, je ne l'oublierai pas."],
-        "interaction_radius": 80,
-        "stock": None,
-        "quests": [
-            {
-                "titre": "Les matériaux du forgeron",
-                "description": "Otto a besoin de 5 Bûches et 3 Charbons pour forger une arme légendaire.",
-                "objectifs": [
-                    {"item": "Bûche", "quantite": 5},
-                    {"item": "Charbon", "quantite": 3},
-                ],
-                "recompense_coins": 150,
-                "recompense_items": [
-                    {"item": "Bâton de Rubis", "quantite": 1},
-                ],
-                "dialogue_debut": [
-                    "J'ai besoin de matériaux pour forger mon chef-d'œuvre.",
-                    "Sans ces ressources je ne peux rien faire. Pouvez-vous m'aider ?",
-                ],
-                "dialogue_actif": [
-                    "Vous avez accepté de m'aider, j'espère que vous trouverez tout ça.",
-                    "Il me faut 5 Bûches et 3 Charbons. Revenez quand vous les aurez.",
-                ],
-                "dialogue_complet": [
-                    "Vous avez tout ce qu'il faut ! Remettez-moi les matériaux.",
-                ],
-            },
-            {
-                "titre": "La commande spéciale",
-                "description": "Après le succès, Otto a besoin d'une Pioche et d'un Marteau.",
-                "objectifs": [
-                    {"item": "Pioche", "quantite": 1},
-                    {"item": "Marteau", "quantite": 1},
-                ],
-                "recompense_coins": 300,
-                "recompense_items": [
-                    {"item": "Pierre Runique", "quantite": 2},
-                ],
-                "dialogue_debut": [
-                    "Excellent travail ! J'ai une nouvelle commande.",
-                    "Il me faut une Pioche et un Marteau cette fois.",
-                ],
-                "dialogue_actif": [
-                    "J'ai besoin d'une Pioche et d'un Marteau. Revenez quand vous les aurez.",
-                ],
-                "dialogue_complet": [
-                    "Parfait, vous avez tout ! Donnez-les moi.",
-                ],
-            },
-        ],
-    },
-    "Vieille Sorcière": {
-        "pnj_type": "Quest",
-        "image_path": "Ressources/Animations/PNJ/PNJ_1/",
-        "dialogues": ["Merci encore pour votre aide, je ne l'oublierai pas."],
-        "interaction_radius": 80,
-        "stock": None,
-        "quests": [
-            {
-                "titre": "La potion de la sorcière",
-                "description": "La sorcière a besoin de 3 Champignons et d'un Cristal pour finir sa potion.",
-                "objectifs": [
-                    {"item": "Champignon", "quantite": 3},
-                    {"item": "Cristal", "quantite": 1},
-                ],
-                "recompense_coins": 200,
-                "recompense_items": [
-                    {"item": "Grande Potion Rouge", "quantite": 2},
-                ],
-                "dialogue_debut": [
-                    "Je prépare une potion très rare, mais il me manque des ingrédients.",
-                    "Si vous me rapportez ce qu'il faut, je vous récompenserai bien.",
-                ],
-                "dialogue_actif": [
-                    "Vous cherchez encore mes ingrédients ? Dépêchez-vous !",
-                ],
-                "dialogue_complet": [
-                    "Parfait ! Exactement ce qu'il me faut. Prenez votre récompense.",
-                ],
-            },
-        ],
-    },
-    # =========================================================================
     # PNJ : UPGRADE
     # =========================================================================
     "Archiviste des Ames": {
         "pnj_type": "Upgrade",
         "image_path": "Ressources/Animations/PNJ/PNJ_1/",
-        "dialogues": ["L'experience forge l'ame... Je peux renforcer la votre."],
+        "dialogues": ["L'expérience forge l'âme... Je peux renforcer la vôtre."],
         "interaction_radius": 100,
         "stock": None,
         "quests": None,

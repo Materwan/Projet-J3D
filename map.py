@@ -2215,11 +2215,7 @@ class MapManager(BaseMap):
                 "chunk_size": chunk_size,
                 "octaves": octaves,
                 "seed": seed,
-                "pnj": [
-                    {"name": "Vieux Taupier", "position": [3800, 3800]},
-                    {"name": "Marchande Isabelle", "position": [4000, 3800]},
-                    {"name": "Forgeron Otto", "position": [4200, 3800]},
-                ],
+                "pnj": [],
             },
         }
         for i in range(nb_dungeons):
