@@ -41,18 +41,6 @@ pnj_dic: dict[str, dict] = {
         "stock": None,
         "quests": None,
     },
-    "Garde de la Surface": {
-        "pnj_type": "Basic",
-        "image_path": "Ressources/Animations/PNJ/PNJ_1/",
-        "dialogues": [
-            "Halte ! ... Ah, tu es l'un des nôtres. Circule.",
-            "Les corbeaux patrouillent de plus en plus près de nos tunnels. Reste sur tes gardes.",
-            "On dit qu'ils sont répartis en 7 familles. Autant de chefs à abattre.",
-        ],
-        "interaction_radius": 80,
-        "stock": None,
-        "quests": None,
-    },
     # =========================================================================
     # MARCHANDS — MAP PRINCIPALE
     # =========================================================================
@@ -71,23 +59,6 @@ pnj_dic: dict[str, dict] = {
             "Fromage": 6,
             "Vin blanc": 3,
             "Champignon": 15,
-        },
-        "quests": None,
-    },
-    "Colporteur Barnabé": {
-        "pnj_type": "Merchant",
-        "image_path": "Ressources/Animations/PNJ/PNJ_1/",
-        "dialogues": [
-            "Curiosités, raretés, objets d'origine inconnue... tout ça pour vous !",
-            "J'ai trouvé ça dans les ruines d'un ancien sanctuaire. Je préfère ne pas savoir ce que c'est.",
-        ],
-        "interaction_radius": 80,
-        "stock": {
-            "Cristal": 5,
-            "Engrenage": 8,
-            "Pièce d'or": 10,
-            "Carte Ancienne": 3,
-            "Diamant": 1,
         },
         "quests": None,
     },

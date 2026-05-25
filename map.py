@@ -921,6 +921,10 @@ class Map(BaseMap):
         self.load_chunk_event.set()
         self.load_chunk_thread.start()
 
+        self._chunks_lock = threading.Lock()
+        self._sorted_chunks: list[tuple[pygame.Surface, int, int]] = []
+        self._sorted_dirty = True
+
         # -- PNJs --
         self.pnj_manager = PNJManager(self.screen, camera)
 
@@ -1301,34 +1305,42 @@ class Map(BaseMap):
 
     def _load_chunks(self):
         while self.load_chunk_running:
-            if self.load_chunk_event.is_set() and self.size[0] != 0:
-                abs_position = np.array(self.load_chunk_position, dtype=np.int32)
-                chunk = abs_position // self.chunk_size_pix
+            if not self.load_chunk_event.wait(timeout=0.1):
+                continue
+            if self.size[0] == 0:
+                continue
 
-                for x in range(chunk[0] - 2, chunk[0] + 3):
-                    for y in range(chunk[1] - 2, chunk[1] + 3):
-                        if (
-                            0 <= x < self.nb_chunks[0]
-                            and 0 <= y < self.nb_chunks[1]
-                            and (x, y) not in self.loaded_chunks
-                        ):
-                            self.loaded_chunks[(x, y)] = self.chunks[
-                                (x, y)
-                            ].render_ground()
+            abs_pos = np.array(self.load_chunk_position, dtype=np.int32)
+            center = abs_pos // self.chunk_size_pix
 
-                valid = {
-                    (x, y)
-                    for x in range(chunk[0] - 2, chunk[0] + 3)
-                    for y in range(chunk[1] - 2, chunk[1] + 3)
-                    if 0 <= x < self.nb_chunks[0] and 0 <= y < self.nb_chunks[1]
-                }
+            valid = frozenset(
+                (x, y)
+                for x in range(int(center[0]) - 2, int(center[0]) + 3)
+                for y in range(int(center[1]) - 2, int(center[1]) + 3)
+                if 0 <= x < self.nb_chunks[0] and 0 <= y < self.nb_chunks[1]
+            )
+
+            # Snapshot des clés déjà chargées — lecture courte sous lock
+            with self._chunks_lock:
+                already = set(self.loaded_chunks.keys())
+
+            # render_ground() HORS lock : travail lourd (Surface pygame)
+            # Seuls les nouveaux chunks sont rendus — O(nb_nouveaux)
+            new_chunks = {
+                (x, y): self.chunks[(x, y)].render_ground()
+                for x, y in valid - already
+                if (x, y) in self.chunks
+            }
+
+            # Mise à jour atomique sous lock
+            with self._chunks_lock:
+                self.loaded_chunks.update(new_chunks)
                 for key in list(self.loaded_chunks):
                     if key not in valid:
                         del self.loaded_chunks[key]
+                self._sorted_dirty = True  # invalide le cache du display
 
-                self.load_chunk_event.clear()
-            else:
-                time.sleep(0.5)
+            self.load_chunk_event.clear()
 
     def get_visible_objects(self) -> List[Tuple[int, pygame.Surface, Tuple[int, int]]]:
         result = []
@@ -1442,29 +1454,36 @@ class Map(BaseMap):
         return nearby_action_tiles
 
     def display(self, camera: Camera):
+        with self._chunks_lock:
+            if self._sorted_dirty:
+                sorted_keys = sorted(
+                    self.loaded_chunks.keys(),
+                    key=lambda p: p[1] * 10 + p[0],
+                    reverse=True,
+                )
+                self._sorted_chunks = [
+                    (
+                        self.loaded_chunks[k],
+                        int(k[0] * self.chunk_size_pix[0]),
+                        int(k[1] * self.chunk_size_pix[1]),
+                    )
+                    for k in sorted_keys
+                ]
+                self._sorted_dirty = False
+            snapshot = self._sorted_chunks
 
-        L = list(self.loaded_chunks.keys())
-        L.sort(key=lambda p: p[1] * 10 + p[0], reverse=True)
+        ox = int(camera.camera.x + camera.offset_x)
+        oy = int(camera.camera.y + camera.offset_y)
+        cpx = int(self.chunk_size_pix[0])
+        cpy = int(self.chunk_size_pix[1])
+        cw, ch = camera.width, camera.height
 
-        for x, y in L:
-
-            chunk_world_x = x * self.chunk_size_pix[0]
-            chunk_world_y = y * self.chunk_size_pix[1]
-
-            screen_x = chunk_world_x + camera.camera.x + camera.offset_x
-            screen_y = chunk_world_y + camera.camera.y + camera.offset_y
-
-            if (
-                screen_x + self.chunk_size_pix[0] < 0
-                or screen_x > camera.width
-                or screen_y + self.chunk_size_pix[1] < 0
-                or screen_y > camera.height
-            ):
-                continue
-
-            self.screen.blit(self.loaded_chunks[(x, y)], (screen_x, screen_y))
-
-        self._display_chunks(camera)
+        blit_seq = [
+            (surf, (wx + ox, wy + oy))
+            for surf, wx, wy in snapshot
+            if -cpx < wx + ox < cw and -cpy < wy + oy < ch
+        ]
+        self.screen.blits(blit_seq)
 
     def _render_full_map(self) -> pygame.Surface:
         """Génère une surface complète de la map en rendant tous les chunks."""

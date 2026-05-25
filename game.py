@@ -1318,9 +1318,7 @@ class Game(DefaultManager):
             [
                 "René le Sage",
                 "Vieille Taupière",
-                "Garde de la Surface",
                 "Marchande Isabelle",
-                "Colporteur Barnabé",
                 "Forgeron Otto",
             ],
         )
