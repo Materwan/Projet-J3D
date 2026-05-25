@@ -760,7 +760,7 @@ class Game(DefaultManager):
         """Fait spawn des particules de mort si ennemi est mort"""
         if ennemi.dying and not ennemi.particles_spawned:
             ennemi.particles_spawned = True
-            for _ in range(50):
+            for _ in range(15):
                 spawn_local_particle(
                     self.particles,
                     ennemi.position.tolist(),
@@ -770,7 +770,7 @@ class Game(DefaultManager):
                 )
 
     def update_particles(self):
-        if len(self.particles) < 50:  # Limite pour les performances
+        if len(self.particles) < 15:  # Limite pour les performances
             # On récupère les coordonnées du monde actuellement à l'écran
             # On prend une marge de 100 pixels pour que les particules
             # n'apparaissent pas "magiquement" sur le bord

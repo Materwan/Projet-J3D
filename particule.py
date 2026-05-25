@@ -40,6 +40,11 @@ class Particle(pygame.sprite.Sprite):
         self.chaos = chaos
         self.shrink_speed = shrink_speed
         self.size = size
+
+        # Cache : évite scale+rotate si rien n'a changé
+        self._cached_size = -1
+        self._cached_angle = -1
+        self._cached_scaled = None
         self.create_surf()
 
     def create_surf(self):
@@ -48,11 +53,24 @@ class Particle(pygame.sprite.Sprite):
         if self.size <= 2:
             self.kill()
             return
-        scaled = pygame.transform.scale(
-            self.base_image, (int(self.size), int(self.size))
-        )
-        self.image = pygame.transform.rotate(scaled, self.angle)
-        self.rect = self.image.get_rect(center=self.pos)
+
+        int_size = int(self.size)
+        int_angle = int(self.angle) % 360
+
+        # Ne recalcule que si taille ou angle a changé
+        if int_size != self._cached_size:
+            self._cached_scaled = pygame.transform.scale(
+                self.base_image, (int_size, int_size)
+            )
+            self._cached_size = int_size
+            self._cached_angle = -1  # force re-rotate
+
+        if int_angle != self._cached_angle:
+            self.image = pygame.transform.rotate(self._cached_scaled, int_angle)
+            self._cached_angle = int_angle
+            self.rect = self.image.get_rect(center=self.pos)
+        else:
+            self.rect.center = self.pos
 
     def update(self, dt):
         """Met à jour l'image, sa rotation, sa taille et sa position."""
