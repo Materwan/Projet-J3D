@@ -56,27 +56,29 @@ class PlayerControllerBase:
         self.pv = PV
 
         # -- Invincibilité --
-        self.last_hit = 0.0
-        self.hit_interval = 1.0
+        self.last_hit: int = 0  # ms (pygame ticks)
+        self.hit_interval_ms: int = 1000
 
         # -- Mort --
         self.is_dead = False
 
         # -- Attaque --
         self.attaque = False
-        self.attaque_rect = None
-        self.timer: float | None = 0.0
+        self.attaque_rect: pygame.Rect | None = None
+        self._attaque_rect = pygame.Rect(0, 0, 0, 0)  # pré-alloué, réutilisé
+        self.timer_ms: int = -1
         self.attack_duration = 0.2
+        self.attack_duration_ms: int = int(self.attack_duration * 1000)  # 200 ms
 
     def set_screen(self, screen: pygame.Surface):
         self.screen = screen
 
     def update_pv(self, modif: int):
         """Met à jour les PV et tue le joueur si besoin."""
-        if self.last_hit + self.hit_interval < time.time():
-
+        now = pygame.time.get_ticks()  # int ms, SDL cache — pas de syscall
+        if now - self.last_hit >= self.hit_interval_ms:
             self.pv = max(0, self.pv + modif)
-            self.last_hit = time.time()
+            self.last_hit = now
 
             if self.pv <= 0 and not self.is_dead:
                 self.is_dead = True
@@ -88,10 +90,10 @@ class PlayerControllerBase:
         self.position.update(position)
         self.hitbox.center = self.position
         self.hitbox_damage.midbottom = self.position
-        # On remet l'attaque en ordre pour éviter un état fantôme
         self.attaque = False
         self.attaque_rect = None
         self.velocity.update(0, 0)
+        self.timer_ms = -1
 
     def event(self, keys: Tuple[bool]):
         """Détermine le vecteur de mouvement à partir des entrées clavier."""
@@ -134,22 +136,26 @@ class PlayerControllerBase:
 
     def update_animation(self):
         """Logique d'animation partagée par les deux méthodes."""
-
         if self.is_dead:
             return
 
         state = "run" if self.moving_intent else "idle"
+        now = pygame.time.get_ticks()  # un seul appel par frame
 
         if self.attaque and self.animation.current_state != "attack":
             state = "attack"
             if self.moteur:
-                self.attaque_rect = self.moteur.create_rect_attaque(
-                    self.position, self.direction
+                self.moteur.update_rect_attaque(
+                    self._attaque_rect, self.position, self.direction
                 )
-            self.timer = time.time()
+                self.attaque_rect = self._attaque_rect  # assignment O(1), pas d'alloc
+            self.timer_ms = now
             self.attaque = False
 
-        if self.attaque_rect and self.timer + self.attack_duration < time.time():
+        if (
+            self.attaque_rect is not None
+            and (now - self.timer_ms) >= self.attack_duration_ms
+        ):
             self.attaque_rect = None
 
         self.animation.update(state, self.direction)

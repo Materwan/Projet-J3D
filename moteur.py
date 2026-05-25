@@ -79,3 +79,13 @@ class Moteur:
     ):
         if ennemi.hitbox_damage and attaque_rect.colliderect(ennemi.hitbox_damage):
             ennemi.update_pv(-1)
+
+    def update_rect_attaque(
+        self,
+        rect: pygame.Rect,
+        position: pygame.Vector2,
+        direction: str,
+    ) -> None:
+        """Met à jour un Rect pré-alloué : zéro allocation."""
+        dec_x, dec_y, w, h = self.attaque_config[direction]
+        rect.update(int(position.x) + dec_x, int(position.y) + dec_y, w, h)
