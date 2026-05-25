@@ -1527,8 +1527,13 @@ class PNJManager:
                 self.upgrade_ui.update(dt)
 
         # Animation de tous les PNJ
+        ANIM_RADIUS_SQ = 500**2
+        px, py = player_pos
         for pnj in self.pnjs:
-            pnj.update()
+            dx = pnj.pos[0] - px
+            dy = pnj.pos[1] - py
+            if dx * dx + dy * dy <= ANIM_RADIUS_SQ:
+                pnj.update()
 
         # Détecte le PNJ le plus proche
         if self.mode is None:
