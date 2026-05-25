@@ -43,12 +43,7 @@ def get_neighbors(grid: Map, pos: Tuple[int, int]) -> List[Tuple[int, int]]:
     return [
         (nx, ny)
         for nx, ny in moves
-        if 0 <= nx < cols
-        and 0 <= ny < rows
-        and grid.chunks[
-            (nx // grid.chunk_size_tile[0], ny // grid.chunk_size_tile[1])
-        ].collision[nx % grid.chunk_size_tile[0]][ny % grid.chunk_size_tile[1]]
-        == 0
+        if 0 <= nx < cols and 0 <= ny < rows and grid.is_tile_passable(nx, ny)
     ]
 
 
@@ -226,6 +221,8 @@ class Ennemi:
                 self.path.pop(0)
             else:
                 self.velocity = diff / dist
+        else:
+            self.velocity = np.array((0, 0), dtype=np.float32)
 
         # Vérifie les collision
         if (self.velocity**2).sum() > 0:

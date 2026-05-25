@@ -249,17 +249,15 @@ class Game(DefaultManager):
                 self.network = HostNetwork(self.port)
                 self.network.start(initial_state)
 
-            # -- Ennemis (pour test) --
-            ennemi = Ennemi(
-                self.screen,
-                (3500, 3500),
-                1,
-                32,
-                self.map["principal_map"],
-                self.camera,
-                self.moteur,
+            # -- Ennemis --
+            self._spawn_enemies(
+                self.map["principal_map"], nb=20, speed=1.0, chase_range=15
             )
-            self.map["principal_map"].ennemis[0] = ennemi
+            nb_dungeons = self.map["principal_map"].nb_dungeons
+            for i in range(nb_dungeons):
+                self._spawn_enemies(
+                    self.map[f"dungeon{i}"], nb=8, speed=1.2, chase_range=10
+                )
 
             self.pnj_manager = self.map.get_pnjs()
 
@@ -1199,6 +1197,17 @@ class Game(DefaultManager):
             self.pnj_manager.permanent_xp = self.permanent_xp
             self.pnj_manager.permanent_max_pv_bonus = self.permanent_max_pv_bonus
 
+        # Dans reset(), après les blocs solo/host (avant # -- Keybinds --)
+        if self.playing_mode in ("solo", "host"):
+            self._spawn_enemies(
+                self.map["principal_map"], nb=20, speed=1.0, chase_range=15
+            )
+            nb_dungeons = self.map["principal_map"].nb_dungeons
+            for i in range(nb_dungeons):
+                self._spawn_enemies(
+                    self.map[f"dungeon{i}"], nb=8, speed=1.2, chase_range=10
+                )
+
         # -- Keybinds --
         self.player_controller.keybinds = self.keybinds
 
@@ -1288,6 +1297,27 @@ class Game(DefaultManager):
         self.permanent_max_pv_bonus = data.get("permanent_max_pv_bonus", 0)
         self._guest_permanent_xp = data.get("guest_permanent_xp", 0)
         self._guest_permanent_max_pv_bonus = data.get("guest_permanent_max_pv_bonus", 0)
+
+    def _spawn_enemies(
+        self,
+        map_obj,
+        nb: int,
+        speed: float = 1.0,
+        chase_range: int = 32,
+    ) -> None:
+        """Spawn nb ennemis sur des tuiles praticables. O(W·H) pour le sampling."""
+        positions = map_obj.get_random_walkable_positions(nb)
+        next_id = (max(map_obj.ennemis) + 1) if map_obj.ennemis else 0
+        for i, pos in enumerate(positions):
+            map_obj.ennemis[next_id + i] = Ennemi(
+                self.screen,
+                list(pos),
+                speed,
+                chase_range,
+                map_obj,
+                self.camera,
+                self.moteur,
+            )
 
 
 """

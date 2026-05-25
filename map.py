@@ -48,7 +48,7 @@ def get_dungeon_tiles(
     """
     if not os.path.exists(tmx_filepath):
         print(f"Erreur : Le fichier spécifié n'existe pas : {tmx_filepath}")
-        return []
+        return [], []
 
     empty_tile_positions = []
     occupied_tiles = []
@@ -61,7 +61,8 @@ def get_dungeon_tiles(
         for x, case in enumerate(row):
             if case == 0:
                 empty_tile_positions.append((x, y))
-            occupied_tiles.append((x, y))
+            else:  # ← seulement les tuiles NON vides
+                occupied_tiles.append((x, y))
 
     return empty_tile_positions, occupied_tiles
 
@@ -708,6 +709,92 @@ class BaseMap(ABC):
             camera (Camera): La camera du jeu.
         """
 
+    @abstractmethod
+    def is_tile_passable(self, tile_x: int, tile_y: int) -> bool:
+        """True si la tuile est traversable pour le pathfinding."""
+
+    @abstractmethod
+    def get_random_walkable_positions(self, n: int) -> List[Tuple[int, int]]:
+        """Retourne n positions pixel aléatoires sur des tuiles praticables."""
+
+    # --- Logique d'update ennemis partagée (DRY) ---
+
+    def _update_ennemis_solo_impl(self) -> List:
+        paths, del_key = [], []
+        player = self.game.player_controller
+        on_same_map = self is player.current_map
+
+        for key, ennemi in self.ennemis.items():
+            if on_same_map:
+                paths.append(ennemi.update(player))
+                if ennemi.attaque_rect:
+                    self.game.moteur.apply_attack(ennemi.attaque_rect, player)
+            self.game.spawn_death_particles(ennemi)
+            if time.time() > ennemi.death_time:
+                del_key.append(key)
+
+        for key in del_key:
+            self.game.run_stats.enemies_killed += 1
+            del self.ennemis[key]
+
+        if on_same_map and player.attaque_rect:
+            for ennemi in self.ennemis.values():
+                self.game.moteur.apply_attack(player.attaque_rect, ennemi)
+        return paths
+
+    def _update_ennemis_host_impl(self) -> List:
+        paths, del_key = [], []
+        hc = self.game.player_controller
+        on_same_map_host = self is hc.current_map
+        on_same_map_guest = self is hc.guest.current_map
+
+        for key, ennemi in self.ennemis.items():
+            active_players = []
+            if on_same_map_host and not hc.is_dead:
+                active_players.append(hc)
+            if on_same_map_guest and not hc.guest.is_dead:
+                active_players.append(hc.guest)
+
+            if active_players:
+                paths.append(ennemi.update(*active_players))
+                if ennemi.attaque_rect:
+                    for target in active_players:
+                        self.game.moteur.apply_attack(ennemi.attaque_rect, target)
+            self.game.spawn_death_particles(ennemi)
+            if time.time() > ennemi.death_time:
+                del_key.append(key)
+
+        for key in del_key:
+            self.game.run_stats.enemies_killed += 1
+            del self.ennemis[key]
+
+        for attacker, on_map in ((hc, on_same_map_host), (hc.guest, on_same_map_guest)):
+            if on_map and attacker.attaque_rect:
+                for ennemi in self.ennemis.values():
+                    self.game.moteur.apply_attack(attacker.attaque_rect, ennemi)
+        return paths
+
+    def _update_ennemis_guest_impl(self) -> List:
+        del_key = []
+        for key, ennemi in self.ennemis.items():
+            self.game.spawn_death_particles(ennemi)
+            if time.time() > ennemi.death_time:
+                del_key.append(key)
+        for key in del_key:
+            self.game.run_stats.enemies_killed += 1
+            del self.ennemis[key]
+            self.game.ennemis.pop(key, None)
+        return []
+
+    def _make_update_ennemis(self) -> Callable:
+        """Factory selon le playing_mode. Remplace _get_update_ennemis dans les sous-classes."""
+        dispatch = {
+            "solo": self._update_ennemis_solo_impl,
+            "host": self._update_ennemis_host_impl,
+            "guest": self._update_ennemis_guest_impl,
+        }
+        return dispatch.get(self.game.playing_mode, lambda: [])
+
 
 class Map(BaseMap):
     """
@@ -1229,104 +1316,42 @@ class Map(BaseMap):
     def get_ennemis(self) -> Dict[int, "Ennemi"]:
         return self.ennemis
 
-    def _update_ennemis_solo(self):
-        del_key = []
-        paths = []
+    def _get_update_ennemis(self) -> Callable:
+        return self._make_update_ennemis()
 
-        for key, ennemi in self.ennemis.items():
-            paths.append(ennemi.update(self.game.player_controller))
+    def is_tile_passable(self, tile_x: int, tile_y: int) -> bool:
+        xc, yc = tile_x // self.chunk_size_tile[0], tile_y // self.chunk_size_tile[1]
+        rx, ry = tile_x % self.chunk_size_tile[0], tile_y % self.chunk_size_tile[1]
+        if not (0 <= xc < self.nb_chunks[0] and 0 <= yc < self.nb_chunks[1]):
+            return False
+        chunk = self.chunks[(xc, yc)]
+        return bool(chunk.ground[rx][ry] and not chunk.collision[rx][ry])
 
-            if ennemi.attaque_rect is not None:
-                self.game.moteur.apply_attack(
-                    ennemi.attaque_rect, self.game.player_controller
-                )
+    def get_random_walkable_positions(
+        self, n: int, margin: int = 5
+    ) -> List[Tuple[int, int]]:
+        """O(W·H) vectorisé — construit le masque walkable depuis les chunks."""
+        ground = self.map > 0.5
+        coll = np.zeros(self.size, dtype=bool)
+        for (cx, cy), chunk in self.chunks.items():
+            ox = cx * self.chunk_size_tile[0]
+            oy = cy * self.chunk_size_tile[1]
+            w, h = self.chunk_size_tile
+            coll[ox : ox + w, oy : oy + h] = chunk.collision.astype(bool)
 
-            self.game.spawn_death_particles(ennemi)
+        walkable = ground & ~coll
+        walkable[:margin, :] = walkable[-margin:, :] = False
+        walkable[:, :margin] = walkable[:, -margin:] = False
 
-            if time.time() > ennemi.death_time:
-                del_key.append(key)
-
-        for key in del_key:
-            self.game.run_stats.enemies_killed += 1
-            del self.ennemis[key]
-
-        if self.game.player_controller.attaque_rect is not None:
-            for ennemi in self.ennemis.values():
-                self.game.moteur.apply_attack(
-                    self.game.player_controller.attaque_rect, ennemi
-                )
-
-        return paths
-
-    def _update_ennemis_host(self):
-        del_key = []
-        paths = []
-
-        for key, ennemi in self.ennemis.items():
-            paths.append(
-                ennemi.update(
-                    self.game.player_controller,
-                    self.game.player_controller.guest,
-                )
-            )
-
-            if ennemi.attaque_rect is not None:
-                self.game.moteur.apply_attack(
-                    ennemi.attaque_rect, self.game.player_controller
-                )
-                self.game.moteur.apply_attack(
-                    ennemi.attaque_rect, self.game.player_controller.guest
-                )
-
-            self.game.spawn_death_particles(ennemi)
-
-            if time.time() > ennemi.death_time:
-                del_key.append(key)
-
-        for key in del_key:
-            self.game.run_stats.enemies_killed += 1
-            del self.ennemis[key]
-
-        if self.game.player_controller.attaque_rect is not None:
-            for ennemi in self.ennemis.values():
-                self.game.moteur.apply_attack(
-                    self.game.player_controller.attaque_rect, ennemi
-                )
-
-        if self.game.player_controller.guest.attaque_rect is not None:
-            for ennemi in self.ennemis.values():
-                self.game.moteur.apply_attack(
-                    self.game.player_controller.guest.attaque_rect, ennemi
-                )
-
-        return paths
-
-    def _update_ennemis_guest(self):
-        """Côté guest : les ennemis sont pilotés par les données réseau."""
-        del_key = []
-
-        for key, ennemi in self.ennemis.items():
-
-            self.game.spawn_death_particles(self.ennemis[key])
-
-            if time.time() > ennemi.death_time:
-                del_key.append(key)
-
-        for key in del_key:
-            self.game.run_stats.enemies_killed += 1
-            del self.ennemis[key]
-            if key in self.game.ennemis.keys():
-                self.game.ennemis.pop(key)
-
-        return []
-
-    def _get_update_ennemis(self) -> Callable[[], List[Tuple[int, int]]]:
-        if self.game.playing_mode == "solo":
-            return self._update_ennemis_solo
-        elif self.game.playing_mode == "host":
-            return self._update_ennemis_host
-        elif self.game.playing_mode == "guest":
-            return self._update_ennemis_guest
+        pts = np.argwhere(walkable)  # O(W·H)
+        if not len(pts):
+            return []
+        chosen = pts[np.random.choice(len(pts), min(n, len(pts)), replace=False)]
+        ts = self.tile_size
+        return [
+            (int(p[0]) * ts[0] + ts[0] // 2, int(p[1]) * ts[1] + ts[1] // 2)
+            for p in chosen
+        ]
 
     def update(self, absolute_position: Tuple[int, int]) -> None:
 
@@ -1616,6 +1641,16 @@ class Hub(BaseMap):
 
         self.screen.blit(self.image, (screen_x, screen_y))
 
+    def is_tile_passable(self, tile_x: int, tile_y: int) -> bool:
+        if not (
+            0 <= tile_x < self.size_in_tile[0] and 0 <= tile_y < self.size_in_tile[1]
+        ):
+            return False
+        return not bool(self.collision_tiles[tile_x][tile_y])
+
+    def get_random_walkable_positions(self, n: int) -> List[Tuple[int, int]]:
+        return []  # Pas d'ennemis dans le Hub
+
 
 class Dungeon(BaseMap):
 
@@ -1684,9 +1719,39 @@ class Dungeon(BaseMap):
 
         return self.ennemis
 
-    def _get_update_ennemis(self) -> Callable[[], List[Tuple[int, int]]]:
+    def _get_update_ennemis(self) -> Callable:
+        return self._make_update_ennemis()
 
-        return lambda: []
+    def is_tile_passable(self, tile_x: int, tile_y: int) -> bool:
+        w, h = self.collision_tiles.shape
+        if not (0 <= tile_x < w and 0 <= tile_y < h):
+            return False
+        return bool(
+            self.floor_tiles[tile_x, tile_y]
+            and not self.collision_tiles[tile_x, tile_y]
+        )
+
+    def get_random_walkable_positions(self, n: int) -> List[Tuple[int, int]]:
+        walkable = (self.floor_tiles == 1) & (
+            self.collision_tiles == 0
+        )  # occupied_tiles retiré
+
+        if self.rooms:
+            cell = self.dungeon_size[0] // self.tile_size[0]
+            boss = self.rooms[-1]
+            ox, oy = int(boss.position[0]) * cell, int(boss.position[1]) * cell
+            w, h = boss.size
+            walkable[ox : ox + w, oy : oy + h] = False
+
+        pts = np.argwhere(walkable)
+        if not len(pts):
+            return []
+        chosen = pts[np.random.choice(len(pts), min(n, len(pts)), replace=False)]
+        ts = self.tile_size
+        return [
+            (int(p[0]) * ts[0] + ts[0] // 2, int(p[1]) * ts[1] + ts[1] // 2)
+            for p in chosen
+        ]
 
     def update(self, absolute_position: Tuple[int, int]):
 
@@ -1895,22 +1960,13 @@ class Dungeon(BaseMap):
         self.size = self.get_size()
 
     def _build_tile_grids(self):
-        """
-        Construit deux matrices numpy globales (en tuiles) couvrant l'ensemble
-        du donjon, en agrégeant les tuiles locales de chaque salle placée.
 
-        Après normalisation, toutes les positions de salle sont >= (0, 0).
-        La taille globale est donnée par self.size (propriété).
-
-        Attributs créés :
-            collision_tiles (np.ndarray[uint8]) : 1 là où le joueur est bloqué.
-            occupied_tiles  (np.ndarray[uint8]) : 1 là où une tuile est déjà occupée.
-        """
         cell = self.dungeon_size[0] // self.tile_size[0]  # 9 tuiles par cellule
         total_w, total_h = self.get_size()  # en tuiles (via property)
 
         self.collision_tiles = np.zeros((total_w, total_h), dtype=np.uint8)
         self.occupied_tiles = np.zeros((total_w, total_h), dtype=np.uint8)
+        self.floor_tiles = np.zeros((total_w, total_h), dtype=np.uint8)
 
         for room in self.rooms:
             # Origine de la salle dans le repère global en tuiles
@@ -1918,6 +1974,7 @@ class Dungeon(BaseMap):
             origin_y = int(room.position[1]) * cell
             w, h = room.size
 
+            self.floor_tiles[origin_x : origin_x + w, origin_y : origin_y + h] = 1
             self.collision_tiles[
                 origin_x : origin_x + w, origin_y : origin_y + h
             ] |= room.collision_tiles
@@ -2237,6 +2294,12 @@ class MapManager(BaseMap):
 
     def get_nearby_action_tiles(self, hitbox):
         return self.map.get_nearby_action_tiles(hitbox)
+
+    def is_tile_passable(self, tile_x: int, tile_y: int) -> bool:
+        return self.map.is_tile_passable(tile_x, tile_y) if self.map else False
+
+    def get_random_walkable_positions(self, n: int) -> List[Tuple[int, int]]:
+        return self.map.get_random_walkable_positions(n) if self.map else []
 
     def change_map(self, map: str | BaseMap):
         """
