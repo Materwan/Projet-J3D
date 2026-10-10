@@ -26,6 +26,17 @@ SAVE_FILE = resource_path(r"save")
 SAVE_MULTI = os.path.join(SAVE_FILE, "multiplayer")
 SAVE_SOLO = os.path.join(SAVE_FILE, "solo")
 
+
+def verify_folders(dir: str):
+
+    if not os.path.isdir(dir):
+        os.makedirs(dir)
+
+
+verify_folders(SAVE_FILE)
+verify_folders(SAVE_SOLO)
+verify_folders(SAVE_MULTI)
+
 UDP_IP = "0.0.0.0"
 UDP_PORT = 9999
 

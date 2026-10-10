@@ -1,8 +1,6 @@
-runAnimation/
-runAnimation.zip
-Ressources/
 __pycache__
-.venv/
-.vscode/
+.venv
+.vscode
 ~*
 save/
+.dist

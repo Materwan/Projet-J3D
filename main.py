@@ -28,7 +28,7 @@ from sound import SOUND
 pygame.display.set_caption("MoleTale")
 
 FPS = 60
-TAILLE_ECRAN = (500, 500)  # (500, 500) pour petit ecran (0, 0) pour plein ecran
+TAILLE_ECRAN = (0, 0)  # (500, 500) pour petit ecran (0, 0) pour plein ecran
 
 
 screen = pygame.display.set_mode(TAILLE_ECRAN, pygame.RESIZABLE)

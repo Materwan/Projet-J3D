@@ -1,0 +1,232 @@
+{
+    "ground": {
+        "file": "TX Tileset Grass.png",
+        "left": 0,
+        "top": 0,
+        "width": 32,
+        "height": 32,
+        "occupied_tiles": [],
+        "collision_tiles": []
+    },
+    "grass": {
+        "file": "TX Tileset Grass.png",
+        "left": 0,
+        "top": 32,
+        "width": 32,
+        "height": 32,
+        "occupied_tiles": [
+            [
+                0,
+                0
+            ]
+        ],
+        "collision_tiles": []
+    },
+    "rock": {
+        "file": "TX Props.png",
+        "left": 160,
+        "top": 480,
+        "width": 32,
+        "height": 32,
+        "occupied_tiles": [
+            [
+                0,
+                0
+            ]
+        ],
+        "collision_tiles": [
+            [
+                0,
+                0
+            ]
+        ]
+    },
+    "bush": {
+        "file": "TX Plant.png",
+        "left": 32,
+        "top": 192,
+        "width": 32,
+        "height": 32,
+        "occupied_tiles": [
+            [
+                0,
+                0
+            ]
+        ],
+        "collision_tiles": []
+    },
+    "tree": {
+        "file": "TX Plant.png",
+        "left": 0,
+        "top": 0,
+        "width": 160,
+        "height": 160,
+        "occupied_tiles": [
+            [
+                1,
+                1
+            ],
+            [
+                1,
+                2
+            ],
+            [
+                1,
+                3
+            ],
+            [
+                2,
+                1
+            ],
+            [
+                2,
+                2
+            ],
+            [
+                2,
+                3
+            ],
+            [
+                3,
+                1
+            ],
+            [
+                3,
+                2
+            ],
+            [
+                3,
+                3
+            ],
+            [
+                2,
+                0
+            ],
+            [
+                2,
+                4
+            ]
+        ],
+        "collision_tiles": [
+            [
+                2,
+                4
+            ]
+        ]
+    },
+    "pave": {
+        "file": "TX Tileset Grass.png",
+        "left": [
+            0,
+            32,
+            0,
+            32,
+            0,
+            32,
+            0,
+            32
+        ],
+        "top": [
+            128,
+            128,
+            160,
+            160,
+            192,
+            192,
+            224,
+            224
+        ],
+        "width": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+        ],
+        "height": [
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32,
+            32
+        ],
+        "occupied_tiles": [
+            [
+                0,
+                0
+            ]
+        ],
+        "collision_tiles": []
+    },
+    "place": {
+        "file": "TX Tileset Stone Ground.png",
+        "left": 0,
+        "top": 0,
+        "width": 256,
+        "height": 256,
+        "occupied_tiles": -1,
+        "collision_tiles": []
+    },
+    "dungeon_entrance": {
+        "file": "TX Struct.png",
+        "left": 416,
+        "top": 0,
+        "width": 64,
+        "height": 96,
+        "occupied_tiles": [
+            [
+                0,
+                0
+            ],
+            [
+                0,
+                1
+            ],
+            [
+                0,
+                2
+            ],
+            [
+                1,
+                0
+            ],
+            [
+                1,
+                1
+            ],
+            [
+                1,
+                2
+            ]
+        ],
+        "collision_tiles": [],
+        "action_tiles": [
+            {
+                "x": 0,
+                "y": 1,
+                "action": "change_map"
+            },
+            {
+                "x": 0,
+                "y": 2,
+                "action": "change_map"
+            },
+            {
+                "x": 1,
+                "y": 1,
+                "action": "change_map"
+            },
+            {
+                "x": 1,
+                "y": 2,
+                "action": "change_map"
+            }
+        ]
+    }
+}

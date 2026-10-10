@@ -1,0 +1,442 @@
+{
+    "edible": {
+        "Champignon": {
+            "description": "Un petit champignon des bois comestible.",
+            "item_type": "Consommable",
+            "file_name": "Mushroom.png",
+            "max_stack": 50,
+            "price": 12,
+            "effect": 2
+        },
+        "Pomme": {
+            "description": "Une pomme rouge bien sucrée.",
+            "item_type": "Consommable",
+            "file_name": "Apple.png",
+            "max_stack": 20,
+            "price": 15,
+            "effect": 3
+        },
+        "Pomme verte": {
+            "description": "Légèrement acide mais très rafraîchissante.",
+            "item_type": "Consommable",
+            "file_name": "Green Apple.png",
+            "max_stack": 20,
+            "price": 15,
+            "effect": 3
+        },
+        "Fromage": {
+            "description": "Un morceau de fromage qui a du caractère.",
+            "item_type": "Consommable",
+            "file_name": "Cheese.png",
+            "max_stack": 20,
+            "price": 18,
+            "effect": 4
+        },
+        "Vin blanc": {
+            "description": "Un vin blanc sec et fruité.",
+            "item_type": "Consommable",
+            "file_name": "Wine.png",
+            "max_stack": 5,
+            "price": 22,
+            "effect": 4
+        },
+        "Pain": {
+            "description": "Un pain artisanal tout juste sorti du four.",
+            "item_type": "Consommable",
+            "file_name": "Bread.png",
+            "max_stack": 15,
+            "price": 18,
+            "effect": 5
+        },
+        "Vin rouge": {
+            "description": "Une bouteille de grand cru.",
+            "item_type": "Consommable",
+            "file_name": "Wine 2.png",
+            "max_stack": 5,
+            "price": 25,
+            "effect": 5
+        },
+        "Viande": {
+            "description": "Un morceau de viande crue de qualité.",
+            "item_type": "Consommable",
+            "file_name": "Meat.png",
+            "max_stack": 10,
+            "price": 22,
+            "effect": 7
+        },
+        "Jambon": {
+            "description": "Un jambon entier bien cuit.",
+            "item_type": "Consommable",
+            "file_name": "Ham.png",
+            "max_stack": 5,
+            "price": 28,
+            "effect": 8
+        },
+        "Petite Potion Rouge": {
+            "description": "Une petite fiole qui referme les plaies légères.",
+            "item_type": "Consommable",
+            "file_name": "Red Potion 2.png",
+            "max_stack": 10,
+            "price": 35,
+            "effect": 10
+        },
+        "Potion Rouge": {
+            "description": "La potion de soin classique des aventuriers.",
+            "item_type": "Consommable",
+            "file_name": "Red Potion.png",
+            "max_stack": 10,
+            "price": 50,
+            "effect": 15
+        },
+        "Grande Potion Rouge": {
+            "description": "Un flacon de soin majeur, très efficace.",
+            "item_type": "Consommable",
+            "file_name": "Red Potion 3.png",
+            "max_stack": 5,
+            "price": 60,
+            "effect": 20
+        },
+        "Viande de monstre": {
+            "description": "De la viande à l'odeur suspecte.",
+            "item_type": "Consommable",
+            "file_name": "Monster Meat.png",
+            "max_stack": 20,
+            "price": 12,
+            "effect": -10
+        }
+    },
+    "junk": {
+        "Os": {
+            "description": "Un vieil os blanchi par le soleil.",
+            "item_type": "Bric-à-brac",
+            "file_name": "Bone.png",
+            "max_stack": 50,
+            "price": 5,
+            "effect": null
+        },
+        "Livre": {
+            "description": "Un vieux livre aux pages jaunies.",
+            "item_type": "Bric-à-brac",
+            "file_name": "Book.png",
+            "max_stack": 5,
+            "price": 20,
+            "effect": null
+        },
+        "Bougie": {
+            "description": "Une simple bougie pour s'éclairer dans le noir.",
+            "item_type": "Bric-à-brac",
+            "file_name": "Candle.png",
+            "max_stack": 20,
+            "price": 8,
+            "effect": null
+        },
+        "Charbon": {
+            "description": "Un morceau de charbon noir, utile pour le feu.",
+            "item_type": "Bric-à-brac",
+            "file_name": "Coal.png",
+            "max_stack": 99,
+            "price": 6,
+            "effect": null
+        },
+        "Pièce de cuivre": {
+            "description": "La monnaie de base du royaume.",
+            "item_type": "Bric-à-brac",
+            "file_name": "Copper Coin.png",
+            "max_stack": 999,
+            "price": 1,
+            "effect": null
+        },
+        "Œuf": {
+            "description": "Un œuf mystérieux, peut-être comestible ?",
+            "item_type": "Bric-à-brac",
+            "file_name": "Egg.png",
+            "max_stack": 20,
+            "price": 8,
+            "effect": null
+        },
+        "Enveloppe": {
+            "description": "Une lettre scellée. Qui en est le destinataire ?",
+            "item_type": "Bric-à-brac",
+            "file_name": "Envelop.png",
+            "max_stack": 1,
+            "price": 15,
+            "effect": null
+        },
+        "Tissu": {
+            "description": "Un rouleau de tissu blanc, utile pour la couture.",
+            "item_type": "Bric-à-brac",
+            "file_name": "Fabric.png",
+            "max_stack": 99,
+            "price": 8,
+            "effect": null
+        },
+        "Plume": {
+            "description": "Une plume légère et résistante.",
+            "item_type": "Bric-à-brac",
+            "file_name": "Feather.png",
+            "max_stack": 50,
+            "price": 7,
+            "effect": null
+        },
+        "Engrenage": {
+            "description": "Une pièce mécanique complexe.",
+            "item_type": "Bric-à-brac",
+            "file_name": "Gear.png",
+            "max_stack": 50,
+            "price": 15,
+            "effect": null
+        },
+        "Pièce d'or": {
+            "description": "Une pièce brillante de grande valeur.",
+            "item_type": "Bric-à-brac",
+            "file_name": "Golden Coin.png",
+            "max_stack": 999,
+            "price": 10,
+            "effect": null
+        },
+        "Marteau": {
+            "description": "Un lourd marteau de forge.",
+            "item_type": "Bric-à-brac",
+            "file_name": "Hammer.png",
+            "max_stack": 1,
+            "price": 25,
+            "effect": null
+        },
+        "Lanterne": {
+            "description": "Une lanterne en métal qui éclaire bien dans le noir.",
+            "item_type": "Bric-à-brac",
+            "file_name": "Lantern.png",
+            "max_stack": 5,
+            "price": 20,
+            "effect": null
+        },
+        "Cuir": {
+            "description": "Une peau tannée souple et résistante.",
+            "item_type": "Bric-à-brac",
+            "file_name": "Leather.png",
+            "max_stack": 99,
+            "price": 10,
+            "effect": null
+        },
+        "Papier": {
+            "description": "Un parchemin vierge prêt à être écrit.",
+            "item_type": "Bric-à-brac",
+            "file_name": "Paper.png",
+            "max_stack": 99,
+            "price": 5,
+            "effect": null
+        },
+        "Pioche": {
+            "description": "L'outil indispensable de tout mineur.",
+            "item_type": "Bric-à-brac",
+            "file_name": "Pickaxe.png",
+            "max_stack": 1,
+            "price": 22,
+            "effect": null
+        },
+        "Corde": {
+            "description": "Une corde solide faite de fibres tressées.",
+            "item_type": "Bric-à-brac",
+            "file_name": "Rope.png",
+            "max_stack": 99,
+            "price": 8,
+            "effect": null
+        },
+        "Pelle": {
+            "description": "Utile pour creuser des trous ou déterrer des trésors.",
+            "item_type": "Bric-à-brac",
+            "file_name": "Shovel.png",
+            "max_stack": 1,
+            "price": 18,
+            "effect": null
+        },
+        "Pièce d'argent": {
+            "description": "Une pièce d'argent du royaume.",
+            "item_type": "Bric-à-brac",
+            "file_name": "Silver Coin.png",
+            "max_stack": 999,
+            "price": 5,
+            "effect": null
+        },
+        "Gel de Slime": {
+            "description": "Une substance gluante et verdâtre.",
+            "item_type": "Bric-à-brac",
+            "file_name": "Slime Gel.png",
+            "max_stack": 99,
+            "price": 10,
+            "effect": null
+        },
+        "Ficelle": {
+            "description": "Une bobine de fil résistant.",
+            "item_type": "Bric-à-brac",
+            "file_name": "String.png",
+            "max_stack": 99,
+            "price": 4,
+            "effect": null
+        },
+        "Bûche": {
+            "description": "Un morceau de bois brut fraîchement coupé.",
+            "item_type": "Bric-à-brac",
+            "file_name": "Wood Log.png",
+            "max_stack": 99,
+            "price": 5,
+            "effect": null
+        },
+        "Planche en bois": {
+            "description": "Du bois taillé prêt pour la construction.",
+            "item_type": "Bric-à-brac",
+            "file_name": "Wooden Plank.png",
+            "max_stack": 99,
+            "price": 7,
+            "effect": null
+        },
+        "Laine": {
+            "description": "Une boule de laine douce et chaude.",
+            "item_type": "Bric-à-brac",
+            "file_name": "Wool.png",
+            "max_stack": 99,
+            "price": 8,
+            "effect": null
+        }
+    },
+    "curiosities": {
+        "Livre Mystérieux": {
+            "description": "Un grimoire millénaire contenant des sorts oubliés.",
+            "item_type": "Curiosités",
+            "file_name": "Book 3.png",
+            "max_stack": 1,
+            "price": 130,
+            "effect": null
+        },
+        "Cristal": {
+            "description": "Un cristal translucide qui reflète la lumière.",
+            "item_type": "Curiosités",
+            "file_name": "Crystal.png",
+            "max_stack": 99,
+            "price": 120,
+            "effect": null
+        },
+        "Émeraude": {
+            "description": "Une émeraude brute extraite de la roche.",
+            "item_type": "Curiosités",
+            "file_name": "Emerald.png",
+            "max_stack": 99,
+            "price": 100,
+            "effect": null
+        },
+        "Carte Ancienne": {
+            "description": "Une carte aux contours usés qui mènerait à un trésor oublié.",
+            "item_type": "Curiosités",
+            "file_name": "Map.png",
+            "max_stack": 1,
+            "price": 150,
+            "effect": null
+        },
+        "Obsidienne": {
+            "description": "Une roche volcanique noire et tranchante.",
+            "item_type": "Curiosités",
+            "file_name": "Obsidian.png",
+            "max_stack": 99,
+            "price": 80,
+            "effect": null
+        },
+        "Perle": {
+            "description": "Une perle nacrée provenant des profondeurs.",
+            "item_type": "Curiosités",
+            "file_name": "Pearl.png",
+            "max_stack": 99,
+            "price": 150,
+            "effect": null
+        },
+        "Rubis": {
+            "description": "Un rubis brut à l'éclat rouge sombre.",
+            "item_type": "Curiosités",
+            "file_name": "Ruby.png",
+            "max_stack": 99,
+            "price": 100,
+            "effect": null
+        },
+        "Saphir": {
+            "description": "Un saphir brut d'un bleu profond.",
+            "item_type": "Curiosités",
+            "file_name": "Sapphire.png",
+            "max_stack": 99,
+            "price": 95,
+            "effect": null
+        },
+        "Parchemin": {
+            "description": "Un parchemin couvert de runes mystérieuses.",
+            "item_type": "Curiosités",
+            "file_name": "Scroll.png",
+            "max_stack": 5,
+            "price": 120,
+            "effect": null
+        },
+        "Crâne": {
+            "description": "Un crâne qui pourrait servir de trophée.",
+            "item_type": "Curiosités",
+            "file_name": "Skull.png",
+            "max_stack": 10,
+            "price": 80,
+            "effect": null
+        },
+        "Chapeau de Sorcier": {
+            "description": "Un chapeau pointu imprégné d'une légère aura magique.",
+            "item_type": "Curiosités",
+            "file_name": "Wizard Hat.png",
+            "max_stack": 1,
+            "price": 180,
+            "effect": null
+        },
+        "Bâton Magique": {
+            "description": "Un vieux bâton en bois qui semble canaliser une énergie mystérieuse.",
+            "item_type": "Curiosités",
+            "file_name": "Wooden Staff.png",
+            "max_stack": 1,
+            "price": 160,
+            "effect": null
+        }
+    },
+    "legends": {
+        "Diamant": {
+            "description": "La plus dure et la plus précieuse des gemmes.",
+            "item_type": "Légendes",
+            "file_name": "Diamond.png",
+            "max_stack": 99,
+            "price": 500,
+            "effect": null
+        },
+        "Œuf de Monstre": {
+            "description": "Un œuf orné de motifs étranges, il semble vibrer.",
+            "item_type": "Légendes",
+            "file_name": "Monster Egg.png",
+            "max_stack": 10,
+            "price": 280,
+            "effect": null
+        },
+        "Œil de Monstre": {
+            "description": "Une pupille verticale qui semble encore vous fixer.",
+            "item_type": "Légendes",
+            "file_name": "Monster Eye.png",
+            "max_stack": 30,
+            "price": 320,
+            "effect": null
+        },
+        "Bâton de Rubis": {
+            "description": "Canalise le pouvoir destructeur du feu. Un artefact rare.",
+            "item_type": "Légendes",
+            "file_name": "Ruby Staff.png",
+            "max_stack": 1,
+            "price": 550,
+            "effect": null
+        },
+        "Pierre Runique": {
+            "description": "Une pierre gravée de runes ancestrales qui émane une énergie mystérieuse.",
+            "item_type": "Légendes",
+            "file_name": "Rune Stone.png",
+            "max_stack": 5,
+            "price": 400,
+            "effect": null
+        }
+    }
+}

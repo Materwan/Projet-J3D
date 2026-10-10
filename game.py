@@ -739,7 +739,6 @@ class Game(DefaultManager):
             self.camera.set_position(player_controller.current_map.start_position)
 
     def _boss_fight_start(self):
-        print("start boss fight")
         self.manager.states["CARD"].start(
             playing_mode=self.playing_mode,
             on_victory=self._on_card_victory,
